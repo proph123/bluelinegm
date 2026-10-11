@@ -1390,6 +1390,30 @@ body.mobile .lines-card .ln-bench .lc .lc-face, body.mobile .lines-card .ln-benc
 body.mobile .lines-card .ln-bench .lc .lc-nm { width: 100%; min-width: 0 } body.mobile .lines-card .ln-bench .lc .lc-nm b { font-size: 11.5px !important; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap } body.mobile .lines-card .ln-bench .lc .lc-nm small { font-size: 9.5px !important; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 body.mobile .lines-card .ln-bench .lc .ovr { position: absolute !important; top: 3px; right: 4px; font-size: 14px !important } body.mobile .lines-card .ln-bench .lc .lc-pos { position: absolute !important; top: 4px; left: 5px; font-size: 9.5px }
 body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
+/* Home on a phone (mHome): the next-game card, your games, swipe cards, your club, the news */
+.mhome { display: flex; flex-direction: column; gap: 10px }
+.mh-next { background: linear-gradient(160deg, color-mix(in srgb, var(--hc) 30%, var(--panel)), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 12px }
+.mh-when { text-align: center; font: 800 11px var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px }
+.mh-vs { display: flex; align-items: center; justify-content: space-around }
+.mh-tm { all: unset; display: flex; flex-direction: column; align-items: center; gap: 2px; cursor: pointer; min-width: 90px } .mh-tm .lg.big, .mh-tm img { width: 56px !important; height: 56px !important } .mh-tm b { font: 800 16px var(--f-display); letter-spacing: .04em } .mh-tm small { color: var(--muted); font-size: 12px }
+.mh-at { font: 900 28px var(--f-display); color: var(--muted) }
+.mh-gs { display: flex; justify-content: space-between; align-items: center; margin: 10px 2px; font-size: 13px } .mh-gs > span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em } .mh-g b { color: var(--gold, #f2c14e); font-family: var(--f-display) }
+.mh-cta { display: grid; grid-template-columns: 2fr 1fr; gap: 8px } .mh-cta .gd-play { background: linear-gradient(180deg, #2f7dff, #1450c4) !important; color: #fff !important; border: 0 !important } .mh-cta .gd-sim { background: #0d1117 !important; border: 1px solid rgba(255,255,255,.22) !important; color: #fff !important } .mh-cta .btn { padding: 11px 0 !important; font-size: 14px !important; justify-content: center }
+.mh-sw { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain } .mh-sw::-webkit-scrollbar { display: none }
+.mh-sl { flex: 0 0 100%; scroll-snap-align: start; min-width: 0 } .mh-sl > .gd-card { height: 100% !important; margin: 0 !important }
+.mh-dots { display: flex; justify-content: center; gap: 6px; margin-top: -4px } .mh-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line) } .mh-dots i.on { background: var(--blue) }
+.mh-sec { font: 800 12px var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 10px 2px -2px }
+.mh-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px }
+.mh-st { all: unset; box-sizing: border-box; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 4px; text-align: center; display: flex; flex-direction: column; gap: 2px } button.mh-st { cursor: pointer } .mh-st b { font: 800 17px var(--f-display) } .mh-st span { font-size: 11px; color: var(--muted) }
+.mh-card { margin: 0 !important; height: auto !important }
+.mh-ld { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 62px 28px 1fr auto; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid var(--line); cursor: pointer; font-size: 13px } .mh-ld > span:first-child { color: var(--muted); font-size: 11.5px } .mh-lf { width: 26px; height: 26px; border-radius: 50%; overflow: hidden; line-height: 0 } .mh-lf svg, .mh-lf .phwrap { width: 26px; height: 26px } .mh-ld em { font: 800 16px var(--f-display); font-style: normal }
+.mh-dv { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 16px 22px 1fr auto 28px; align-items: center; gap: 6px; padding: 5px 0; border-top: 1px solid var(--line); cursor: pointer; font-size: 13px } .mh-dv > span { color: var(--muted) } .mh-dv small { color: var(--muted) } .mh-dv em { font: 800 15px var(--f-display); font-style: normal; text-align: right } .mh-dv.me b, .mh-dv.me em { color: #7fb4ff }
+.mh-nf { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px } .mh-nf button { all: unset; flex: none; padding: 5px 11px; border-radius: 14px; background: var(--panel2); font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer } .mh-nf button.on { background: var(--blue); color: #fff }
+.mh-nw { display: flex; gap: 10px; align-items: flex-start; padding: 9px 2px; border-bottom: 1px solid var(--line) } .mh-nw[role=button] { cursor: pointer } .mh-nw .gd-nl { flex: none; width: 26px; height: 26px } .mh-nw p { margin: 0; font-size: 13.5px; line-height: 1.35 } .mh-nw small { color: var(--muted); font-size: 11px } .mh-nw em { font-style: normal; font-weight: 800 } .mh-nw.mine p { color: #dfe9ff }
+.mh-more { align-self: center }
+.mh-simlist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px } .mh-simlist .btn { justify-content: center; padding: 12px 0 }
+body.mobile .mhome .gd-strip { margin: 0 }
+body.mobile .mhome .gd-sday.hm { background: rgba(47,125,225,.26) !important } body.mobile .mhome .gd-sday.aw { background: rgba(240,140,42,.24) !important }
 /* the strength tabs and Auto-set on one row */
 body.mobile .lines-card > .cardhead { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 6px !important }
 body.mobile .lines-card > .cardhead .tabs.inline { flex: 1 1 auto; min-width: 0 }
@@ -11677,12 +11701,19 @@ function mBar() {
     const pg = document.createElement('div'); pg.className = 'lev-pg';
     pg.innerHTML = '<button type="button">Forwards</button><button type="button">Defense &amp; goalies</button>';
     ev.before(pg);
+    // (the scratches on the defense page too - tap one, then a pair's or the net's slot; they were only under the forwards,
+    // a swipe away from the D slots, the user found)
+    const bn = ev.children[0].querySelector('.ln-bench'), s2 = ev.children[1];
+    if (bn && !s2.querySelector('.ln-bench')) { const h = document.createElement('h3'); h.className = 'eyebrow'; h.textContent = 'Scratches and injured'; const at = s2.querySelector('.tac.gshare, .strat-mode'); s2.insertBefore(h, at); s2.insertBefore(bn.cloneNode(true), at); }
     const bs = pg.querySelectorAll('button'), mark = i => bs.forEach((x, j) => x.classList.toggle('on', i === j));
     bs.forEach((x, i) => x.addEventListener('click', () => ev.scrollTo({ left: i * ev.clientWidth, behavior: 'smooth' })));
     ev.addEventListener('scroll', () => { const i = Math.round(ev.scrollLeft / Math.max(1, ev.clientWidth)); if (i !== sub.levPg) { sub.levPg = i; mark(i); } }, { passive: true });
     if (sub.levPg) ev.scrollLeft = sub.levPg * ev.clientWidth;
     mark(sub.levPg || 0);
   }
+  // the phone Home's swipe cards: the dot under them follows the card in view
+  const sw = document.querySelector('#main .mh-sw');
+  if (sw) { const ds = document.querySelectorAll('#main .mh-dots i'); sw.addEventListener('scroll', () => { const sl = sw.children[0], i = Math.round(sw.scrollLeft / Math.max(1, sl ? sl.offsetWidth + 8 : sw.clientWidth)); ds.forEach((d, j) => d.classList.toggle('on', i === j)); }, { passive: true }); }
 }
 // photos that have loaded before show at once when the page is redrawn (each waits for its load event to show, and a redraw -
 // moving the starts bar, Auto-set - made every photo on the page blink to the drawn face and back)
@@ -13289,6 +13320,7 @@ function vHome() {
   // injuries move right; on an off day the card is small and both fit under it)
   // in season with a game ahead: the Broadcast layout - your games strip, the matchup banner with the projected starters,
   // then the matchup's numbers, form, scorers and injuries, and on the right the news and the stats box
+  if (MOBILE && (reg || L.phase === 'playoffs')) { const m = mHome(t); if (m) return m; }
   if (reg || L.phase === 'playoffs') {
     const Hh = gdHero(t);
     if (Hh) {
@@ -13302,6 +13334,63 @@ function vHome() {
   const left = [calStrip(), seasonBar(t), simRow(), nextGame(t), gameDay ? '' : injuriesBox(t), gameDay ? '' : leadersBox(t), L.phase === 'playoffs' || L.playoffs ? bracket() : ''].join('');
   const right = [newsBox(), gameDay ? injuriesBox(t) : '', standingBox(t)].join('');
   return `<div class="office" style="--hc:${t.c1}">${head}${ticker}<div class="ofgrid"><div class="ofcol">${left}</div><div class="ofcol">${right}</div></div></div>`;
+}
+// ---------- HOME on a phone (2026-10, the user's pick "A" of the mobile mock-ups) ----------
+// the next game as a compact card (both clubs, tonight's goalies, Watch / Sim), your games around now, the matchup cards
+// side by side to swipe through, then your club (record, place, streak, cap, roster, injuries, leaders, the division)
+// and the news and transactions with filters
+function mHome(t) {
+  const po = L.phase === 'playoffs', P = L.players;
+  let g = L.userGameToday(), k = L.day; const today = !!g;
+  if (!g && L.phase === 'regular') { k = nextUserDay(); g = k < L.schedule.length ? userGameOn(k) : null; }
+  if (!g) return null;
+  const home = g.h === t.tid, opp = L.teams[home ? g.a : g.h], hT = L.teams[g.h], aT = L.teams[g.a];
+  const when = po ? (g.series ? seriesText(g.series) : 'Playoffs') : (today ? 'Today, ' : '') + gameDate(k).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  let gs = []; try { gs = L.gameStarters(g, po) || []; } catch (e) { }
+  const gk = tm => P[gs[tm.tid === g.h ? 0 : 1] || (tm.lines && tm.lines.G[0])];
+  const side = tm => `<button class="mh-tm" data-act="teamview" data-tid="${tm.tid}">${lgImg(tm, 'big')}<b>${esc(tm.abbr)}</b><small>${recStr(tm)}</small></button>`;
+  const gl = (tm, r) => { const p = gk(tm); return p ? `<button class="link mh-g${r ? ' r' : ''}" data-act="player" data-pid="${p.id}">${r ? `<b>${R(p.ovr)}</b> ` : ''}${esc(p.last)}${r ? '' : ` <b>${R(p.ovr)}</b>`}</button>` : '<span></span>'; };
+  const btns = today ? `<button class="btn gd-play" data-act="godotExport">▶ Watch game</button><button class="btn gd-sim" data-act="mSim">Sim ▾</button>`
+    : `<button class="btn gd-play" data-act="simdays" data-n="${Math.max(1, k - L.day)}">Sim to next game</button><button class="btn gd-sim" data-act="mSim">Sim ▾</button>`;
+  const card = `<div class="mh-next"><div class="mh-when">${today ? 'Next game · ' : 'Next game · '}${esc(when)}</div>
+    <div class="mh-vs">${side(aT)}<b class="mh-at">@</b>${side(hT)}</div>
+    <div class="mh-gs">${gl(aT, false)}<span>Starters</span>${gl(hT, true)}</div>
+    <div class="mh-cta">${btns}</div></div>`;
+  // the matchup cards (the PC Home's), one screen wide each, swiped sideways
+  const sw = [gdTape(aT, hT), gdForm(aT, hT, t), gdWatch(aT, hT), gdInj(aT, hT)];
+  const swipe = `<div class="mh-sw">${sw.map(h => `<div class="mh-sl">${h}</div>`).join('')}</div><div class="mh-dots">${sw.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>`;
+  // your club
+  const r = t.rec, dpl = L.standings(x => x.div === t.div).indexOf(t) + 1, pay = L.payroll(t), sp = CAP - pay + L.ltirRelief(t);
+  const nInj = L.rosterOf(t).filter(p => p.inj > 0).length, stk = streakOf(t);
+  const box = (v, lab, cls, act) => `<${act ? 'button' : 'div'} class="mh-st"${act || ''}><b class="${cls || ''}">${v}</b><span>${lab}</span></${act ? 'button' : 'div'}>`;
+  const stats = `<div class="mh-stats">${box(recStr(t), 'Record')}${box(ordn(dpl), esc(t.div), '', ' data-act="nav" data-v="standings"')}${box(stk, 'Streak', stk[0] === 'W' ? 'pos' : stk === '—' ? '' : 'neg')}
+    ${box(money(sp), 'Cap space', sp >= 0 ? 'pos' : 'neg', ' data-act="nav" data-v="contracts"')}${box(L.rosterOf(t).length + '/' + ROSTER_MAX, 'Roster', '', ' data-act="nav" data-v="roster"')}${box(nInj, 'Injured', nInj ? 'neg' : '')}</div>`;
+  const st = p => (po ? p.pstats : p.stats) || {};
+  const sk = L.rosterOf(t).filter(p => p.pos !== 'G' && st(p).gp), gkk = L.rosterOf(t).filter(p => p.pos === 'G' && st(p).gp && st(p).sa);
+  const top = (ps, f) => ps.slice().sort((a, b) => f(st(b)) - f(st(a)))[0];
+  const ldr = (lab, p, v) => p ? `<button class="mh-ld" data-act="player" data-pid="${p.id}"><span>${lab}</span><span class="mh-lf">${faceSVG(p, t, 26)}</span><b>${esc(p.first[0] + '. ' + p.last)}</b><em>${v}</em></button>` : '';
+  const pP = top(sk, s => s.g + s.a), pG = top(sk, s => s.g), pS = top(gkk, s => 1 - s.ga / s.sa);
+  const leaders = sk.length ? `<section class="gd-card mh-card"><h3 class="gd-cap">Team leaders<button class="gd-more" data-act="nav" data-v="stats">Stats ›</button></h3>${ldr('Points', pP, pP && st(pP).g + st(pP).a)}${ldr('Goals', pG, pG && st(pG).g)}${ldr('Save %', pS, pS && (1 - st(pS).ga / st(pS).sa).toFixed(3).replace(/^0/, ''))}</section>` : '';
+  const div = `<section class="gd-card mh-card"><h3 class="gd-cap">${esc(t.div || 'Division')}<button class="gd-more" data-act="nav" data-v="standings">Standings ›</button></h3>${L.standings(x => x.div === t.div).map((x, i) => `<button class="mh-dv${x.tid === L.userTid ? ' me' : ''}" data-act="teamview" data-tid="${x.tid}"><span>${i + 1}</span>${lgImg(x, 'sm')}<b>${esc(x.city)}</b><small>${recStr(x)}</small><em>${L.pts(x)}</em></button>`).join('')}</section>`;
+  // news and transactions, with filters
+  const nf = sub.mhn || 'all', F = { all: ['All', () => true], mine: ['My team', n => n.tid === L.userTid], trade: ['Trades', n => n.cat === 'trade'], txn: ['Signings', n => n.cat === 'txn'], injury: ['Injuries', n => n.cat === 'injury' || /injur/i.test(n.text)] };
+  const ns = L.news.filter(F[nf] ? F[nf][1] : F.all[1]).slice(0, sub.mhnN || 12);
+  const item = n => { const tm = n.tid >= 0 ? L.teams[n.tid] : null, tg = GD_TAG[n.cat];
+    const act = newsReport(n) ? ` data-act="repOpen" data-s="${n.s}" data-d="${n.d}"` : n.cat === 'trade' ? ` data-act="tradeNews" data-i="${L.news.indexOf(n)}"` : n.pid ? ` data-act="player" data-pid="${n.pid}"` : '';
+    return `<div class="mh-nw${n.tid === L.userTid ? ' mine' : ''}"${act ? ' role="button" tabindex="0"' + act : ''}>${tm ? lgImg(tm, 'gd-nl') : '<span class="lgx gd-nl" style="--c1:var(--muted)">NHL</span>'}<div><p>${esc(n.text)}</p><small>${tg ? `<em style="color:${tg[1]}">${tg[0]}</em> · ` : ''}${newsDate(n)}</small></div></div>`; };
+  const news = `<div class="mh-nf">${Object.entries(F).map(([key, [lab]]) => `<button class="${nf === key ? 'on' : ''}" data-act="mhNews" data-k="${key}">${lab}</button>`).join('')}</div>
+    ${ns.length ? ns.map(item).join('') : '<p class="muted small">Nothing here yet.</p>'}${L.news.filter(F[nf][1]).length > ns.length ? '<button class="btn ghost mh-more" data-act="mhMore">Show more</button>' : ''}`;
+  return `<div class="mhome" style="--hc:${t.c1}">${card}${gdStrip()}${swipe}
+    <h3 class="mh-sec">${esc(t.city + ' ' + t.name)}</h3>${stats}${leaders}${div}
+    <h3 class="mh-sec">News and transactions</h3>${news}${po || L.playoffs ? bracket() : ''}</div>`;
+}
+// the phone Home's Sim button: the longer sims in a sheet
+function mSimSheet() {
+  const b = (lab, a, n, extra) => `<button class="btn${extra ? ' ' + extra : ''}" data-act="mSimGo" data-a="${a}"${n != null ? ` data-n="${n}"` : ''}>${lab}</button>`;
+  const rows = [L.userGameToday() ? b('Sim this game', 'simgame', null, 'primary') : ''];
+  if (L.phase === 'regular') { rows.push(b('Sim 7 days', 'simdays', 7)); if (L.day < L.tradeDeadline - 1) rows.push(b('Sim to the trade deadline', 'simdays', L.tradeDeadline - 1 - L.day)); rows.push(b('Sim to the end of the season', 'simdays', 999), b('Sim through the playoffs', 'simplayoffs')); }
+  else if (L.phase === 'playoffs' && L.playoffs && L.playoffs.champ == null) { if (L.userGameToday()) rows.push(b('Sim the rest of the series', 'simseries')); rows.push(b('Sim the rest of the playoffs', 'simdays', 999)); }
+  modal(`<h2>Sim</h2><div class="mh-simlist">${rows.join('')}</div>`, 'mh-sheet');
 }
 function calStrip() {
   if (L.phase !== 'regular' || !L.schedule.length) return '';
@@ -13512,7 +13601,7 @@ function gdStrip() {
     if (g.res) { const my = g.res.s[home ? 0 : 1], th = g.res.s[home ? 1 : 0], w = my > th; cls = w ? ' w' : g.res.ot || g.res.so ? ' o' : ' l'; r = (w ? 'W' : g.res.so ? 'SOL' : g.res.ot ? 'OTL' : 'L') + ' ' + my + '-' + th; }
     const d = now && k === L.day ? 'Today' : dt.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', month: 'short' });
     const tag = g.res ? 'button' : 'div';
-    return `<${tag} class="gd-sday${cls}${now ? ' now' : ''}"${g.res ? ` data-act="boxDay" data-day="${k}" title="Box score"` : ''}>${lgImg(opp)}<span class="d">${esc(d)}${g.res ? ' · ' + (home ? 'vs ' : '@') + esc(opp.abbr) : ''}</span><span class="r">${r}</span></${tag}>`; }).join('')}</div>`;
+    return `<${tag} class="gd-sday${cls}${now ? ' now' : ''} ${home ? 'hm' : 'aw'}"${g.res ? ` data-act="boxDay" data-day="${k}" title="Box score"` : ''}>${lgImg(opp)}<span class="d">${esc(d)}${g.res ? ' · ' + (home ? 'vs ' : '@') + esc(opp.abbr) : ''}</span><span class="r">${r}</span></${tag}>`; }).join('')}</div>`;
 }
 // the matchup banner: home club left, away right, each with its logo big, its projected starting goalie (the one the
 // coach will start - decided once per game) under it, and its record; Play / Sim on a game day, Sim to it before
@@ -17086,6 +17175,10 @@ const ACT = {
   lotAuto: () => lotAuto(),
   nav: d => { view = d.v; closeModal(); document.body.classList.remove('navopen'); render(); window.scrollTo(0, 0); },
   mMenu: () => document.body.classList.toggle('navopen'),   // (the phone version's side menu)
+  mSim: () => mSimSheet(),
+  mSimGo: (d, el) => { closeModal(); if (ACT[d.a]) ACT[d.a](d, el); },
+  mhNews: d => { sub.mhn = d.k; sub.mhnN = 12; render(); },
+  mhMore: () => { sub.mhnN = (sub.mhnN || 12) + 20; render(); },
   newleague: d => { pendingStart = { kind: 'gen', tid: +d.tid }; render(); window.scrollTo(0, 0); },
   continue: () => {
     if (L.ddDue()) { startDeadlineDay(); return; }
