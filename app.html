@@ -1401,7 +1401,7 @@ body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
 .mh-gs { display: flex; justify-content: space-between; align-items: center; margin: 10px 2px; font-size: 13px } .mh-gs > span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em } .mh-g b { color: var(--gold, #f2c14e); font-family: var(--f-display) }
 .mh-cta { display: grid; grid-template-columns: 2fr 1fr; gap: 8px } .mh-cta .gd-play { background: linear-gradient(180deg, #2f7dff, #1450c4) !important; color: #fff !important; border: 0 !important } .mh-cta .gd-sim { background: #0d1117 !important; border: 1px solid rgba(255,255,255,.22) !important; color: #fff !important } .mh-cta .btn { padding: 11px 0 !important; font-size: 14px !important; justify-content: center }
 .mh-sw { display: flex; gap: 8px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain } .mh-sw::-webkit-scrollbar { display: none }
-.mh-sl { flex: 0 0 100%; scroll-snap-align: start; min-width: 0 } .mh-sl > .gd-card { height: 100% !important; margin: 0 !important }
+.mh-sw { align-items: flex-start; transition: height .2s } .mh-sl { flex: 0 0 100%; scroll-snap-align: start; min-width: 0 } .mh-sl > .gd-card { height: auto !important; margin: 0 !important }
 .mh-dots { display: flex; justify-content: center; gap: 6px; margin-top: -4px } .mh-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--line) } .mh-dots i.on { background: var(--blue) }
 .mh-sec { font: 800 12px var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 10px 2px -2px }
 .mh-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px }
@@ -1412,6 +1412,7 @@ body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
 .mh-nf { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px } .mh-nf button { all: unset; flex: none; padding: 5px 11px; border-radius: 14px; background: var(--panel2); font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer } .mh-nf button.on { background: var(--blue); color: #fff }
 .mh-nw { display: flex; gap: 10px; align-items: flex-start; padding: 9px 2px; border-bottom: 1px solid var(--line) } .mh-nw[role=button] { cursor: pointer } .mh-nw .gd-nl { flex: none; width: 26px; height: 26px } .mh-nw p { margin: 0; font-size: 13.5px; line-height: 1.35 } .mh-nw small { color: var(--muted); font-size: 11px } .mh-nw em { font-style: normal; font-weight: 800 } .mh-nw.mine p { color: #dfe9ff }
 .mh-more { align-self: center }
+.mh-sech { display: flex; justify-content: space-between; align-items: center } .mh-sech .gd-more { font-size: 11px }
 .mh-sb { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px } .mh-sb::-webkit-scrollbar { display: none }
 .mh-sbi { all: unset; box-sizing: border-box; flex: none; width: 92px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 7px; display: flex; flex-direction: column; gap: 2px } button.mh-sbi { cursor: pointer } .mh-sbi.me { border-color: var(--blue) }
 .mh-sbi small { font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
@@ -11766,7 +11767,10 @@ function mBar() {
   }
   // the phone Home's swipe cards: the dot under them follows the card in view
   const sw = document.querySelector('#main .mh-sw');
-  if (sw) { const ds = document.querySelectorAll('#main .mh-dots i'); sw.addEventListener('scroll', () => { const sl = sw.children[0], i = Math.round(sw.scrollLeft / Math.max(1, sl ? sl.offsetWidth + 8 : sw.clientWidth)); ds.forEach((d, j) => d.classList.toggle('on', i === j)); }, { passive: true }); }
+  // (and the strip takes the height of that card - the tallest one's height left a gap under a short one)
+  if (sw) { const ds = document.querySelectorAll('#main .mh-dots i'), fit = i => { const c = sw.children[i] && sw.children[i].firstElementChild; if (c) sw.style.height = c.offsetHeight + 'px'; };
+    sw.addEventListener('scroll', () => { const sl = sw.children[0], i = Math.round(sw.scrollLeft / Math.max(1, sl ? sl.offsetWidth + 8 : sw.clientWidth)); ds.forEach((d, j) => d.classList.toggle('on', i === j)); fit(i); }, { passive: true });
+    fit(0); }
 }
 // photos that have loaded before show at once when the page is redrawn (each waits for its load event to show, and a redraw -
 // moving the starts bar, Auto-set - made every photo on the page blink to the drawn face and back)
@@ -13426,7 +13430,8 @@ function mHome(t) {
     const col = (lab, ps, f, fmt) => `<div class="mh-race"><h4>${lab}</h4>${ps.slice().sort((a, b) => f(st2(b)) - f(st2(a))).slice(0, 3).map((p, i) => `<button class="mh-rc${p.tid === L.userTid ? ' me' : ''}" data-act="player" data-pid="${p.id}"><span>${i + 1}</span>${lgImg(L.teams[p.tid], 'sm')}<b>${esc(p.last)}</b><em>${fmt(f(st2(p)))}</em></button>`).join('') || '<p class="muted small">No games yet.</p>'}</div>`;
     return `<section class="gd-card"><h3 class="gd-cap">League leaders${po ? ' · playoffs' : ''}<button class="gd-more" data-act="nav" data-v="stats">Stats ›</button></h3>${col('Points', sk, s => s.g + s.a, v => v)}${col('Goals', sk, s => s.g, v => v)}${col('Save %', gs2.filter(p => st2(p).gp >= minG && st2(p).sa), s => 1 - s.ga / s.sa, v => v.toFixed(3).replace(/^0/, ''))}</section>`; })();
   // the matchup cards (the PC Home's), one screen wide each, swiped sideways
-  const sw = [gdTape(aT, hT), lgRace, gdForm(aT, hT, t), gdWatch(aT, hT), gdInj(aT, hT)];
+  // (no tale of the tape: the two clubs' leaders lead, then the league's - the user's call)
+  const sw = [gdWatch(aT, hT), lgRace, gdForm(aT, hT, t), gdInj(aT, hT)];
   const swipe = `<div class="mh-sw">${sw.map(h => `<div class="mh-sl">${h}</div>`).join('')}</div><div class="mh-dots">${sw.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>`;
   // your club
   const r = t.rec, dpl = L.standings(x => x.div === t.div).indexOf(t) + 1, pay = L.payroll(t), sp = CAP - pay + L.ltirRelief(t);
@@ -13451,7 +13456,7 @@ function mHome(t) {
     ${ns.length ? ns.map(item).join('') : '<p class="muted small">Nothing here yet.</p>'}${L.news.filter(F[nf][1]).length > ns.length ? '<button class="btn ghost mh-more" data-act="mhMore">Show more</button>' : ''}`;
   // (three tabs, each about a screen - one long page took too much scrolling, the user found)
   const tab = sub.mht || 'game', tb = (k, lab) => `<button class="${tab === k ? 'on' : ''}" data-act="mhTab" data-k="${k}">${lab}</button>`;
-  const body = tab === 'team' ? `${stats}${leaders}${div}` : tab === 'news' ? news : `${board}${card}${story}${gdStrip()}${swipe}${po || L.playoffs ? bracket() : ''}`;
+  const body = tab === 'team' ? `${stats}${leaders}${div}` : tab === 'news' ? news : `${board}${card}${story}${gdStrip()}${swipe}<h3 class="mh-sec mh-sech">News and transactions<button class="gd-more" data-act="mhTab" data-k="news">All ›</button></h3>${L.news.slice(0, 6).map(item).join('') || '<p class="muted small">No news yet.</p>'}${po || L.playoffs ? bracket() : ''}`;
   return `<div class="mhome" style="--hc:${t.c1}"><div class="mh-tabs">${tb('game', 'Game')}${tb('team', esc(t.name))}${tb('news', 'News')}</div>${body}</div>`;
 }
 // the phone Home's Sim button: the longer sims in a sheet
