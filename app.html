@@ -1510,6 +1510,18 @@ body.mobile .card:has(.tg-pages) > .partner .small, body.mobile .card:has(.tg-pa
 /* a team column in a phone table: the logo alone (logo + abbreviation ran into the next column - "EDMC") */
 body.mobile .tbl td:not(:first-child):not(.l) > .tbadge.plain { font-size: 0 !important; gap: 0 !important; padding: 0 !important }
 body.mobile .tbl td:not(:first-child):not(.l) > .tbadge.plain img { width: 20px !important; height: 20px !important; margin: 0 !important }
+body.mobile .msec { margin: 0 0 10px; position: sticky; top: 52px; z-index: 5; background: var(--bg, #0b1220); padding: 6px 0 }
+body.mobile .scm-wrap { grid-template-columns: minmax(0, 1fr) !important; display: grid !important } body.mobile .scm-wrap svg { max-width: 100%; height: auto }
+/* the International page's tables scroll sideways inside the page */
+body.mobile #main .card > table.tbl, body.mobile #main section > table.tbl { display: block; overflow-x: auto; max-width: 100% }
+/* a box score's three stars on a phone: face over the name, the name whole ("Tr..." in a row too narrow) */
+body.mobile .stars > div { flex-direction: column !important; align-items: center !important; text-align: center; gap: 4px !important; padding: 8px 4px !important }
+body.mobile .stars > div > div { min-width: 0; width: 100% } body.mobile .stars .link, body.mobile .stars b { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; display: block; line-height: 1.15 }
+/* Settings on a phone: each setting's label over its control (side by side they ran off the screen) */
+body.mobile .st-row { flex-direction: column !important; align-items: stretch !important; gap: 6px !important }
+body.mobile .st-row > input, body.mobile .st-row > select, body.mobile .st-row > textarea { width: 100% !important; max-width: 100% !important; box-sizing: border-box }
+/* the retirement class: the text beside the face wraps instead of running off the card */
+body.mobile .ret-card > div { flex: 1 1 auto; min-width: 0 } body.mobile .ret-card > div * { white-space: normal !important }
 /* standings on a phone (standTable's MOBILE table) */
 body.mobile .tbl.mstand { width: 100%; table-layout: fixed; font-size: 13px }
 body.mobile .tbl.mstand th, body.mobile .tbl.mstand td { padding: 7px 3px !important; text-align: center; white-space: nowrap; min-width: 0 !important; max-width: none !important; position: static !important }
@@ -11296,6 +11308,32 @@ class RinkViewer {
       placed.push([best[0] - tw / 2, best[1] - th / 2, best[0] + tw / 2, best[1] + th / 2]);
       c.strokeText(nm, best[0], best[1]); c.fillText(nm, best[0], best[1]);
     }
+    this.fx2D(c, w, h, sc, toS, vert, dpr, top);
+  }
+  // the 2D view's touches (2026-10, the user's pick): a puck trail on shots, the goal light and a GOAL banner in the
+  // scorer's colours, and the power play as a chip over the ice (the team, its strength, the time left)
+  fx2D(c, w, h, sc, toS, vert, dpr, top) {
+    const g = this.g, p = g.puck, now = performance.now(), F = this.f2 || (this.f2 = { sc: g.score.slice(), trail: [], goal: null });
+    const [px, py] = toS(p.x, p.y);
+    // the trail: the last positions while the puck moves fast (a shot or a hard pass), fading out
+    const last = F.trail[F.trail.length - 1], fast = last && Math.hypot(px - last[0], py - last[1]) > 6 * sc * .2;
+    if (fast || F.trail.length) F.trail.push([px, py, now]);
+    F.trail = F.trail.filter(q => now - q[2] < 260); if (!fast && F.trail.length < 3) F.trail.length = 0;
+    if (F.trail.length > 1) { c.lineCap = 'round'; for (let i = 1; i < F.trail.length; i++) { const a0 = F.trail[i - 1], a1 = F.trail[i], al = 1 - (now - a1[2]) / 260; c.strokeStyle = `rgba(20,30,45,${(al * .45).toFixed(3)})`; c.lineWidth = Math.max(1.5, .8 * sc * al); c.beginPath(); c.moveTo(a0[0], a0[1]); c.lineTo(a1[0], a1[1]); c.stroke(); } }
+    // a goal: the score went up since the last frame
+    for (const s of [0, 1]) if (g.score[s] > F.sc[s]) F.goal = { s, t: now, net: p.x > 0 ? 1 : -1 };
+    F.sc = g.score.slice();
+    if (F.goal && now - F.goal.t < 2600) {
+      const k = (now - F.goal.t) / 2600, tm = F.goal.s === 0 ? this.home : this.away, [nx, ny] = toS(F.goal.net * 92, 0);
+      const blink = (Math.floor((now - F.goal.t) / 180) % 2) ? .35 : 1, R = 9 * sc;
+      const gr = c.createRadialGradient(nx, ny, 0, nx, ny, R); gr.addColorStop(0, `rgba(255,40,40,${(.85 * blink * (1 - k)).toFixed(3)})`); gr.addColorStop(1, 'rgba(255,40,40,0)');
+      c.fillStyle = gr; c.beginPath(); c.arc(nx, ny, R, 0, 7); c.fill();
+      const bh = Math.max(44, 13 * sc), by = (top || 0) + (h - (top || 0)) * (vert ? .5 : .5) - bh / 2, al = k < .15 ? k / .15 : k > .8 ? (1 - k) / .2 : 1;
+      c.globalAlpha = Math.max(0, Math.min(1, al)); c.fillStyle = tm.c1; c.fillRect(0, by, w, bh); c.fillStyle = tm.c2 || '#fff'; c.fillRect(0, by, w, Math.max(2, bh * .06)); c.fillRect(0, by + bh - Math.max(2, bh * .06), w, Math.max(2, bh * .06));
+      c.fillStyle = '#fff'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '900 ' + Math.round(bh * .62) + 'px "Saira Condensed", "Arial Narrow", sans-serif'; c.lineWidth = Math.max(2, bh * .06); c.strokeStyle = 'rgba(0,0,0,.45)';
+      const txt = 'GOAL  ' + (tm.abbr || ''); c.strokeText(txt, w / 2, by + bh / 2); c.fillText(txt, w / 2, by + bh / 2); c.globalAlpha = 1;
+    }
+    // (the power play isn't drawn here: the scoreboard over the ice already shows it - "NYI PP 1:35")
   }
   // ---------- loop ----------
   resize() {
@@ -11877,6 +11915,38 @@ function mBar() {
     card.appendChild(bar);
     if (sub.tgPg) pages.scrollLeft = sub.tgPg * pages.clientWidth;
     mark(sub.tgPg || 0); bar.hidden = sub.tgPg === 2;
+  }
+  // swiping left / right on a page with tabs moves to the next / previous tab (Home's Game · team · News, Stats, Standings);
+  // a swipe that starts on something that scrolls sideways itself (scoreboard, games strip, cards, tables) is left to it
+  if (!mBar.swipe) {
+    mBar.swipe = true; let sx = 0, sy = 0, st = 0, ok = false;
+    document.addEventListener('touchstart', e => { const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); ok = !e.target.closest('.mh-sb, .mh-sw, .gd-strip, .tblwrap, .tabs, .mh-nf, .lines-ev, .tg-pages, input, select, textarea, #modal, #game, .cal'); }, { passive: true });
+    document.addEventListener('touchend', e => {
+      if (!ok || !L || !document.getElementById('modal').hidden) return;
+      const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+      if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .6 || Date.now() - st > 600) return;
+      const sets = { home: ['mht', ['game', 'team', 'news'], 'game'], stats: ['stv', ['lead', 'rank'], 'lead'], standings: ['lgTab', ['standings', 'overview', 'history'], 'standings'] }[view];
+      if (!sets) return;
+      const [k, list, def] = sets, i = Math.max(0, list.indexOf(sub[k] || def)), j = i + (dx < 0 ? 1 : -1);
+      if (j < 0 || j >= list.length) return;
+      sub[k] = list[j]; render(); window.scrollTo(0, 0);
+    }, { passive: true });
+  }
+  // pages made of several panels one under another (Scouting's map, draft class, scouts, mock draft...): on a phone a row
+  // of chips, one a panel, shows one at a time - stacked they ran to a dozen screens (the user's ask: less scrolling)
+  if (['scouting', 'staff', 'minors', 'intl', 'editor', 'settings'].includes(view)) {
+    const cards = [...document.querySelectorAll('#main .card')].filter(c => !c.parentElement.closest('.card') && c.offsetHeight > 90);
+    const title = c => { const h = c.querySelector(':scope > .cardhead h2, :scope > h2, :scope > .cardhead h3, :scope > h3'); return h ? h.textContent.replace(/\s+/g, ' ').trim().replace(/ ·.*$/, '') : ''; };
+    const secs = cards.filter(c => title(c));
+    if (secs.length >= 2) {
+      const key = 'msec_' + view, cur = Math.min(sub[key] || 0, secs.length - 1);
+      const bar = document.createElement('div'); bar.className = 'mh-nf msec';
+      bar.innerHTML = secs.map((c, i) => `<button type="button" class="${i === cur ? 'on' : ''}">${esc(title(c))}</button>`).join('');
+      secs[0].before(bar);
+      const show = i => { secs.forEach((c, j) => { c.style.display = i === j ? '' : 'none'; }); bar.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', i === j)); };
+      bar.querySelectorAll('button').forEach((b, i) => b.addEventListener('click', () => { sub[key] = i; show(i); window.scrollTo(0, 0); }));
+      show(cur);
+    }
   }
   // the phone Home's swipe cards: the dot under them follows the card in view
   const sw = document.querySelector('#main .mh-sw');
@@ -15949,7 +16019,9 @@ const natChip = n => natFlag(n);
 const intlP = id => L.players[id] || null;
 function intlAwardRows(r) {
   const A = [['mvp', 'Most valuable player'], ['bf', 'Best forward'], ['bd', 'Best defenseman'], ['bg', 'Best goaltender']];
-  return A.map(([k, lab]) => { const p = intlP(r.aw[k]); if (!p) return r.nm && r.nm[r.aw[k]] ? `<li><div><small class="muted">${lab}</small><div>${esc(r.nm[r.aw[k]])} ${natChip(intlNatOf(r, r.aw[k]))}</div></div></li>` : ''; const x = r.st && r.st[p.id]; return `<li><span class="srep-face">${faceSVG(p, p.tid >= 0 ? L.teams[p.tid] : null, 40)}</span><div><small class="muted">${lab}</small><div><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natChip(intlNatOf(r, p.id))}${x ? ` <span class="small">${p.pos === 'G' ? x.gp + ' GP · ' + (x.sa ? (1 - x.ga / x.sa).toFixed(3).slice(1) : '—') + ' SV%' : x.gp + ' GP · ' + x.g + ' G · ' + x.a + ' A'}</span>` : ''}</div></div></li>`; }).join('');
+  // (no flag when his nation can't be found - a retired winner of an old tournament showed an empty white box)
+  const fl = id => { const n = intlNatOf(r, id); return n ? natChip(n) : ''; };
+  return A.map(([k, lab]) => { const p = intlP(r.aw[k]); if (!p) return r.nm && r.nm[r.aw[k]] ? `<li><div><small class="muted">${lab}</small><div>${esc(r.nm[r.aw[k]])} ${fl(r.aw[k])}</div></div></li>` : ''; const x = r.st && r.st[p.id]; return `<li><span class="srep-face">${faceSVG(p, p.tid >= 0 ? L.teams[p.tid] : null, 40)}</span><div><small class="muted">${lab}</small><div><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${fl(p.id)}${x ? ` <span class="small">${p.pos === 'G' ? x.gp + ' GP · ' + (x.sa ? (1 - x.ga / x.sa).toFixed(3).slice(1) : '—') + ' SV%' : x.gp + ' GP · ' + x.g + ' G · ' + x.a + ' A'}</span>` : ''}</div></div></li>`; }).join('');
 }
 const intlNatOf = (r, id) => { const t = r.teams.find(t => (t.ids || []).includes(id)); return t ? t.nat : ''; };
 function intlModal(r) {
