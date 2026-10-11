@@ -13409,7 +13409,7 @@ function mHome(t) {
   const nInj = L.rosterOf(t).filter(p => p.inj > 0).length, stk = streakOf(t);
   const box = (v, lab, cls, act) => `<${act ? 'button' : 'div'} class="mh-st"${act || ''}><b class="${cls || ''}">${v}</b><span>${lab}</span></${act ? 'button' : 'div'}>`;
   const stats = `<div class="mh-stats">${box(recStr(t), 'Record')}${box(ordn(dpl), esc(t.div), '', ' data-act="nav" data-v="standings"')}${box(stk, 'Streak', stk[0] === 'W' ? 'pos' : stk === '—' ? '' : 'neg')}
-    ${box(money(sp), 'Cap space', sp >= 0 ? 'pos' : 'neg', ' data-act="nav" data-v="contracts"')}${box(L.rosterOf(t).length + '/' + ROSTER_MAX, 'Roster', '', ' data-act="nav" data-v="roster"')}${box(nInj, 'Injured', nInj ? 'neg' : '')}</div>`;
+    ${box((sp < 0 ? '-' : '') + money(Math.abs(sp)), 'Cap space', sp >= 0 ? 'pos' : 'neg', ' data-act="nav" data-v="contracts"')}${box(L.rosterOf(t).length + '/' + ROSTER_MAX, 'Roster', '', ' data-act="nav" data-v="roster"')}${box(nInj, 'Injured', nInj ? 'neg' : '')}</div>`;
   const st = p => (po ? p.pstats : p.stats) || {};
   const sk = L.rosterOf(t).filter(p => p.pos !== 'G' && st(p).gp), gkk = L.rosterOf(t).filter(p => p.pos === 'G' && st(p).gp && st(p).sa);
   const top = (ps, f) => ps.slice().sort((a, b) => f(st(b)) - f(st(a)))[0];
