@@ -1507,6 +1507,9 @@ body.mobile .tg-bar { position: sticky; bottom: 60px; z-index: 6; display: flex;
 body.mobile .tg-bar[hidden] { display: none }
 body.mobile .tg-bm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px } body.mobile .tg-bm .tmeter { margin: 0 !important } body.mobile .tg-bm small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 body.mobile .card:has(.tg-pages) > .partner .small, body.mobile .card:has(.tg-pages) > p.muted.small { display: none }
+/* a team column in a phone table: the logo alone (logo + abbreviation ran into the next column - "EDMC") */
+body.mobile .tbl td:not(:first-child):not(.l) > .tbadge.plain { font-size: 0 !important; gap: 0 !important; padding: 0 !important }
+body.mobile .tbl td:not(:first-child):not(.l) > .tbadge.plain img { width: 20px !important; height: 20px !important; margin: 0 !important }
 /* standings on a phone (standTable's MOBILE table) */
 body.mobile .tbl.mstand { width: 100%; table-layout: fixed; font-size: 13px }
 body.mobile .tbl.mstand th, body.mobile .tbl.mstand td { padding: 7px 3px !important; text-align: center; white-space: nowrap; min-width: 0 !important; max-width: none !important; position: static !important }
@@ -14488,7 +14491,7 @@ function vSchedule() {
 
 // ---------- STANDINGS ----------
 function vStandings() {
-  const tab = sub.lgTab === 'settings' ? 'standings' : sub.lgTab || 'standings';
+  const tab = sub.lgTab === 'settings' || sub.lgTab === 'players' ? 'standings' : sub.lgTab || 'standings';
   if (tab !== 'standings') return vLeague();
   const mode = sub.smode || 'div';
   let body = '';
@@ -14500,7 +14503,13 @@ function vStandings() {
 }
 
 // ---------- STATS ----------
+// two tabs: the league leaders and the player rankings (moved here from Standings - the user's call, 2026-10)
 function vStats() {
+  const v = sub.stv || 'lead', tb = (k, lab) => `<button class="${v === k ? 'on' : ''}" data-act="stView" data-k="${k}">${lab}</button>`;
+  const head = `<div class="card lg-head"><div class="cardhead"><h2>Stats</h2><div class="tabs inline">${tb('lead', 'League leaders')}${tb('rank', 'Player rankings')}</div></div></div>`;
+  return `<div class="lgwrap">${head}${v === 'rank' ? playerRankings() : statsLeaders()}</div>`;
+}
+function statsLeaders() {
   const kind = sub.stk || 'sk', scope = sub.sts || 'all', po = sub.stp === 'po';
   const key = po ? 'pstats' : 'stats';
   let ps = Object.values(L.players).filter(p => p.tid >= 0 && (kind === 'g' ? p.pos === 'G' : p.pos !== 'G') && p[key].gp > 0);
@@ -15698,7 +15707,7 @@ function playerRankings() {
 // rankings, history, settings)
 function lgHead(tab) {
   const tb = (k, lab) => `<button class="${tab === k ? 'on' : ''}" data-act="lgTab" data-k="${k}">${lab}</button>`;
-  return `<div class="card lg-head"><div class="cardhead"><h2>Standings</h2><div class="tabs inline">${tb('standings', 'Standings')}${tb('overview', 'Power rankings')}${tb('players', 'Player rankings')}${tb('history', 'History')}</div></div></div>`;
+  return `<div class="card lg-head"><div class="cardhead"><h2>Standings</h2><div class="tabs inline">${tb('standings', 'Standings')}${tb('overview', 'Power rankings')}${tb('history', 'History')}</div></div></div>`;   // (Player rankings moved to the Stats page)
 }
 // League → Settings: its own page in the side menu (the rules, staff duties, sim speed, NHL.com sync and saving)
 function vSettings() { return vLeague('settings'); }
@@ -17710,7 +17719,8 @@ const ACT = {
     if (!await askConfirm({ title: 'Sync rosters with NHL.com?', yes: 'Sync rosters', text: L.season + '-' + (L.season + 1 - 2000) + ' rosters, data from ' + String(R.updated || '').slice(0, 10) + '.' + (keep ? ' Your team stays as it is.' : ' This includes your team.') + ' Players will change clubs and this can\'t be undone, so copy a save code first if you want a way back.' })) return;
     const o = L.syncReal(R, keep, $('#sync-stats') && $('#sync-stats').checked); save(); render(); toast(o.moved + ' moved, ' + o.signed + ' signed, ' + o.added + ' added, ' + o.left + ' removed' + (o.rated != null ? ', ' + o.rated + ' ratings adjusted' : '') + '.', 'good');
   },
-  lgTab: d => { sub.lgTab = d.k; render(); },
+  lgTab: d => { if (d.k === 'players') { view = 'stats'; sub.stv = 'rank'; render(); return; } sub.lgTab = d.k; render(); },
+  stView: d => { sub.stv = d.k; render(); },
   devW: d => { sub.devW = d.k; render(); },
   labAuto: () => { if (!L.labOpen()) return toast('The development lab opens after the playoffs.', 'bad'); L.labAutoFill(UT()); save(); render(); toast('Your staff filled the open lab slots.', 'good'); },
   labClear: () => { if (!L.labOpen()) return; L.labOf(UT()).a = {}; save(); render(); },
