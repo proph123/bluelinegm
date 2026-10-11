@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=1180,viewport-fit=cover"><script>window.BLGM_DESKTOP=true;window.BLGM_MOBILE=true;if(!navigator.serviceWorker||!navigator.serviceWorker.controller)location.replace('index.html');</script><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0b1a2e"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="icon-192.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><script>window.BLGM_DESKTOP=true;window.BLGM_MOBILE=true;if(!navigator.serviceWorker||!navigator.serviceWorker.controller)location.replace('index.html');</script><link rel="manifest" href="manifest.webmanifest"><meta name="theme-color" content="#0b1a2e"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="apple-touch-icon" href="icon-192.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Blue Line GM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1265,6 +1265,102 @@ main#main:has(.lines-full-h) { padding-bottom: 18px !important }
 .oh-name h2 { font: italic 900 46px/.95 var(--f-display) !important; text-transform: uppercase; margin-top: 4px; color: #fff }
 .oh-stats { margin-left: auto; display: flex; gap: 26px; z-index: 1 }
 .oh-stats div { display: flex; flex-direction: column } .oh-stats b { font: 800 34px/1 var(--f-display) } .oh-stats span { font-size: 11.5px; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.7) }
+/* ================= the phone version (body.mobile, tools/build_mobile.py): phone-width pages =================
+   A header with a menu button (#mbar) that slides the PC's own side menu (#nav) out from the left over a shade; every
+   page in one column; wide tables scroll sideways with the first column pinned; controls big enough for a thumb. */
+#mbar, #mshade, #mtab { display: none }
+body.mobile #mtab { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; padding: 4px 4px env(safe-area-inset-bottom, 0px); background: rgba(8,12,18,.96); backdrop-filter: blur(12px); border-top: 1px solid rgba(255,255,255,.08) }
+body.mobile #mtab button { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 52px; background: none; border: 0; color: var(--muted); font: 700 11px var(--f-display); letter-spacing: .06em; text-transform: uppercase; border-radius: 10px }
+body.mobile #mtab button svg { width: 23px; height: 23px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round }
+body.mobile #mtab button.on { color: #fff } body.mobile #mtab button.on svg { stroke: var(--accent) }
+body.mobile #mtab button:active { background: rgba(255,255,255,.06) }
+body.mobile.ingame #mtab { display: none }
+body.mobile { font-size: 14px; -webkit-text-size-adjust: 100%; overscroll-behavior-y: none }
+body.mobile #mbar { display: flex; align-items: center; gap: 10px; position: sticky; top: 0; z-index: 40; height: calc(52px + env(safe-area-inset-top, 0px)); padding: env(safe-area-inset-top, 0px) 12px 0 4px; box-sizing: border-box; background: rgba(8,12,18,.94); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,.07) }
+body.mobile .mb-menu { width: 44px; height: 44px; display: grid; place-items: center; background: none; border: 0; color: #fff; border-radius: 10px }
+body.mobile .mb-menu svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2.2; fill: none; stroke-linecap: round }
+body.mobile .mb-menu:active { background: rgba(255,255,255,.08) }
+body.mobile .mb-title { flex: 1; min-width: 0; font: italic 900 20px var(--f-display); text-transform: uppercase; letter-spacing: .02em; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+body.mobile .mb-team .logo, body.mobile .mb-team .lgx { width: 30px !important; height: 30px !important }
+body.mobile #top { display: none !important }
+body.mobile #app { display: block !important; grid-template-columns: none !important }
+/* the side menu: off to the left until the ☰ is tapped */
+body.mobile #nav { position: fixed !important; top: 0; bottom: 0; left: 0; width: min(290px, 84vw); z-index: 60; overflow-y: auto; -webkit-overflow-scrolling: touch; transform: translateX(-105%); transition: transform .22s ease; padding-top: env(safe-area-inset-top, 0px); border-right: 1px solid rgba(255,255,255,.08) !important; background: #0b1119 !important; box-shadow: 8px 0 30px rgba(0,0,0,.5) }
+body.mobile.navopen #nav { transform: none }
+body.mobile #mshade { display: block; position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .22s }
+body.mobile.navopen #mshade { opacity: 1; pointer-events: auto }
+body.mobile.navopen { overflow: hidden }
+body.mobile .navrow { display: flex !important; flex-direction: column; align-items: stretch; padding: 10px 0 24px; min-height: 100% }
+body.mobile .navscroll { display: flex !important; flex-direction: column; overflow: visible !important; gap: 0 }
+body.mobile .an-logo { display: block !important; padding: 8px 18px 10px; font-size: 24px }
+body.mobile #nav .quicksearch { margin: 0 14px 6px; height: 40px; font-size: 16px; width: auto }
+body.mobile .navgrp { display: block !important; font: 800 12px var(--f-display) !important; letter-spacing: .2em !important; color: var(--gold) !important; padding: 16px 18px 4px !important }
+body.mobile .navscroll button { display: flex !important; align-items: center; min-height: 44px; font: 700 17px var(--f-display) !important; letter-spacing: .06em; text-transform: uppercase; text-align: left; color: var(--muted); padding: 0 18px !important; border: 0 !important; border-left: 3px solid transparent !important; background: none !important; border-radius: 0 !important }
+body.mobile .navscroll button.on { color: #fff; border-left-color: var(--accent) !important; background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 40%, transparent), transparent) !important }
+body.mobile .navrow .nav-mm { margin: 18px 14px 0 !important; position: static !important; min-height: 44px }
+/* pages: one column, edge to edge */
+body.mobile main#main { padding: 10px 10px calc(76px + env(safe-area-inset-bottom, 0px)) !important; max-width: none !important; margin: 0 !important }
+body.mobile #mbar { padding-left: 16px !important }
+body.mobile .grid, body.mobile .col, body.mobile .pgrid, body.mobile .mn-grid, body.mobile .stand-grid, body.mobile .cprof-grid, body.mobile .news-g, body.mobile .box2 { grid-template-columns: minmax(0, 1fr) !important }
+body.mobile .rk-wrap { grid-template-columns: minmax(0, 1fr) !important }
+body.mobile .card { padding: 12px !important; border-radius: 10px; margin-bottom: 10px }
+body.mobile .cardhead { flex-wrap: wrap; gap: 8px }
+body.mobile h2 { font-size: 20px }
+body.mobile .hero h1 { font-size: 30px }
+/* tables: sideways scroll inside their card, the first column pinned */
+body.mobile .tblwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 -12px; padding: 0 12px }
+body.mobile .tbl { font-size: 13px }
+body.mobile .tbl th, body.mobile .tbl td { padding: 7px 6px; white-space: nowrap }
+body.mobile .tbl th:first-child, body.mobile .tbl td:first-child { position: sticky; left: -12px; z-index: 1; background: var(--panel) }
+/* controls a thumb can hit; text inputs at 16px so the phone doesn't zoom in on them */
+body.mobile .btn { min-height: 40px }
+body.mobile .btn.sm { min-height: 34px }
+body.mobile input, body.mobile select, body.mobile textarea { font-size: 16px !important }
+body.mobile .tabs { overflow-x: auto; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; scrollbar-width: none }
+body.mobile .tabs::-webkit-scrollbar { display: none }
+body.mobile .tabs button { flex: 0 0 auto; min-height: 38px }
+body.mobile .btnrow { flex-wrap: wrap }
+/* pop-ups: full width, scrolling inside */
+body.mobile .mbox, body.mobile .mbox.wide { width: 100% !important; max-width: 100% !important; max-height: calc(100vh - 20px); overflow-y: auto; border-radius: 12px; padding: 14px !important; box-sizing: border-box }
+body.mobile #modal { padding: 10px !important; align-items: flex-start }
+/* Home: its own height (the PC's fills the window), the date strip scrolls, the matchup as two halves over the details,
+   the cards one under the other */
+body.mobile .office, body.mobile .office.gd { height: auto !important; min-height: 0 !important; overflow: visible !important }
+body.mobile .gd-strip { display: flex !important; overflow-x: auto; gap: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch }
+body.mobile .gd-strip::-webkit-scrollbar { display: none }
+body.mobile .gd-sday { flex: 0 0 64px; width: 64px !important; height: auto !important; grid-template-columns: 1fr !important; justify-items: center; align-content: center; gap: 2px; padding: 6px 0 !important }
+body.mobile .gd-sday .d { display: none !important } body.mobile .gd-sday .r { display: block !important; position: static !important; font-size: 10.5px !important; white-space: nowrap; width: auto !important }
+body.mobile .gd-hero .gd-side .gd-cut { flex: 0 0 100% !important; width: 100% !important; left: 0 !important; right: 0 !important; margin: 0 !important }
+body.mobile .simrow { flex-wrap: wrap; gap: 6px }
+body.mobile .simrow .btn { flex: 1 1 auto }
+body.mobile .gd-hero { grid-template-columns: 1fr 1fr !important; grid-template-rows: 170px auto; height: auto !important; min-height: 0 !important }
+body.mobile .gd-side { height: 170px !important; overflow: hidden }
+body.mobile .gd-side.h { grid-column: 2; grid-row: 1 } body.mobile .gd-side.a { grid-column: 1; grid-row: 1 }
+body.mobile .gd-mid { grid-column: 1 / -1; grid-row: 2; padding: 12px 8px !important; width: auto !important }
+body.mobile .gd-grid { grid-template-columns: minmax(0, 1fr) !important; height: auto !important }
+body.mobile .gd-col { min-height: 0 !important; height: auto !important }
+body.mobile .gd-card { height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important }
+/* Lines: each line a slim label bar over its players as tiles side by side (three forwards, two D), face over name */
+body.mobile .lines-card .lev-hd { display: none !important }
+body.mobile .lines-card .lines-ev, body.mobile .lines-card .lines-ev > section { height: auto !important; max-height: none !important; min-height: 0 !important }
+body.mobile .lines-card .ln { flex: none !important; max-height: none !important; display: grid !important; grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: auto auto !important; height: auto !important; min-height: 0 !important; gap: 4px !important; margin: 0 0 12px !important }
+body.mobile .lines-card .ln-h { height: 28px !important; min-height: 0 !important; display: flex !important; flex-direction: row !important; align-items: center !important; justify-content: space-between !important; padding: 0 10px !important; border-radius: 6px !important }
+body.mobile .lines-card .ln-h b { position: static !important; transform: none !important; font-size: 14px !important; writing-mode: horizontal-tb !important }
+body.mobile .lines-card .ln-body { display: block !important; height: auto !important; min-height: 0 !important }
+body.mobile .lines-card .ln-cards { display: grid !important; grid-template-columns: repeat(3, minmax(0, 1fr)) !important; height: auto !important; gap: 6px !important }
+body.mobile .lines-card .ln-cards:has(> .lc:nth-child(2):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important }
+body.mobile .lines-card .ln .lc { display: flex !important; flex-direction: column !important; align-items: center !important; text-align: center; gap: 2px !important; padding: 8px 4px 6px !important; min-height: 0 !important; height: auto !important; width: auto !important; position: relative }
+body.mobile .lines-card .ln .lc .lc-face { width: 44px !important; height: 44px !important; margin: 0 !important }
+body.mobile .lines-card .ln .lc .lc-nm { width: 100%; min-width: 0 } body.mobile .lines-card .ln .lc .lc-nm b { font-size: 12.5px !important; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+body.mobile .lines-card .ln .lc .lc-nm small { font-size: 10px !important; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+body.mobile .lines-card .ln .lc .ovr { position: absolute !important; top: 4px; right: 6px; font-size: 16px !important }
+body.mobile .lines-card .ln .lc .lc-pos { position: absolute !important; top: 5px; left: 6px; font-size: 10px }
+body.mobile .lines-card .ln .lc .lc-xf { justify-content: center } body.mobile .lines-card .ln .lc .lc-xf .xfb { width: 16px; height: 16px }
+body.mobile .lines-card .ln-bench { grid-template-columns: minmax(0, 1fr) !important }
+/* the schedule's month: seven narrow columns, the days' details trimmed to fit */
+body.mobile .cal { grid-template-columns: repeat(7, minmax(0, 1fr)) !important; gap: 2px !important; font-size: 10px }
+body.mobile .cal > * { min-width: 0 !important; padding: 3px 2px !important; overflow: hidden }
+body.mobile .cal img { width: 18px !important; height: 18px !important }
 </style>
 <div id="app"><header id="top"></header><nav id="nav"></nav><main id="main"></main></div>
 <div id="modal" hidden></div>
@@ -1332,7 +1428,7 @@ function wallInfo(x, y) {
 // facing-aware passes/shots, structured AI (zone shapes, coverage, 1-2-2 forecheck, puck protection, dekes, one-timers),
 // rating-driven physical play (poke checks, body checks, nudges, stick checks, with body weight), wrist and slap shots.
 // Same constructor and result() shape as before, so the rest of the app is unchanged.
-const TUNE = { sgate: 0.30, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.03, patience: 0.2, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.12, office: 0.08, regroup: 0.15 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.30, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.03, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -2504,6 +2600,7 @@ class HockeyGame {
       let val = -0.1 + clamp(prog / 45, inOZ && m.x * d > 25 ? -0.15 : -0.6, 0.7) + (lane < 3 ? -0.35 : 0.1) + (mo < 5 ? -0.35 : mo < 8 ? -0.1 : 0.05) - clamp((pd - 55) / 70, 0, 0.4);
       if (prog > 45 && mo > 12) val += 0.25 * clamp((prog - 45) / 30, 0, 1);   // stretch pass: a man open up ice behind the forecheck
       if (!inOZ && Math.abs(prog) < 8 && pr > 6) val -= 0.2;   // sideways pass with no pressure and no gain
+      if (inOZ && pr > 6 && prog < 5 && this.shotQ(t, m.x, m.y) < 0.3) val -= 0.12;   // and in their zone: a pass across or back that sets nobody up (as engine.gd, 2026-10)
       if (p.recvT < 0.5 && pr > 7 && !inOZ) val -= 0.2;        // just got it with time: settle it first
       if (m.x * d > 25) val += this.shotQ(t, m.x, m.y) * 1.3;
       // cross-crease / backdoor / slot feeds: a pass that drags the goalie across leaves him not set for the shot
@@ -2620,7 +2717,10 @@ class HockeyGame {
       if (rnd() < 1 - Math.exp(-hd * Math.max(0.12, e.dec))) { this.play(e, t, { k: 'shot' }); return; }
       holdShot = look >= 0.3 && !laneBlocked;   // a look worth shooting isn't given away: he shoots at the next read
     }
-    if (best && pV > cV && !holdShot) { this.play(e, t, { k: 'pass', m: best }); return; }
+    // (in their zone a pass has to be clearly better than keeping it, unless a checker's right on him - as engine.gd:
+    // 419 -> 362 passes a team-game, possessions longer)
+    const passM = inOZ && pr > 3 && sit !== 'pp' ? 0.25 : 0;
+    if (best && pV > cV + passM && !holdShot) { this.play(e, t, { k: 'pass', m: best }); return; }
     // deke: a checker closing on him in front (or a defender standing him up 1-on-1); skilled hands try to beat him instead
     // of turning away and shielding it
     let chk = null;
@@ -2995,7 +3095,7 @@ class HockeyGame {
     if (s.outcome === 'goal') { p.x = Math.sign(t.d) * 90.2; p.y = clamp(p.y, -2.0, 2.0); p.vx *= 0.05; p.vy *= 0.05; p.in_net = Math.sign(t.d); this.goal(t, o, s); return; }   // in: over the line, clear of the shallow corners, and in the net as puckPhys sees it so the mesh holds it (put over the line instead of carried across, without in_net the next step took it for a puck come into the frame from outside and pushed it out the back or side netting)
     const G = o.g.R;
     // (0.33 base froze 60% of saves: 38 goalie whistles a game, NHL ~15-20)
-    const freeze = rnd() < 0.04 + G.reb / 250 - (s.q > 0.5 ? 0.12 : 0) + ('vacuum' in o.g.X ? 0.15 * xk(o.g.X.vacuum) : 0);
+    const freeze = rnd() < 0.015 + G.reb / 250 - (s.q > 0.5 ? 0.12 : 0) + ('vacuum' in o.g.X ? 0.15 * xk(o.g.X.vacuum) : 0);
     const gn = shortName(this.pl(o.g.pid));
     if (freeze) {
       p.vx = 0; p.vy = 0; p.x = o.g.x; p.y = o.g.y;
@@ -4374,7 +4474,10 @@ function potFix(p) { if (p.age >= potAge(p) && !p.lateBloom) p.pot = p.ovr; else
 const RATING_ADJ = { 'Jesper Wallstedt': [87, 92, 'Medium'], 'Kirill Kaprizov': 93,
   'Scott Wedgewood': 87, 'Jake Oettinger': 90, 'Jet Greaves': 87, 'Joey Daccord': 86,
   'Igor Shesterkin': 94, 'Andrei Vasilevskiy': 93, 'Filip Gustavsson': [88, 88], 'Ilya Sorokin': 91, 'Logan Thompson': 91, 'Jeremy Swayman': 90,
-  'Gavin McKenna': { ovr: 81, pot: 95, like: 'Medium', shape: { pas: 8, ska: 6, hnd: 5, sht: 3, chk: -9, def: -13 }, arch: 'Playmaker' } }, RATING_ADJ_V = 10;
+  'Gavin McKenna': { ovr: 81, pot: 95, like: 'Medium', shape: { pas: 8, ska: 6, hnd: 5, sht: 3, chk: -9, def: -13 }, arch: 'Playmaker' },
+  'Jonas Brodin': { ovr: 86, shape: { ska: 5, sht: -21, pas: 1, hnd: -4, def: 23 } },
+  'Jared Spurgeon': { ovr: 85, shape: { ska: -3, sht: -16, pas: 1, hnd: -5, def: 18 } },
+  'Alex Pietrangelo': { ovr: 81, cEnd: 'hip' } }, RATING_ADJ_V = 13;   // (didn't play 2025-26 - hip, on LTIR - and isn't expected to again; contract through 2026-27)   // (a better skater, a weaker shot - the user's call)
 function ratingAdj(p) {
   const adj = p.hlm != null && RATING_ADJ[p.first + ' ' + p.last]; if (!adj) return;
   const o = Array.isArray(adj) ? { ovr: adj[0], pot: adj[1], like: adj[2] } : typeof adj === 'object' ? adj : { ovr: adj };
@@ -4385,10 +4488,16 @@ function ratingAdj(p) {
   if (o.shape) { const ks = Object.keys(o.shape).filter(k => p.r[k] != null), m = ks.reduce((s, k) => s + p.r[k], 0) / ks.length; for (const k of ks) p.r[k] = Math.round(cl(m + o.shape[k], 20, 99)); }
   for (let i = 0; i < 30 && R(ovrOf(p)) !== want; i++) { const d = R(ovrOf(p)) < want ? 1 : -1; for (const k of keys) p.r[k] = cl(p.r[k] + d, 20, 99); }
   if (o.arch && p.pos !== 'G') { const top = o.arch === 'Playmaker' ? 'pas' : o.arch === 'Sniper' ? 'sht' : null; for (let i = 0; i < 6 && top && archOf(p) !== o.arch; i++) { p.r[top] = cl(p.r[top] + 1, 20, 99); for (let j = 0; j < 4 && R(ovrOf(p)) > want; j++) p.r.def = cl(p.r.def - 1, 20, 99); } }
-  if (o.shift || o.shape || o.arch) { delete p.shp; if (p.rx) delete p.rx.c0; shapeAnchor(p); }
+  // (his style anchor re-read from the new shape, so shapePull doesn't drift him back. The measured detail readings keep
+  // their reference, rx.c0: the detail ratings follow his core ratings' change from it - erased, a reshaped skater's
+  // Speed or shot ratings barely moved)
+  if (o.shift || o.shape || o.arch) { const m = SHP_K.reduce((s, k) => s + p.r[k], 0) / 5; p.shp = Object.fromEntries(SHP_K.map(k => [k, Math.round((p.r[k] - m) * 10) / 10])); }
   p.ovr = ovrOf(p); potFix(p); p.arch = archOf(p); p.xf = xfOf(p);
   if (potW) p.pot = Math.max(p.ovr, Math.round(invShowR(potW)));   // shown ceiling → internal
   if (like) p.likeAdj = like; else delete p.likeAdj;
+  // (cEnd: a real player whose career is over but whose contract runs on - on long-term injured reserve for the rest of
+  // it, the cap hit on the books and LTIR relief covering it, retiring when it ends; he never plays again)
+  if (o.cEnd) { p.inj = 999; p.injType = o.cEnd; p.cEnd = p.cEnd || (typeof L !== 'undefined' && L && L.season) || (p.contract ? p.contract.exp - 1 : 2026); }
   delete p.pcf; delete p.pcfT;
 }
 function recStrL(t) { return t.rec.w + '-' + t.rec.l + '-' + t.rec.otl; }
@@ -11454,8 +11563,24 @@ function render() {
   const fn = { camp: vCamp, deadline: vDeadline, office: vOffice, dev: vDev, editor: vEditor, news: vNews, home: vHome, roster: vRoster, contracts: vContracts, minors: vMinors, staff: vStaff, lines: vLines, schedule: vSchedule, standings: vStandings, stats: vStats, trade: vTrade, fa: vFA, search: vSearch, scouting: vScouting, draft: vDraft, league: vStandings, intl: vIntl, nation: vNation, hof: vHof, settings: vSettings }[view] || vHome;
   const ddBar = view !== 'deadline' && L.ddOn && L.ddOn() ? `<div class="card dd-banner"><b>Deadline Day: ${ddTime(L.dd.tick)}</b><span>The phones close at 3:00 PM.</span><button class="btn sm primary" data-act="nav" data-v="deadline">Back to the board</button></div>` : '';
   $('#main').innerHTML = ddBar + fn();
+  if (MOBILE) mBar();
   showLoadedPhotos($('#main'));
   afterRender();
+}
+// the phone version's header: a ☰ button that slides the side menu (#nav, the PC's own) out from the left, the page's
+// name and the club's logo (the user asked for the side menu rather than bottom tabs, 2026-10)
+function mBar() {
+  let b = document.getElementById('mbar');
+  if (!b) { b = document.createElement('header'); b.id = 'mbar'; document.body.prepend(b); const sh = document.createElement('div'); sh.id = 'mshade'; sh.dataset.act = 'mMenu'; document.body.appendChild(sh); }
+  const nm = (NAV.find(([k]) => k === view) || [])[1] || ({ player: 'Player', teamview: 'Team', nation: 'International', deadline: 'Deadline Day', camp: 'Training camp', draft: 'Draft' })[view] || '';
+  const t = UT();
+  b.innerHTML = `<b class="mb-title">${esc(nm)}</b><span class="mb-team">${t ? teamBadge(t) : ''}</span>`;
+  // the tab bar at the bottom, in thumb's reach: the four pages used most and the full menu (the user picked these, 2026-10)
+  let tb = document.getElementById('mtab');
+  if (!tb) { tb = document.createElement('nav'); tb.id = 'mtab'; tb.setAttribute('aria-label', 'Main pages'); document.body.appendChild(tb); }
+  const ic = d => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${d}"/></svg>`;
+  const tabs = [['home', 'Home', 'M4 11l8-7 8 7v9h-5v-6H9v6H4z'], ['roster', 'Roster', 'M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 11a3 3 0 1 0 0-6M18 14c2 .7 3 2.8 3 6'], ['lines', 'Lines', 'M4 6h16M4 12h16M4 18h16M8 4v4M14 10v4M10 16v4'], ['standings', 'Standings', 'M4 20V10M10 20V4M16 20v-7M22 20H2']];
+  tb.innerHTML = tabs.map(([k, l, d]) => `<button class="${view === k ? 'on' : ''}" data-act="nav" data-v="${k}">${ic(d)}<span>${l}</span></button>`).join('') + `<button data-act="mMenu">${ic('M4 7h16M4 12h16M4 17h16')}<span>Menu</span></button>`;
 }
 // photos that have loaded before show at once when the page is redrawn (each waits for its load event to show, and a redraw -
 // moving the starts bar, Auto-set - made every photo on the page blink to the drawn face and back)
@@ -13433,7 +13558,7 @@ function bracketList() {   // (the old list layout, kept for reference)
 }
 function standTable(ts, compact, half) {   // (half: a two-up table - the club's name without its city)
   if (half) compact = false;
-  return `<div class="tblwrap"><table class="tbl stand${half ? ' half' : ''}"><thead><tr><th></th><th class="l">Team</th><th>GP</th><th>W</th><th>L</th><th>OTL</th><th>PTS</th>${compact ? '' : '<th>RW</th><th>GF</th><th>GA</th><th>DIFF</th><th>L10</th>'}</tr></thead><tbody>${ts.map((t, i) => { const r = t.rec; const gp = r.w + r.l + r.otl; const l10 = (r.last || ''); return `<tr class="${t.tid === L.userTid ? 'mine' : ''}"><td class="muted">${i + 1}</td><td class="l">${teamBadge(t)} <button class="link" data-act="teamview" data-tid="${t.tid}">${esc(compact || half ? t.name : t.city + ' ' + t.name)}</button> ${compact ? '' : statusChip(t)}</td><td>${gp}</td><td>${r.w}</td><td>${r.l}</td><td>${r.otl}</td><td><b>${L.pts(t)}</b></td>${compact ? '' : `<td>${r.rw}</td><td>${r.gf}</td><td>${r.ga}</td><td class="${r.gf - r.ga >= 0 ? 'pos' : 'neg'}">${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td>${l10.split('').filter(c => c === 'W').length}-${l10.split('').filter(c => c === 'L').length}-${l10.split('').filter(c => c === 'O').length}</td>`}</tr>`; }).join('')}</tbody></table></div>`;
+  return `<div class="tblwrap"><table class="tbl stand${half ? ' half' : ''}"><thead><tr><th></th><th class="l">Team</th><th>GP</th><th>W</th><th>L</th><th>OTL</th><th>PTS</th>${compact ? '' : '<th>RW</th><th>GF</th><th>GA</th><th>DIFF</th><th>L10</th>'}</tr></thead><tbody>${ts.map((t, i) => { const r = t.rec; const gp = r.w + r.l + r.otl; const l10 = (r.last || ''); return `<tr class="${t.tid === L.userTid ? 'mine' : ''}"><td class="muted">${i + 1}</td><td class="l">${teamBadge(t)} <button class="link" data-act="teamview" data-tid="${t.tid}">${esc(compact || half ? t.name : t.city + ' ' + t.name)}</button></td><td>${gp}</td><td>${r.w}</td><td>${r.l}</td><td>${r.otl}</td><td><b>${L.pts(t)}</b></td>${compact ? '' : `<td>${r.rw}</td><td>${r.gf}</td><td>${r.ga}</td><td class="${r.gf - r.ga >= 0 ? 'pos' : 'neg'}">${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td>${l10.split('').filter(c => c === 'W').length}-${l10.split('').filter(c => c === 'L').length}-${l10.split('').filter(c => c === 'O').length}</td>`}</tr>`; }).join('')}</tbody></table></div>`;
 }
 
 // ---------- ROSTER ----------
@@ -13733,6 +13858,7 @@ function lineCallUp(t, pid, g, i, j) {
   lineMove(t, g, i, j, pid); save(); render(); toast(nm(p) + ' called up' + (op ? ', ' + nm(op) + ' to the scratches.' : '.'), 'good');
 }
 function vLines() {
+  if (sub.ltab === 'echl') sub.ltab = 'ahl';   // (no ECHL lines to set - the user's call, 2026-10: only the NHL club and its AHL affiliate)
   const t = UT(); L.validateLines(t); const Ln = t.lines, P = L.players;
   const hc = L.hcOf ? L.hcOf(t) : null;
   if (hc) { t.tacMode = 'coach'; t.tactics = Object.assign({}, SYSTEMS[hc.sys].tac); }   // (the coach's system; no custom settings any more)
@@ -13866,7 +13992,7 @@ function vLines() {
   const sw = (k, lab) => `<button class="${team === k ? 'on' : ''}" data-act="ltab" data-k="${k === 'nhl' ? 'ev' : k}">${logoOf(k, 'lsw-logo')}<span>${esc(lab)}</span></button>`;
   // (the logo / name / ratings / stats row under the switcher was taken out at the user's request; SHOW_LHEAD brings it back)
   const SHOW_LHEAD = false;
-  const head = `<div class="lhead${SHOW_LHEAD ? '' : ' slim'}"><div class="lsw">${sw('nhl', t.name)}${sw('ahl', L.affName(t))}${sw('echl', L.echlName(t))}</div>
+  const head = `<div class="lhead${SHOW_LHEAD ? '' : ' slim'}"><div class="lsw">${sw('nhl', t.name)}${sw('ahl', L.affName(t))}</div>
     ${SHOW_LHEAD ? `<div class="lh-main">${logoOf(team, 'lh-logo')}<div class="lh-name"><small>${esc(lg0)}</small><h2>${esc(nm0)}</h2></div>
       <div class="lh-nums">${[[ovr, 'OVR'], [rv(fA), 'FWD'], [rv(dA), 'DEF'], [rv(gA), 'G']].map(num).join('')}</div><i class="lh-sep"></i><div class="lh-nums st">${stats.map(num).join('')}</div></div>` : ''}</div>`;
   return `<div class="grid lines full">
@@ -15163,7 +15289,7 @@ function vLeague(only) {
   const head = only ? `<div class="card lg-head"><div class="cardhead"><h2>Settings</h2></div></div>` : lgHead(tab);
   let body = '';
   if (tab === 'overview') {
-    const power = `<div class="card"><h2>Power rankings</h2><div class="tblwrap"><table class="tbl"><thead><tr><th>#</th><th class="l">Team</th><th class="l">Status</th><th>OVR</th><th>Record</th><th>Payroll</th></tr></thead><tbody>${teams.map((t, i) => `<tr class="${t.tid === L.userTid ? 'mine' : ''}"><td class="muted">${i + 1}</td><td class="l">${teamBadge(t)} <button class="link" data-act="teamview" data-tid="${t.tid}">${esc(t.city + ' ' + t.name)}</button></td><td class="l">${statusChip(t)}</td><td><span class="ovr ${ovrCls(R(L.teamOvr(t)))}">${R(L.teamOvr(t))}</span></td><td>${recStr(t)}</td><td>${money(L.payroll(t))}</td></tr>`).join('')}</tbody></table></div></div>`;
+    const power = `<div class="card"><h2>Power rankings</h2><div class="tblwrap"><table class="tbl"><thead><tr><th>#</th><th class="l">Team</th><th>OVR</th><th>Record</th><th>Payroll</th></tr></thead><tbody>${teams.map((t, i) => `<tr class="${t.tid === L.userTid ? 'mine' : ''}"><td class="muted">${i + 1}</td><td class="l">${teamBadge(t)} <button class="link" data-act="teamview" data-tid="${t.tid}">${esc(t.city + ' ' + t.name)}</button></td><td><span class="ovr ${ovrCls(R(L.teamOvr(t)))}">${R(L.teamOvr(t))}</span></td><td>${recStr(t)}</td><td>${money(L.payroll(t))}</td></tr>`).join('')}</tbody></table></div></div>`;
     const fo = `<div class="card"><h2>Front offices</h2><p class="muted small">Team situations update weekly from roster strength, standings and age. They decide how teams value players in trades, the draft, re-signings and free agency.</p><div class="fo-grid">${['Contender', 'Playoff Bubble', 'Retooling', 'Rebuilding'].map(s => `<div><h3 class="eyebrow">${statusChip({ status: s })}</h3><p class="small muted">${esc(L.statusInfo(s))}</p><ul class="fo-list">${L.teams.filter(t => t.status === s).sort((a, b) => L.pts(b) - L.pts(a) || L.teamOvr(b) - L.teamOvr(a)).map(t => `<li class="${t.tid === L.userTid ? 'mine' : ''}">${teamBadge(t)} <button class="link" data-act="teamview" data-tid="${t.tid}">${esc(t.city + ' ' + t.name)}</button> <span class="muted small">${recStr(t)}</span>${t.tid !== L.userTid ? ` <button class="link small" data-act="tradeWith" data-tid="${t.tid}">Trade</button>` : ''}</li>`).join('') || '<li class="muted small">None</li>'}</ul></div>`).join('')}</div></div>`;
     body = `<div class="lgv">${power}${fo}</div>`;
   } else if (tab === 'players') body = playerRankings();
@@ -16827,7 +16953,8 @@ function renderStart() {
     <div class="mn-grid"><div>${last ? `<h3 class="eyebrow">Continue</h3>${card(last, true)}` : ''}
       ${rest.length ? `<h3 class="eyebrow">Your leagues</h3><div class="mn-list">${rest.map(x => card(x)).join('')}</div>` : ''}
       ${!saveList.length ? '<div class="card"><p>No saved leagues yet. Start one to begin.</p></div>' : ''}</div>
-    <div class="mn-side card"><button class="btn primary mn-big" data-act="menuNew">New league</button><button class="btn" data-act="importOpen">Import a league</button><p class="muted small">Every league saves on its own as you play. Close the program any time and pick up where you left off.</p><p class="small muted" id="rd-status"></p>${DESK ? '<p class="small"><button class="link small" data-act="updCheck">Check for updates</button></p>' : ''}</div></div>`;
+    <div class="mn-side card"><button class="btn primary mn-big" data-act="menuNew">New league</button><button class="btn" data-act="importOpen">Import a league</button><p class="muted small">Every league saves on its own as you play. Close the program any time and pick up where you left off.</p><p class="small muted" id="rd-status"></p>${DESK ? '<p class="small"><button class="link small" data-act="updCheck">Check for updates</button></p>' : ''}</div></div>
+    <p class="muted small mn-disc">A fan-made game, not affiliated with or endorsed by the NHL, the NHLPA or any club. Team names, logos and player photos belong to their owners.</p>`;
   rdStatus();
 }
 async function deskBoot() {
@@ -16855,7 +16982,8 @@ const ACT = {
   evDone: () => { EV = null; closeModal(); render(); },
   lotNext: () => { if (EV.auto) return; EV.shown = Math.min(lotView().lottery.length, EV.shown + 1); evLottery(); },
   lotAuto: () => lotAuto(),
-  nav: d => { view = d.v; closeModal(); render(); window.scrollTo(0, 0); },
+  nav: d => { view = d.v; closeModal(); document.body.classList.remove('navopen'); render(); window.scrollTo(0, 0); },
+  mMenu: () => document.body.classList.toggle('navopen'),   // (the phone version's side menu)
   newleague: d => { pendingStart = { kind: 'gen', tid: +d.tid }; render(); window.scrollTo(0, 0); },
   continue: () => {
     if (L.ddDue()) { startDeadlineDay(); return; }
