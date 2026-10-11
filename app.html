@@ -1475,7 +1475,7 @@ body.mobile .ts-side .ts-ret { display: flex; align-items: center; gap: 6px; mar
 body.mobile .tbl td:first-child, body.mobile .tbl th:first-child { max-width: 150px; overflow: hidden }
 body.mobile .tbl td:first-child .st-pl { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 150px }
 body.mobile .tbl td:first-child .st-pl > :last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; max-width: 140px; display: inline-block; vertical-align: middle }
-body.mobile .tbl td:first-child { white-space: nowrap; min-width: 134px }   /* (else the table squeezed it below face + name) */
+body.mobile .tbl td:first-child:has(.link, .st-pl, .avatar) { white-space: nowrap; min-width: 134px }   /* (else the table squeezed it below face + name; only a column with a name - a rank column stays narrow) */
 body.mobile .tbl td:first-child > .link { white-space: normal; text-align: left; line-height: 1.15; max-width: 92px; display: inline-block; vertical-align: middle }   /* (a long name wraps: a button won't take an ellipsis - "Vladimir Tarasenko" showed as "...") */
 body.mobile .tbl td:first-child > .avatar { display: inline-block; vertical-align: middle; margin-right: 6px }
 body.mobile .tbl td:first-child .avatar, body.mobile .tbl td:first-child .avatar svg, body.mobile .tbl td:first-child .avatar img { width: 26px !important; height: 26px !important; flex: 0 0 26px }
@@ -1507,6 +1507,12 @@ body.mobile .tg-bar { position: sticky; bottom: 60px; z-index: 6; display: flex;
 body.mobile .tg-bar[hidden] { display: none }
 body.mobile .tg-bm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px } body.mobile .tg-bm .tmeter { margin: 0 !important } body.mobile .tg-bm small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 body.mobile .card:has(.tg-pages) > .partner .small, body.mobile .card:has(.tg-pages) > p.muted.small { display: none }
+/* standings on a phone (standTable's MOBILE table) */
+body.mobile .tbl.mstand { width: 100%; table-layout: fixed; font-size: 13px }
+body.mobile .tbl.mstand th, body.mobile .tbl.mstand td { padding: 7px 3px !important; text-align: center; white-space: nowrap; min-width: 0 !important; max-width: none !important; position: static !important }
+body.mobile .tbl.mstand th:nth-child(1) { width: 20px } body.mobile .tbl.mstand th:nth-child(2) { width: auto; text-align: left } body.mobile .tbl.mstand th:nth-child(3) { width: 28px } body.mobile .tbl.mstand th:nth-child(4) { width: 60px } body.mobile .tbl.mstand th:nth-child(5) { width: 34px } body.mobile .tbl.mstand th:nth-child(6) { width: 38px } body.mobile .tbl.mstand th:nth-child(7) { width: 50px }
+body.mobile .tbl.mstand td:nth-child(2) { text-align: left } body.mobile .mstand .ms-tm { display: inline-flex; align-items: center; gap: 6px; max-width: none !important } body.mobile .mstand .ms-tm b { font-family: var(--f-display); letter-spacing: .04em }
+body.mobile .tbl.mstand tr.cut td { border-bottom: 2px dashed color-mix(in srgb, var(--blue) 60%, transparent) }
 /* League leaders on a phone (vStats): switches, sort chips and a leaderboard */
 .ms .mh-tabs { position: static; margin-bottom: 8px }
 .ms-flt { display: flex; gap: 4px; margin-bottom: 8px } .ms-flt span { flex: 1 } .ms-flt button { all: unset; padding: 5px 10px; border-radius: 14px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--panel2); cursor: pointer } .ms-flt button.on { background: color-mix(in srgb, var(--blue) 35%, var(--panel2)); color: #fff }
@@ -13928,6 +13934,13 @@ function bracketList() {   // (the old list layout, kept for reference)
 }
 function standTable(ts, compact, half) {   // (half: a two-up table - the club's name without its city)
   if (half) compact = false;
+  // on a phone: seven narrow columns that fit - rank, club, GP, record, points, goal difference, last 10 - and a dashed
+  // line under the playoff places (top 3 of a division, top 8 of a conference)
+  if (MOBILE) {
+    const cut = ts.length === 8 ? 3 : ts.length === 16 ? 8 : 0, l10 = r => { const s = r.last || ''; return [...s].filter(c => c === 'W').length + '-' + [...s].filter(c => c === 'L').length + '-' + [...s].filter(c => c === 'O').length; };
+    return `<table class="tbl mstand"><thead><tr><th></th><th class="l">Team</th><th>GP</th><th>W-L-OT</th><th>PTS</th><th>DIFF</th><th>L10</th></tr></thead><tbody>${ts.map((t, i) => { const r = t.rec, d = r.gf - r.ga;
+      return `<tr class="${t.tid === L.userTid ? 'mine' : ''}${cut && i === cut - 1 ? ' cut' : ''}"><td class="muted">${i + 1}</td><td class="l"><button class="link ms-tm" data-act="teamview" data-tid="${t.tid}">${lgImg(t, 'sm')}<b>${esc(t.abbr)}</b></button></td><td>${r.w + r.l + r.otl}</td><td>${r.w}-${r.l}-${r.otl}</td><td><b>${L.pts(t)}</b></td><td class="${d >= 0 ? 'pos' : 'neg'}">${d > 0 ? '+' : ''}${d}</td><td>${l10(r)}</td></tr>`; }).join('')}</tbody></table>`;
+  }
   return `<div class="tblwrap"><table class="tbl stand${half ? ' half' : ''}"><thead><tr><th></th><th class="l">Team</th><th>GP</th><th>W</th><th>L</th><th>OTL</th><th>PTS</th>${compact ? '' : '<th>RW</th><th>GF</th><th>GA</th><th>DIFF</th><th>L10</th>'}</tr></thead><tbody>${ts.map((t, i) => { const r = t.rec; const gp = r.w + r.l + r.otl; const l10 = (r.last || ''); return `<tr class="${t.tid === L.userTid ? 'mine' : ''}"><td class="muted">${i + 1}</td><td class="l">${teamBadge(t)} <button class="link" data-act="teamview" data-tid="${t.tid}">${esc(compact || half ? t.name : t.city + ' ' + t.name)}</button></td><td>${gp}</td><td>${r.w}</td><td>${r.l}</td><td>${r.otl}</td><td><b>${L.pts(t)}</b></td>${compact ? '' : `<td>${r.rw}</td><td>${r.gf}</td><td>${r.ga}</td><td class="${r.gf - r.ga >= 0 ? 'pos' : 'neg'}">${r.gf - r.ga > 0 ? '+' : ''}${r.gf - r.ga}</td><td>${l10.split('').filter(c => c === 'W').length}-${l10.split('').filter(c => c === 'L').length}-${l10.split('').filter(c => c === 'O').length}</td>`}</tr>`; }).join('')}</tbody></table></div>`;
 }
 
