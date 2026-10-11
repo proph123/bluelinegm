@@ -11194,13 +11194,23 @@ class RinkViewer {
     c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#0d1419'; c.fillRect(0, 0, w, h);
     const rinkT = () => vert ? c.setTransform(0, -sc, -sc, 0, w / 2, cy) : c.setTransform(sc, 0, 0, -sc, w / 2, h / 2);
     rinkT();
-    c.fillStyle = '#eef4f9'; c.beginPath(); c.roundRect ? c.roundRect(-100, -42.5, 200, 85, 28) : c.rect(-100, -42.5, 200, 85); c.fill();
-    // the logos painted into the ice, faded (drawn on the screen, upright)
+    const rinkPath = () => { c.beginPath(); c.roundRect ? c.roundRect(-100, -42.5, 200, 85, 28) : c.rect(-100, -42.5, 200, 85); };
+    c.fillStyle = '#eef4f9'; rinkPath(); c.fill();
+    // the home club's logo at centre ice, faded (drawn on the screen, upright) - no zone logos (the user's call)
     const logo = (im, X, sz, al) => { if (!im || !im.complete || !im.naturalWidth) return; const [sx, sy] = toS(X, 0), z = sz * sc; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = al; c.drawImage(im, sx - z / 2, sy - z / 2, z, z); c.restore(); };
-    logo(this.lg2[0], 0, 22, .5); logo(this.lg2[1], -57, 13, .22); logo(this.lg2[0], 57, 13, .22);
+    logo(this.lg2[0], 0, 22, .5);
+    // the markings, kept inside the boards (the goal lines ran out past the rounded corners)
+    c.save(); rinkPath(); c.clip();
     c.fillStyle = '#c8102e'; c.fillRect(-.5, -42.5, 1, 85); c.fillStyle = '#1f4e9c'; c.fillRect(24.5, -42.5, 1, 85); c.fillRect(-25.5, -42.5, 1, 85);
-    c.fillStyle = '#c8102e'; c.fillRect(88.9, -42.5, .2, 85); c.fillRect(-89.1, -42.5, .2, 85);
+    c.fillStyle = '#c8102e'; c.fillRect(88.8, -42.5, .4, 85); c.fillRect(-89.2, -42.5, .4, 85);
     c.strokeStyle = '#c8102e'; c.lineWidth = .3; c.beginPath(); c.arc(0, 0, 15, 0, 7); c.stroke();
+    // the creases and the nets: a 6-foot-wide goal, about 3.5 feet deep behind the goal line
+    for (const X of [89, -89]) { const d = X > 0 ? -1 : 1;
+      c.fillStyle = 'rgba(80,150,230,.45)'; c.beginPath(); c.moveTo(X, -4); c.lineTo(X + d * 4.5, -4); c.arc(X + d * 4.5, 0, 4, -Math.PI / 2, Math.PI / 2, d < 0); c.lineTo(X, 4); c.closePath(); c.fill(); c.strokeStyle = '#c8102e'; c.lineWidth = .25; c.stroke();
+      const bx = X - d * 3.5; c.fillStyle = 'rgba(255,255,255,.9)'; c.fillRect(Math.min(X, bx), -3, 3.5, 6);
+      c.strokeStyle = '#c8102e'; c.lineWidth = .55; c.beginPath(); c.moveTo(X, -3); c.lineTo(bx, -3); c.lineTo(bx, 3); c.lineTo(X, 3); c.stroke();
+      c.strokeStyle = 'rgba(120,130,140,.5)'; c.lineWidth = .12; c.beginPath(); for (let k = 1; k < 6; k++) { c.moveTo(X, -3 + k); c.lineTo(bx, -3 + k); } c.stroke(); }
+    c.restore();
     // the players: a jersey-coloured disc with his number, his name under it (the user's ask, 2026-10)
     const R0 = 2.9, pos = [];
     for (const e of this.g.ent) { const x = e.px + (e.x - e.px) * a, y = e.py + (e.y - e.py) * a, hm = e.team === 0, tm = hm ? this.home : this.away; c.fillStyle = hm ? tm.c1 : '#fff'; c.strokeStyle = hm ? '#fff' : tm.c1; c.lineWidth = .6; c.beginPath(); c.arc(x, y, e.isG ? R0 + .5 : R0, 0, 7); c.fill(); c.stroke(); pos.push([e, x, y, hm, tm]); }
@@ -11217,15 +11227,15 @@ class RinkViewer {
     for (let i = 0; i < pos.length; i++) {
       const P = this.g.P[pos[i][0].pid] || {}, nm = (P.last || '').toUpperCase(); if (!nm) continue;
       const [X, Y] = S[i], tw = c.measureText(nm).width, th = fL * 1.05, gap = rr + fL * .75;
-      const tries = [[X, Y + gap], [X, Y - gap], [X + rr + tw / 2 + 3, Y], [X - rr - tw / 2 - 3, Y]];
-      // (the spot it had last frame wins ties, so the tags don't flicker between spots)
-      const lp = this.lp2 || (this.lp2 = {}), pid = pos[i][0].pid; let best = tries[0], bv = 1e18, bk = 0;
-      tries.forEach(([tx, ty], k) => { const b = [tx - tw / 2, ty - th / 2, tx + tw / 2, ty + th / 2]; let v = k * .3;
+      // (under or over him only, and it stays put: it moves only when its spot is badly covered, the other is clear,
+      // and it hasn't moved in the last second and a half - tags hopping about every frame, the user found)
+      const tries = [[X, Y + gap], [X, Y - gap]], cost = ([tx, ty]) => { const b = [tx - tw / 2, ty - th / 2, tx + tw / 2, ty + th / 2]; let v = 0;
         for (let j = 0; j < S.length; j++) if (j !== i) v += hit(b, [S[j][0] - rr, S[j][1] - rr, S[j][0] + rr, S[j][1] + rr]);
-        for (const q of placed) v += hit(b, q);
-        if (lp[pid] === k) v *= .6;
-        if (v < bv) { bv = v; best = [tx, ty]; bk = k; } });
-      lp[pid] = bk;
+        for (const q of placed) v += hit(b, q); return v; };
+      const lp = this.lp2 || (this.lp2 = {}), pid = pos[i][0].pid, now = performance.now(), cur = lp[pid] || (lp[pid] = { k: 0, t: 0 }), area = tw * th;
+      const vc = cost(tries[cur.k]), vo = cost(tries[1 - cur.k]);
+      if (now - cur.t > 1500 && vc > area * .35 && vo < vc * .4) { cur.k = 1 - cur.k; cur.t = now; }
+      const best = tries[cur.k];
       placed.push([best[0] - tw / 2, best[1] - th / 2, best[0] + tw / 2, best[1] + th / 2]);
       c.strokeText(nm, best[0], best[1]); c.fillText(nm, best[0], best[1]);
     }
