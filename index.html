@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1a2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Blue Line GM">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Blue Line GM</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: #0b1a2e; color: #e8eef6; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { min-height: 100%; display: grid; place-items: center; padding: 24px; box-sizing: border-box; text-align: center; }
+  img { width: 96px; height: 96px; border-radius: 22px; }
+  h1 { font-size: 22px; margin: 16px 0 6px; letter-spacing: .02em; }
+  p { margin: 6px 0; color: #9fb3c8; max-width: 340px; }
+  .bar { width: 220px; height: 6px; border-radius: 3px; background: #1d3354; margin: 18px auto 0; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 30%; background: #5fa0ff; animation: run 1.1s ease-in-out infinite; }
+  @keyframes run { from { transform: translateX(-100%); } to { transform: translateX(330%); } }
+  .err { color: #ff8a80; }
+</style>
+</head><body>
+<div class="wrap"><div>
+  <img src="icon-192.png" alt="">
+  <h1>Blue Line GM</h1>
+  <p id="msg">Getting the game ready…</p>
+  <div class="bar"><i></i></div>
+</div></div>
+<script>
+// The starter page: the game itself (app.html) needs its service worker in charge first (it answers the game's /api
+// calls on the phone - sw.js), so this installs it on the first visit and then opens the game. Later visits go straight on.
+(async () => {
+  const msg = document.getElementById('msg');
+  if (!('serviceWorker' in navigator)) { msg.className = 'err'; msg.textContent = 'This browser can\'t run Blue Line GM. Use Chrome, Edge, Samsung Internet or Safari.'; return; }
+  try {
+    const reg = await navigator.serviceWorker.register('sw.js');
+    if (!navigator.serviceWorker.controller) {
+      msg.textContent = 'First start: downloading the game (about 5 MB)…';
+      await new Promise(res => { navigator.serviceWorker.addEventListener('controllerchange', res, { once: true }); setTimeout(res, 20000); });
+    }
+    location.replace('app.html');
+  } catch (e) { msg.className = 'err'; msg.textContent = 'Couldn\'t start the game: ' + (e.message || e) + '. Check your connection and reload.'; }
+})();
+</script>
+</body></html>
