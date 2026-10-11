@@ -1414,6 +1414,8 @@ body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
 .mh-simlist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px } .mh-simlist .btn { justify-content: center; padding: 12px 0 }
 body.mobile .mhome .gd-strip { margin: 0 }
 body.mobile .mhome .gd-sday.hm { background: rgba(47,125,225,.26) !important } body.mobile .mhome .gd-sday.aw { background: rgba(240,140,42,.24) !important }
+/* the game on a phone: the 2D view has no cameras, graphics levels or 3D name tags - those controls are hidden */
+body.mobile .gctrl #gcam, body.mobile .gctrl #gqual, body.mobile .gctrl [data-act=glabels] { display: none !important }
 /* the strength tabs and Auto-set on one row */
 body.mobile .lines-card > .cardhead { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 6px !important }
 body.mobile .lines-card > .cardhead .tabs.inline { flex: 1 1 auto; min-width: 0 }
@@ -11150,16 +11152,39 @@ class RinkViewer {
   init2D() {
     const cv = document.createElement('canvas'); cv.className = 'rv-canvas'; this.host.appendChild(cv); this.cv = cv; this.ctx = cv.getContext('2d');
     this.ro = new ResizeObserver(() => this.resize()); this.ro.observe(this.host); this.resize();
+    // both clubs' logos for the ice (the home club's at centre, each club's in a zone)
+    const img = t => { if (t.logoImg && t.logoImg.complete) return t.logoImg; if (!t.logo) return null; const im = new Image(); im.src = t.logo; return im; };
+    this.lg2 = [img(this.home), img(this.away)];
   }
   draw2D(a) {
-    const c = this.ctx, cv = this.cv, w = cv.width, h = cv.height; const sc = Math.min(w / 210, h / 95);
+    const c = this.ctx, cv = this.cv, w = cv.width, h = cv.height;
+    // (a phone held upright: the rink turned to run top to bottom, so it fills the screen - flat it was a strip a third tall)
+    // (upright, the scoreboard over the top and the speed buttons along the bottom keep their strips of the screen)
+    const vert = h > w * 1.1, dpr = window.devicePixelRatio || 1, top = vert ? 66 * dpr : 0, bot = vert ? 58 * dpr : 0, hh = h - top - bot, cy = top + hh / 2;
+    const sc = vert ? Math.min(w / 95, hh / 210) : Math.min(w / 210, h / 95);
+    const toS = (x, y) => vert ? [w / 2 - y * sc, cy - x * sc] : [w / 2 + x * sc, h / 2 - y * sc];
     c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#0d1419'; c.fillRect(0, 0, w, h);
-    c.setTransform(sc, 0, 0, -sc, w / 2, h / 2);
+    const rinkT = () => vert ? c.setTransform(0, -sc, -sc, 0, w / 2, cy) : c.setTransform(sc, 0, 0, -sc, w / 2, h / 2);
+    rinkT();
     c.fillStyle = '#eef4f9'; c.beginPath(); c.roundRect ? c.roundRect(-100, -42.5, 200, 85, 28) : c.rect(-100, -42.5, 200, 85); c.fill();
+    // the logos painted into the ice, faded (drawn on the screen, upright)
+    const logo = (im, X, sz, al) => { if (!im || !im.complete || !im.naturalWidth) return; const [sx, sy] = toS(X, 0), z = sz * sc; c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = al; c.drawImage(im, sx - z / 2, sy - z / 2, z, z); c.restore(); };
+    logo(this.lg2[0], 0, 22, .5); logo(this.lg2[1], -57, 13, .22); logo(this.lg2[0], 57, 13, .22);
     c.fillStyle = '#c8102e'; c.fillRect(-.5, -42.5, 1, 85); c.fillStyle = '#1f4e9c'; c.fillRect(24.5, -42.5, 1, 85); c.fillRect(-25.5, -42.5, 1, 85);
     c.fillStyle = '#c8102e'; c.fillRect(88.9, -42.5, .2, 85); c.fillRect(-89.1, -42.5, .2, 85);
-    for (const e of this.g.ent) { const x = e.px + (e.x - e.px) * a, y = e.py + (e.y - e.py) * a; c.fillStyle = e.team === 0 ? this.home.c1 : '#fff'; c.strokeStyle = e.team === 0 ? '#fff' : this.away.c1; c.lineWidth = .5; c.beginPath(); c.arc(x, y, e.isG ? 2.3 : 1.8, 0, 7); c.fill(); c.stroke(); }
-    const p = this.g.puck; const ppx = p.px ?? p.x, ppy = p.py ?? p.y; c.fillStyle = '#000'; c.beginPath(); c.arc(ppx + (p.x - ppx) * a, ppy + (p.y - ppy) * a, .8, 0, 7); c.fill();
+    c.strokeStyle = '#c8102e'; c.lineWidth = .3; c.beginPath(); c.arc(0, 0, 15, 0, 7); c.stroke();
+    // the players: a jersey-coloured disc with his number, his name under it (the user's ask, 2026-10)
+    const R0 = 2.9, pos = [];
+    for (const e of this.g.ent) { const x = e.px + (e.x - e.px) * a, y = e.py + (e.y - e.py) * a, hm = e.team === 0, tm = hm ? this.home : this.away; c.fillStyle = hm ? tm.c1 : '#fff'; c.strokeStyle = hm ? '#fff' : tm.c1; c.lineWidth = .6; c.beginPath(); c.arc(x, y, e.isG ? R0 + .5 : R0, 0, 7); c.fill(); c.stroke(); pos.push([e, x, y, hm, tm]); }
+    const p = this.g.puck; const ppx = p.px ?? p.x, ppy = p.py ?? p.y; c.fillStyle = '#000'; c.beginPath(); c.arc(ppx + (p.x - ppx) * a, ppy + (p.y - ppy) * a, .9, 0, 7); c.fill();
+    c.setTransform(1, 0, 0, 1, 0, 0); c.textAlign = 'center'; c.textBaseline = 'middle';
+    const fN = Math.max(8, R0 * 1.15 * sc), fL = Math.max(8, 2.1 * sc);
+    for (const [e, x, y, hm, tm] of pos) {
+      const P = this.g.P[e.pid] || {}, [X, Y] = toS(x, y);
+      c.font = '800 ' + fN + 'px "Saira Condensed", "Arial Narrow", sans-serif'; c.fillStyle = hm ? '#fff' : tm.c1; c.fillText(String(P.num || ''), X, Y + fN * .05);
+      c.font = '700 ' + fL + 'px "Saira Condensed", "Arial Narrow", sans-serif'; c.lineWidth = Math.max(2, fL * .28); c.strokeStyle = 'rgba(10,16,22,.85)'; c.fillStyle = '#fff';
+      const nm = (P.last || '').toUpperCase(), ny = Y + (R0 + 1.9) * sc; c.strokeText(nm, X, ny); c.fillText(nm, X, ny);
+    }
   }
   // ---------- loop ----------
   resize() {
