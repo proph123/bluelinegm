@@ -1496,6 +1496,17 @@ body.mobile #modal:has(.pf-modal) { padding: 0 !important; align-items: stretch 
    lay the whole page out wider and cut the profile off on the right) */
 body.mobile .tabs { max-width: 100% !important; min-width: 0 !important; box-sizing: border-box; overflow-x: auto }
 body.mobile .card { min-width: 0; max-width: 100% }
+/* the Trade Center on a phone (mBar builds it): three pages side by side and a bar pinned over the tab bar */
+body.mobile .tg-pages { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; align-items: flex-start }
+body.mobile .tg-pages::-webkit-scrollbar { display: none }
+body.mobile .tg-pages > * { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always }
+body.mobile .tg-pages .tv-list { max-height: calc(100vh - 360px) !important; min-height: 240px }
+body.mobile .tg-pages .tp-sel { max-width: 100% !important; width: 100% !important; box-sizing: border-box }
+body.mobile .tg-deal .tsum, body.mobile .tg-deal .verdict { margin: 0 0 10px !important }
+body.mobile .tg-bar { position: sticky; bottom: 60px; z-index: 6; display: flex; align-items: center; gap: 10px; margin: 10px -4px 0; padding: 8px 10px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 -6px 18px rgba(0,0,0,.35) }
+body.mobile .tg-bar[hidden] { display: none }
+body.mobile .tg-bm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px } body.mobile .tg-bm .tmeter { margin: 0 !important } body.mobile .tg-bm small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+body.mobile .card:has(.tg-pages) > .partner .small, body.mobile .card:has(.tg-pages) > p.muted.small { display: none }
 /* the profile on a phone: Overview / Stats / Career tabs, the cards one under another, ratings in two columns */
 body.mobile .pf-mt { margin: 10px 10px 0; top: 0 } body.mobile .pf-grid.pf-m { display: flex !important; flex-direction: column; gap: 10px; padding: 10px !important }
 body.mobile .pf-grid.pf-m > * { width: 100% !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box }
@@ -11814,8 +11825,39 @@ function mBar() {
     const bs = pg.querySelectorAll('button'), mark = i => bs.forEach((x, j) => x.classList.toggle('on', i === j));
     bs.forEach((x, i) => x.addEventListener('click', () => ev.scrollTo({ left: i * ev.clientWidth, behavior: 'smooth' })));
     ev.addEventListener('scroll', () => { const i = Math.round(ev.scrollLeft / Math.max(1, ev.clientWidth)); if (i !== sub.levPg) { sub.levPg = i; mark(i); } }, { passive: true });
+    ev.addEventListener('click', () => { sub.levPg = Math.round(ev.scrollLeft / Math.max(1, ev.clientWidth)); }, true);
     if (sub.levPg) ev.scrollLeft = sub.levPg * ev.clientWidth;
     mark(sub.levPg || 0);
+  }
+  // the Trade Center on a phone: your list, their list and the deal as three pages side by side (swipe or tap the switch),
+  // with a bar pinned over the tab bar - the value meter and a jump to the deal - so a pick never means scrolling to see
+  // where the deal stands (the user's ask, 2026-10); the page you were on stays put when a pick redraws it
+  const tg = document.querySelector('#main .tradegrid');
+  if (tg && tg.children.length === 2 && !tg.closest('.tg-pages')) {
+    const card = tg.parentElement, ts = card.querySelector(':scope > .tsum'), vd = card.querySelector(':scope > .verdict');
+    const cnt = card.querySelectorAll('.ts-pc').length;
+    const pages = document.createElement('div'); pages.className = 'tg-pages';
+    const pg3 = document.createElement('div'); pg3.className = 'tg-deal';
+    if (ts) pg3.appendChild(ts); else { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'Pick players or picks on either side to build a deal.'; pg3.appendChild(p); }
+    if (vd) pg3.appendChild(vd);
+    tg.before(pages); pages.appendChild(tg.children[0]); pages.appendChild(tg.children[0]); pages.appendChild(pg3); tg.remove();
+    const sw2 = document.createElement('div'); sw2.className = 'lev-pg tg-pg'; const nm2 = (card.querySelector('.tradegrid, .tg-pages') && pages.children[1].querySelector('.tbadge')) ? pages.children[1].querySelector('.tbadge').textContent.trim() : 'Them';
+    sw2.innerHTML = `<button type="button">${esc(UT().abbr)}</button><button type="button">${esc(nm2)}</button><button type="button">Deal${cnt ? ' (' + cnt + ')' : ''}</button>`;
+    pages.before(sw2);
+    const bs = sw2.querySelectorAll('button'), mark = i => bs.forEach((x, j) => x.classList.toggle('on', i === j));
+    const go = i => pages.scrollTo({ left: i * pages.clientWidth, behavior: 'smooth' });
+    bs.forEach((x, i) => x.addEventListener('click', () => go(i)));
+    pages.addEventListener('scroll', () => { const i = Math.round(pages.scrollLeft / Math.max(1, pages.clientWidth)); if (i !== sub.tgPg) { sub.tgPg = i; mark(i); bar.hidden = i === 2; } }, { passive: true });
+    // the pinned bar: the meter (a copy) and the jump to the deal
+    const bar = document.createElement('div'); bar.className = 'tg-bar';
+    const mt = vd && vd.querySelector('.tmeter'), msg = vd && vd.querySelector(':scope > p');
+    bar.innerHTML = `<div class="tg-bm">${mt ? mt.outerHTML : ''}<small>${msg ? esc(msg.textContent.trim()) : 'Build a deal'}</small></div><button class="btn sm primary" type="button">Deal ›</button>`;
+    bar.querySelector('button').addEventListener('click', () => go(2));
+    // (and the page is noted at the tap itself, before the pick redraws the screen - scroll events can lag behind)
+    pages.addEventListener('click', () => { sub.tgPg = Math.round(pages.scrollLeft / Math.max(1, pages.clientWidth)); }, true);
+    card.appendChild(bar);
+    if (sub.tgPg) pages.scrollLeft = sub.tgPg * pages.clientWidth;
+    mark(sub.tgPg || 0); bar.hidden = sub.tgPg === 2;
   }
   // the phone Home's swipe cards: the dot under them follows the card in view
   const sw = document.querySelector('#main .mh-sw');
