@@ -1392,6 +1392,7 @@ body.mobile .lines-card .ln-bench .lc .ovr { position: absolute !important; top:
 body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
 /* Home on a phone (mHome): the next-game card, your games, swipe cards, your club, the news */
 .mhome { display: flex; flex-direction: column; gap: 10px }
+.mh-tabs { display: flex; gap: 4px; background: var(--panel2); border-radius: 8px; padding: 3px; position: sticky; top: 52px; z-index: 5 } .mh-tabs button { all: unset; flex: 1; text-align: center; padding: 7px 0; border-radius: 6px; font: 800 12.5px var(--f-display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer } .mh-tabs button.on { background: var(--blue); color: #fff }
 .mh-next { background: linear-gradient(160deg, color-mix(in srgb, var(--hc) 30%, var(--panel)), var(--panel)); border: 1px solid var(--line); border-radius: 12px; padding: 12px }
 .mh-when { text-align: center; font: 800 11px var(--f-display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px }
 .mh-vs { display: flex; align-items: center; justify-content: space-around }
@@ -1416,6 +1417,7 @@ body.mobile .mhome .gd-strip { margin: 0 }
 body.mobile .mhome .gd-sday.hm { background: rgba(47,125,225,.26) !important } body.mobile .mhome .gd-sday.aw { background: rgba(240,140,42,.24) !important }
 /* the game on a phone: the 2D view has no cameras, graphics levels or 3D name tags - those controls are hidden */
 body.mobile .gctrl #gcam, body.mobile .gctrl #gqual, body.mobile .gctrl [data-act=glabels] { display: none !important }
+body.mobile .gctrl { flex-wrap: nowrap !important; gap: 4px !important; left: 6px !important; right: 6px !important } body.mobile .gctrl .btn.sm { padding: 6px 8px !important; font-size: 11px !important; white-space: nowrap } body.mobile .gctrl .seg button { padding: 6px 7px !important; font-size: 11.5px !important }
 /* the strength tabs and Auto-set on one row */
 body.mobile .lines-card > .cardhead { display: flex !important; flex-wrap: nowrap !important; align-items: center !important; gap: 6px !important }
 body.mobile .lines-card > .cardhead .tabs.inline { flex: 1 1 auto; min-width: 0 }
@@ -11160,7 +11162,9 @@ class RinkViewer {
     const c = this.ctx, cv = this.cv, w = cv.width, h = cv.height;
     // (a phone held upright: the rink turned to run top to bottom, so it fills the screen - flat it was a strip a third tall)
     // (upright, the scoreboard over the top and the speed buttons along the bottom keep their strips of the screen)
-    const vert = h > w * 1.1, dpr = window.devicePixelRatio || 1, top = vert ? 66 * dpr : 0, bot = vert ? 58 * dpr : 0, hh = h - top - bot, cy = top + hh / 2;
+    // (the ⟲ button picks upright or sideways; by default it follows how the phone is held)
+    if (this.rot2 === undefined) { try { this.rot2 = localStorage.getItem('blgm-rot2') || ''; } catch (e) { this.rot2 = ''; } }
+    const vert = this.vert2 = this.rot2 === 'v' ? true : this.rot2 === 'h' ? false : h > w * 1.1, dpr = window.devicePixelRatio || 1, top = vert ? 66 * dpr : 0, bot = vert ? 58 * dpr : 0, hh = h - top - bot, cy = top + hh / 2;
     const sc = vert ? Math.min(w / 95, hh / 210) : Math.min(w / 210, h / 95);
     const toS = (x, y) => vert ? [w / 2 - y * sc, cy - x * sc] : [w / 2 + x * sc, h / 2 - y * sc];
     c.setTransform(1, 0, 0, 1, 0, 0); c.fillStyle = '#0d1419'; c.fillRect(0, 0, w, h);
@@ -11179,11 +11183,27 @@ class RinkViewer {
     const p = this.g.puck; const ppx = p.px ?? p.x, ppy = p.py ?? p.y; c.fillStyle = '#000'; c.beginPath(); c.arc(ppx + (p.x - ppx) * a, ppy + (p.y - ppy) * a, .9, 0, 7); c.fill();
     c.setTransform(1, 0, 0, 1, 0, 0); c.textAlign = 'center'; c.textBaseline = 'middle';
     const fN = Math.max(8, R0 * 1.15 * sc), fL = Math.max(8, 2.1 * sc);
-    for (const [e, x, y, hm, tm] of pos) {
-      const P = this.g.P[e.pid] || {}, [X, Y] = toS(x, y);
-      c.font = '800 ' + fN + 'px "Saira Condensed", "Arial Narrow", sans-serif'; c.fillStyle = hm ? '#fff' : tm.c1; c.fillText(String(P.num || ''), X, Y + fN * .05);
-      c.font = '700 ' + fL + 'px "Saira Condensed", "Arial Narrow", sans-serif'; c.lineWidth = Math.max(2, fL * .28); c.strokeStyle = 'rgba(10,16,22,.85)'; c.fillStyle = '#fff';
-      const nm = (P.last || '').toUpperCase(), ny = Y + (R0 + 1.9) * sc; c.strokeText(nm, X, ny); c.fillText(nm, X, ny);
+    const rr = R0 * sc, S = pos.map(([e, x, y]) => toS(x, y));
+    for (let i = 0; i < pos.length; i++) { const [e, , , hm, tm] = pos[i], P = this.g.P[e.pid] || {}, [X, Y] = S[i];
+      c.font = '800 ' + fN + 'px "Saira Condensed", "Arial Narrow", sans-serif'; c.fillStyle = hm ? '#fff' : tm.c1; c.fillText(String(P.num || ''), X, Y + fN * .05); }
+    // the names: under the player, else over him, else beside - wherever the tag covers the fewest other players and
+    // names already placed (crowded at a faceoff, they sat on each other - the user's screenshot)
+    c.font = '700 ' + fL + 'px "Saira Condensed", "Arial Narrow", sans-serif'; c.lineWidth = Math.max(2, fL * .28); c.strokeStyle = 'rgba(10,16,22,.85)'; c.fillStyle = '#fff';
+    const placed = [], hit = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+    for (let i = 0; i < pos.length; i++) {
+      const P = this.g.P[pos[i][0].pid] || {}, nm = (P.last || '').toUpperCase(); if (!nm) continue;
+      const [X, Y] = S[i], tw = c.measureText(nm).width, th = fL * 1.05, gap = rr + fL * .75;
+      const tries = [[X, Y + gap], [X, Y - gap], [X + rr + tw / 2 + 3, Y], [X - rr - tw / 2 - 3, Y]];
+      // (the spot it had last frame wins ties, so the tags don't flicker between spots)
+      const lp = this.lp2 || (this.lp2 = {}), pid = pos[i][0].pid; let best = tries[0], bv = 1e18, bk = 0;
+      tries.forEach(([tx, ty], k) => { const b = [tx - tw / 2, ty - th / 2, tx + tw / 2, ty + th / 2]; let v = k * .3;
+        for (let j = 0; j < S.length; j++) if (j !== i) v += hit(b, [S[j][0] - rr, S[j][1] - rr, S[j][0] + rr, S[j][1] + rr]);
+        for (const q of placed) v += hit(b, q);
+        if (lp[pid] === k) v *= .6;
+        if (v < bv) { bv = v; best = [tx, ty]; bk = k; } });
+      lp[pid] = bk;
+      placed.push([best[0] - tw / 2, best[1] - th / 2, best[0] + tw / 2, best[1] + th / 2]);
+      c.strokeText(nm, best[0], best[1]); c.fillText(nm, best[0], best[1]);
     }
   }
   // ---------- loop ----------
@@ -13405,9 +13425,10 @@ function mHome(t) {
     return `<div class="mh-nw${n.tid === L.userTid ? ' mine' : ''}"${act ? ' role="button" tabindex="0"' + act : ''}>${tm ? lgImg(tm, 'gd-nl') : '<span class="lgx gd-nl" style="--c1:var(--muted)">NHL</span>'}<div><p>${esc(n.text)}</p><small>${tg ? `<em style="color:${tg[1]}">${tg[0]}</em> · ` : ''}${newsDate(n)}</small></div></div>`; };
   const news = `<div class="mh-nf">${Object.entries(F).map(([key, [lab]]) => `<button class="${nf === key ? 'on' : ''}" data-act="mhNews" data-k="${key}">${lab}</button>`).join('')}</div>
     ${ns.length ? ns.map(item).join('') : '<p class="muted small">Nothing here yet.</p>'}${L.news.filter(F[nf][1]).length > ns.length ? '<button class="btn ghost mh-more" data-act="mhMore">Show more</button>' : ''}`;
-  return `<div class="mhome" style="--hc:${t.c1}">${card}${gdStrip()}${swipe}
-    <h3 class="mh-sec">${esc(t.city + ' ' + t.name)}</h3>${stats}${leaders}${div}
-    <h3 class="mh-sec">News and transactions</h3>${news}${po || L.playoffs ? bracket() : ''}</div>`;
+  // (three tabs, each about a screen - one long page took too much scrolling, the user found)
+  const tab = sub.mht || 'game', tb = (k, lab) => `<button class="${tab === k ? 'on' : ''}" data-act="mhTab" data-k="${k}">${lab}</button>`;
+  const body = tab === 'team' ? `${stats}${leaders}${div}` : tab === 'news' ? news : `${card}${gdStrip()}${swipe}${po || L.playoffs ? bracket() : ''}`;
+  return `<div class="mhome" style="--hc:${t.c1}"><div class="mh-tabs">${tb('game', 'Game')}${tb('team', esc(t.name))}${tb('news', 'News')}</div>${body}</div>`;
 }
 // the phone Home's Sim button: the longer sims in a sheet
 function mSimSheet() {
@@ -16707,7 +16728,7 @@ function watchGame() {
   el.innerHTML = `<div class="gscreen"><div class="stage" id="stage">
     <div class="sb2"><div class="sbmark" aria-hidden="true"></div><div class="sbrows"><div class="sbrow" style="--c:${at.c1}"><span>${at.abbr}</span><b id="sb-a">0</b></div><div class="sbrow" style="--c:${ht.c1}"><span>${ht.abbr}</span><b id="sb-h">0</b></div></div><div class="sbsog"><b id="sb-sa">0</b><small>SOG</small><b id="sb-sh">0</b></div><div class="sbclk"><b id="sb-clock">20:00</b><span id="sb-per">1st</span></div></div><div class="sbsit" id="sb-sit"></div>
     <div class="goalflash" id="goalflash" hidden></div>
-    <div class="gctrl"><button class="btn sm" data-act="gpause" id="gp">Pause</button><div class="seg" role="group" aria-label="Speed">${[1, 2, 4, 8, 16].map(s => `<button data-act="gspeed" data-s="${s}" class="${s === 2 ? 'on' : ''}">${s}×</button>`).join('')}</div>
+    <div class="gctrl"><button class="btn sm" data-act="gpause" id="gp">Pause</button>${MOBILE ? '<button class="btn sm" data-act="grot" aria-label="Turn the rink" title="Turn the rink">⟲</button>' : ''}<div class="seg" role="group" aria-label="Speed">${[1, 2, 4, 8, 16].map(s => `<button data-act="gspeed" data-s="${s}" class="${s === 2 ? 'on' : ''}">${s}×</button>`).join('')}</div>
     <select id="gcam" data-act="gcam" aria-label="Camera"><option value="zone">Zone (high)</option><option value="broadcast">Broadcast</option><option value="close">Broadcast (close)</option><option value="high">Overhead</option><option value="end">End zone</option><option value="ice">Follow puck</option><option value="orbit">Free orbit (drag)</option></select>
     <button class="btn sm ghost" data-act="glabels" id="glabels">Labels: Names</button><select id="gqual" data-act="gqual" aria-label="Graphics quality"><option value="high">Graphics: High</option><option value="medium">Graphics: Medium</option><option value="low">Graphics: Low</option></select><button class="btn sm" data-act="gskip">Sim to end</button></div>
   </div>
@@ -17203,6 +17224,9 @@ const ACT = {
   mSim: () => mSimSheet(),
   mSimGo: (d, el) => { closeModal(); if (ACT[d.a]) ACT[d.a](d, el); },
   mhNews: d => { sub.mhn = d.k; sub.mhnN = 12; render(); },
+  mhTab: d => { sub.mht = d.k; render(); window.scrollTo(0, 0); },
+  // the phone game's rink: upright or sideways, whichever way the phone is held (kept for the next game)
+  grot: () => { if (!viewer) return; const v = !viewer.vert2; viewer.rot2 = v ? 'v' : 'h'; try { localStorage.setItem('blgm-rot2', viewer.rot2); } catch (e) { } },
   mhMore: () => { sub.mhnN = (sub.mhnN || 12) + 20; render(); },
   newleague: d => { pendingStart = { kind: 'gen', tid: +d.tid }; render(); window.scrollTo(0, 0); },
   continue: () => {
