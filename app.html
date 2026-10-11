@@ -1326,7 +1326,10 @@ body.mobile .tabs button { flex: 0 0 auto; min-height: 38px }
 body.mobile .btnrow { flex-wrap: wrap }
 /* pop-ups: full width, scrolling inside */
 body.mobile .mbox, body.mobile .mbox.wide { width: 100% !important; max-width: 100% !important; max-height: calc(100vh - 20px); overflow-y: auto; border-radius: 12px; padding: 14px !important; box-sizing: border-box }
-body.mobile #modal { padding: 10px !important; align-items: flex-start }
+body.mobile #modal { padding: 10px !important; align-items: center }   /* (in the middle of the screen - the user's ask) */
+/* (a tap on the dim backdrop closes a pop-up: iPhones only send a tap on a plain element as a click when it shows as clickable) */
+.mback { cursor: pointer; -webkit-tap-highlight-color: transparent }
+body.mobile #modal { grid-template-columns: minmax(0, 1fr) } body.mobile .tm-grid { grid-template-columns: minmax(0, 1fr) !important; gap: 12px !important }
 /* Home: its own height (the PC's fills the window), the date strip scrolls, the matchup as two halves over the details,
    the cards one under the other */
 body.mobile .office, body.mobile .office.gd { height: auto !important; min-height: 0 !important; overflow: visible !important }
@@ -1421,6 +1424,18 @@ body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
 .mh-story em { flex: none; font: 800 10px var(--f-display); letter-spacing: .06em; text-transform: uppercase; font-style: normal; color: #fff; padding: 2px 6px; border-radius: 3px } .mh-story p { margin: 0; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }
 .mh-race { margin-bottom: 6px } .mh-race h4 { margin: 2px 0 2px; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
 .mh-rc { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 14px 20px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; font-size: 13px; cursor: pointer } .mh-rc > span { color: var(--muted); font-size: 11px } .mh-rc em { font: 800 14px var(--f-display); font-style: normal } .mh-rc.me b { color: #7fb4ff }
+/* Roster on a phone (vRoster's mRow): a card a player */
+.mr-list { display: flex; flex-direction: column; gap: 6px } .mr-sort { margin-bottom: 4px }
+.mr-grp { font: 800 12px var(--f-display); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin: 10px 2px 2px }
+.mr-card { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px }
+.mr-face { all: unset; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; line-height: 0; cursor: pointer } .mr-face svg, .mr-face .phwrap { width: 44px; height: 44px }
+.mr-mid { min-width: 0; display: flex; flex-direction: column; gap: 2px }
+.mr-nm { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; font-size: 14px } .mr-nm .link { font-weight: 700 } .mr-num { font: 800 12px var(--f-display); color: var(--muted) }
+.mr-sub { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 4px; flex-wrap: wrap }
+.mr-st { font-size: 11.5px; color: var(--ink) }
+.mr-r { display: flex; flex-direction: column; align-items: flex-end; gap: 4px } .mr-r .ovr { font-size: 18px; min-width: 38px; text-align: center }
+.mr-act { display: flex; gap: 4px } .mr-act .btn.sm { padding: 3px 7px; font-size: 10.5px }
+body.mobile .card:has(.mr-list) .cardhead .muted { display: none }
 .mh-simlist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px } .mh-simlist .btn { justify-content: center; padding: 12px 0 }
 body.mobile .mhome .gd-strip { margin: 0 }
 body.mobile .mhome .gd-sday.hm { background: rgba(47,125,225,.26) !important } body.mobile .mhome .gd-sday.aw { background: rgba(240,140,42,.24) !important }
@@ -13882,21 +13897,45 @@ function vRoster() {
     const r = p.r, s = p.stats;
     const rat = p.pos === 'G' ? `<td>${R(r.ref)}</td><td>${R(r.pos)}</td><td>${R(r.reb)}</td><td colspan="4" class="muted small">goaltender</td>` : `<td>${R(r.ska)}</td><td>${R(r.sht)}</td><td>${R(r.pas)}</td><td>${R(r.hnd)}</td><td>${R(r.chk)}</td><td>${R(r.def)}</td><td>${R(r.fo)}</td>`;
     const st = tab === 'roster' ? (p.pos === 'G' ? `<td>${s.gp}</td><td>${s.w}-${s.l}-${s.otl}</td><td>${sv(s.ga, s.sa)}</td><td>${s.gp ? (s.ga / (s.toi / 3600)).toFixed(2) : '—'}</td>` : `<td>${s.gp}</td><td>${s.g}-${s.a}</td><td><b>${s.g + s.a}</b></td><td>${s.pm > 0 ? '+' : ''}${s.pm}</td>`) : stintCells(p, curStint(p));
-    let act = '';
-    if (mine && tab === 'roster') act = `<button class="btn sm ghost" data-act="sendDown" data-pid="${p.id}" title="Assign to ${esc(L.affName(t))}">↓ AHL</button>`;
-    if (mine && (tab === 'farm' || tab === 'echl')) act = p.echl ? `<span class="lgp lg-pro" title="${esc(L.echlName(t))} (ECHL)">ECHL</span> <button class="btn sm" data-act="toAHL" data-pid="${p.id}">↑ AHL</button> <button class="btn sm ghost" data-act="callUp" data-pid="${p.id}">↑ NHL</button>`
-      : `<button class="btn sm" data-act="callUp" data-pid="${p.id}">↑ Call up</button> <button class="btn sm ghost" data-act="toECHL" data-pid="${p.id}" title="Assign to the ${esc(L.echlName(t))} (ECHL)">↓ ECHL</button>`;
-    if (mine && tab === 'prospects') act = p.contract ? `<button class="btn sm" data-act="assignOpen" data-pid="${p.id}">Assign</button>` : `<button class="btn sm primary" data-act="signOpen" data-pid="${p.id}">Sign ELC</button>`;
+    const act = actOf(p);
     const contract = tab === 'prospects' ? `<td class="l small">${p.contract ? 'ELC ' + dealTxt(p.contract.sal, p.contract.exp) + (p.loan ? ' · <i>on loan</i>' : '') : `<span class="${L.rightsUntil(p) <= L.season ? 'neg' : 'muted'}">Unsigned · sign by summer ${L.rightsUntil(p) + 1}</span>`}</td>`
       : `<td>${p.contract ? money(dealNow(p).sal) : '—'}</td><td class="nowrap">${p.contract ? yrsLeft(dealNow(p).exp) : ''} ${clauseChip(p)}</td>`;
     const fit = mine && (tab === 'prospects' || (tab === 'farm' && p.age <= 23)) ? L.devFit(p) : []; const bf = fit.find(o => o.best), cf = fit.find(o => o.cur);
     const fitTag = bf && cf && !bf.cur && bf.s - cf.s >= .3 ? ` <span class="pill good" title="${esc(bf.n)}">Better fit: ${esc(bf.k === 'LOAN' ? 'loan' : bf.k)}${!p.contract && bf.k !== 'LOAN' ? ' (once signed)' : ''}</span>` : '';
     const league = tab === 'prospects' ? `<td class="l nowrap">${lgPill(p)} <span class="small">${clubLogo(p.lg, p.club)}${esc(p.club || '')}</span>${fitTag}</td>` : '';
-    return `<tr><td class="muted">${tab === 'roster' ? p.num || '' : ''}</td><td class="l"><span class="avatar">${faceSVG(p, t, 26)}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button>${tab === 'roster' ? capB(p) : ''}${p.inj ? ` <span class="pill bad" title="${esc((p.injType || 'injury') + ': ' + injLen(p))}">INJ ${injLen(p, true)}</span>` : ''}${p.er ? ' <span class="pill" title="Emergency recall">ER</span>' : ''}${tab === 'farm' ? fitTag : ''}${moodOn() && p.wantsTrade ? ' <span class="pill bad">Wants trade</span>' : ''}${moodOn() && mine && tab === 'roster' && !p.wantsTrade && L.moodLab(p).cls && L.moodLab(p).cls !== 'good' ? ` <span class="pill ${L.moodLab(p).cls}" title="${esc(moodWhy(p))}">${L.moodLab(p).lab}</span>` : ''} ${tab !== 'prospects' ? wxPill(p) : ''}</td><td>${posLab(p)}</td><td>${p.age}</td><td><span class="ovr ${ovrCls(R(p.ovr))}">${R(p.ovr)}</span></td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${archChip(p)}</td>${league}${tab === 'prospects' ? '' : rat}${contract}${st}<td class="nowrap">${act}</td></tr>`;
+    return `<tr><td class="muted">${tab === 'roster' ? p.num || '' : ''}</td><td class="l"><span class="avatar">${faceSVG(p, t, 26)}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button>${tab === 'roster' ? capB(p) : ''}${tags(p)}${tab === 'farm' ? fitTag : ''} ${tab !== 'prospects' ? wxPill(p) : ''}</td><td>${posLab(p)}</td><td>${p.age}</td><td><span class="ovr ${ovrCls(R(p.ovr))}">${R(p.ovr)}</span></td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${archChip(p)}</td>${league}${tab === 'prospects' ? '' : rat}${contract}${st}<td class="nowrap">${act}</td></tr>`;
+  };
+  // (the row's status tags: injured, emergency recall, mood)
+  function tags(p) { return `${p.inj ? ` <span class="pill bad" title="${esc((p.injType || 'injury') + ': ' + injLen(p))}">INJ ${injLen(p, true)}</span>` : ''}${p.er ? ' <span class="pill" title="Emergency recall">ER</span>' : ''}${moodOn() && p.wantsTrade ? ' <span class="pill bad">Wants trade</span>' : ''}${moodOn() && mine && tab === 'roster' && !p.wantsTrade && L.moodLab(p).cls && L.moodLab(p).cls !== 'good' ? ` <span class="pill ${L.moodLab(p).cls}" title="${esc(moodWhy(p))}">${L.moodLab(p).lab}</span>` : ''}`; }
+  // the moves you can make with him from this tab
+  function actOf(p) {
+    let act = '';
+    if (mine && tab === 'roster') act = `<button class="btn sm ghost" data-act="sendDown" data-pid="${p.id}" title="Assign to ${esc(L.affName(t))}">↓ AHL</button>`;
+    if (mine && (tab === 'farm' || tab === 'echl')) act = p.echl ? `<span class="lgp lg-pro" title="${esc(L.echlName(t))} (ECHL)">ECHL</span> <button class="btn sm" data-act="toAHL" data-pid="${p.id}">↑ AHL</button> <button class="btn sm ghost" data-act="callUp" data-pid="${p.id}">↑ NHL</button>`
+      : `<button class="btn sm" data-act="callUp" data-pid="${p.id}">↑ Call up</button> <button class="btn sm ghost" data-act="toECHL" data-pid="${p.id}" title="Assign to the ${esc(L.echlName(t))} (ECHL)">↓ ECHL</button>`;
+    if (mine && tab === 'prospects') act = p.contract ? `<button class="btn sm" data-act="assignOpen" data-pid="${p.id}">Assign</button>` : `<button class="btn sm primary" data-act="signOpen" data-pid="${p.id}">Sign ELC</button>`;
+    return act;
+  }
+  // on a phone: each player a card - face, number, name and tags, position · age · style, the overall and ceiling; under
+  // them his numbers, his deal and the moves (the 20-column table needed sideways scrolling)
+  const mRow = p => {
+    const s = p.stats || {}, cs = tab === 'roster' ? null : curStint(p);
+    const stl = tab === 'roster' ? (p.pos === 'G' ? `${s.gp || 0} GP · ${s.w || 0}-${s.l || 0}-${s.otl || 0} · ${sv(s.ga, s.sa)} · ${s.gp ? (s.ga / (s.toi / 3600)).toFixed(2) : '—'} GAA` : `${s.gp || 0} GP · ${s.g || 0}G ${s.a || 0}A · <b>${(s.g || 0) + (s.a || 0)} P</b> · ${s.pm > 0 ? '+' : ''}${s.pm || 0}`)
+      : cs ? (p.pos === 'G' ? `${cs.gp} GP · ${sv(cs.ga, cs.sa)}` : `${cs.gp} GP · ${cs.g}G ${cs.a}A · <b>${cs.g + cs.a} P</b>`) : 'No games yet';
+    const deal = tab === 'prospects' ? (p.contract ? 'ELC ' + dealTxt(p.contract.sal, p.contract.exp) : `<span class="${L.rightsUntil(p) <= L.season ? 'neg' : 'muted'}">Unsigned · sign by ${L.rightsUntil(p) + 1}</span>`)
+      : p.contract ? `${money(dealNow(p).sal)} · ${yrsLeft(dealNow(p).exp)} ${clauseChip(p)}` : '—';
+    return `<div class="mr-card"><button class="mr-face" data-act="player" data-pid="${p.id}">${faceSVG(p, t, 44)}</button>
+      <div class="mr-mid"><div class="mr-nm">${tab === 'roster' && p.num ? `<span class="mr-num">${p.num}</span>` : ''}<button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button>${tab === 'roster' ? capB(p) : ''}${tags(p)}</div>
+      <div class="mr-sub">${posLab(p)} · ${p.age} · ${archChip(p)}${tab === 'prospects' ? ` · ${lgPill(p)} ${esc(p.club || '')}` : ''}</div>
+      <div class="mr-st">${stl}</div><div class="mr-st">${deal}</div></div>
+      <div class="mr-r"><span class="ovr ${ovrCls(R(p.ovr))}">${R(p.ovr)}</span>${tierChip(p, 'pot')}<div class="mr-act">${actOf(p)}</div></div></div>`;
   };
   // grouped by position as the Contracts page is - forwards, defense, goalies - the chosen sort within each group
   const grpRow = (lab, list) => list.length ? `<tr class="rgrp"><td colspan="24" class="l">${lab} <span class="muted">(${list.length})</span></td></tr>${list.map(rowOf).join('')}` : '';
   const rows = grpRow('Forwards', ps.filter(p => grpOf(p) === 'F')) + grpRow('Defense', ps.filter(p => p.pos === 'D')) + grpRow('Goalies', ps.filter(p => p.pos === 'G'));
+  const mGrp = (lab, list) => list.length ? `<h3 class="mr-grp">${lab} <span class="muted">${list.length}</span></h3>${list.map(mRow).join('')}` : '';
+  const mSort = `<div class="mh-nf mr-sort">${[['pos', 'Position'], ['ovr', 'Overall'], ['pot', 'Potential'], ['age', 'Age'], ['sal', 'Salary'], ['pts', 'Points']].map(([k, lab]) => `<button class="${sk === k ? 'on' : ''}" data-act="rsort" data-k="${k}">${lab}</button>`).join('')}</div>`;
+  const mList = MOBILE ? mSort + (mGrp('Forwards', ps.filter(p => grpOf(p) === 'F')) + mGrp('Defense', ps.filter(p => p.pos === 'D')) + mGrp('Goalies', ps.filter(p => p.pos === 'G')) || '<p class="muted">Nobody here yet.</p>') : '';
   const pay = L.payroll(t);
   const ahl = t.aff ? t.aff.rec : null; const ahlRank = t.aff ? L.ahlStandings().indexOf(t) + 1 : 0;
   const statHead = (tab !== 'roster' && anyG && ps.every(p => p.pos === 'G')) ? '<th>GP</th><th>W-L</th><th>SV%</th><th>GAA</th>' : `<th>GP</th><th>G-A</th>${th('pts', 'PTS')}<th>+/-</th>`;
@@ -13910,7 +13949,7 @@ function vRoster() {
     <div class="cardhead"><div class="titlewrap">${teamBadge(t, true)}<div><h2>${esc(t.city)} ${esc(t.name)}</h2><span class="muted">${recStr(t)} · Payroll ${money(pay)} of ${money(CAP)} · ${t.roster.length} NHL · ${(t.farm || []).length} AHL · ${t.prospects.length} prospects · Team OVR ${R(L.teamOvr(t))}</span></div></div>
     <div class="ctrls"><select data-act="rosterTeam" id="roster-team">${L.teams.map(x => `<option value="${x.tid}" ${x.tid === tid ? 'selected' : ''}>${esc(x.city + ' ' + x.name)}</option>`).join('')}</select>${!mine ? `<button class="btn sm" data-act="tradeWith" data-tid="${tid}">Trade with ${esc(t.abbr)}</button>` : ''}</div></div>
     <div class="tabs"><button class="${tab === 'roster' ? 'on' : ''}" data-act="rtab" data-k="roster">NHL roster (${t.roster.length})</button><button class="${tab === 'farm' ? 'on' : ''}" data-act="rtab" data-k="farm">${t.aff ? affBadge(t) + ' ' : ''}AHL (${L.ahlOf(t).length})</button><button class="${tab === 'echl' ? 'on' : ''}" data-act="rtab" data-k="echl" title="${esc(L.echlName(t))}">${clubLogo('ECHL', L.echlName(t), 'sm')} ECHL (${L.echlOf(t).length})</button><button class="${tab === 'prospects' ? 'on' : ''}" data-act="rtab" data-k="prospects">Prospects (${t.prospects.length})</button><button class="${tab === 'contracts' ? 'on' : ''}" data-act="rtab" data-k="contracts">Contracts</button></div>
-    ${tab === 'contracts' ? contractsMap(t, mine) : `${note}
+    ${tab === 'contracts' ? contractsMap(t, mine) : MOBILE ? `<div class="mr-list">${mList}</div>` : `${note}
     <div class="tblwrap"><table class="tbl roster"><thead><tr>${head}</tr></thead><tbody>${rows || '<tr><td colspan="20" class="muted">Nobody here yet.</td></tr>'}</tbody></table></div>`}
   </div>`;
 }
