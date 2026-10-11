@@ -11203,7 +11203,26 @@ class RinkViewer {
     c.save(); rinkPath(); c.clip();
     c.fillStyle = '#c8102e'; c.fillRect(-.5, -42.5, 1, 85); c.fillStyle = '#1f4e9c'; c.fillRect(24.5, -42.5, 1, 85); c.fillRect(-25.5, -42.5, 1, 85);
     c.fillStyle = '#c8102e'; c.fillRect(88.8, -42.5, .4, 85); c.fillRect(-89.2, -42.5, .4, 85);
-    c.strokeStyle = '#c8102e'; c.lineWidth = .3; c.beginPath(); c.arc(0, 0, 15, 0, 7); c.stroke();
+    c.strokeStyle = '#1f4e9c'; c.lineWidth = .3; c.beginPath(); c.arc(0, 0, 15, 0, 7); c.stroke();
+    c.fillStyle = '#1f4e9c'; c.beginPath(); c.arc(0, 0, .6, 0, 7); c.fill();
+    // the rest of an NHL rink's markings (the user's ask): the end-zone faceoff circles with their hash marks and the
+    // L-shaped lines by the dot, the four neutral-zone dots, the trapezoids behind the nets and the referee's crease
+    const red = '#c8102e';
+    for (const X of [69, -69]) for (const Y of [22, -22]) {
+      c.strokeStyle = red; c.lineWidth = .25; c.beginPath(); c.arc(X, Y, 15, 0, 7); c.stroke();
+      c.fillStyle = red; c.beginPath(); c.arc(X, Y, 1, 0, 7); c.fill();
+      c.lineWidth = .2; c.beginPath();
+      for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+        c.moveTo(X + sx * 2.9, Y + sy * 14.7); c.lineTo(X + sx * 2.9, Y + sy * 17.2);
+        c.moveTo(X + sx * 2, Y + sy * .75); c.lineTo(X + sx * 6, Y + sy * .75); c.moveTo(X + sx * 2, Y + sy * .75); c.lineTo(X + sx * 2, Y + sy * 3.75);
+      }
+      c.stroke();
+    }
+    c.fillStyle = red; for (const X of [20, -20]) for (const Y of [22, -22]) { c.beginPath(); c.arc(X, Y, 1, 0, 7); c.fill(); }
+    c.strokeStyle = red; c.lineWidth = .25; c.beginPath();
+    for (const X of [89, -89]) { const d = X > 0 ? 1 : -1; c.moveTo(X, 11); c.lineTo(X + d * 11, 14); c.moveTo(X, -11); c.lineTo(X + d * 11, -14); }
+    c.stroke();
+    c.beginPath(); c.arc(0, -42.5, 10, 0, Math.PI); c.stroke();
     // the creases and the nets: a 6-foot-wide goal, about 3.5 feet deep behind the goal line
     for (const X of [89, -89]) { const d = X > 0 ? -1 : 1;
       c.fillStyle = 'rgba(80,150,230,.45)'; c.beginPath(); c.moveTo(X, -4); c.lineTo(X + d * 4.5, -4); c.arc(X + d * 4.5, 0, 4, -Math.PI / 2, Math.PI / 2, d < 0); c.lineTo(X, 4); c.closePath(); c.fill(); c.strokeStyle = '#c8102e'; c.lineWidth = .25; c.stroke();
