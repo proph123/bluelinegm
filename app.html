@@ -1412,6 +1412,14 @@ body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
 .mh-nf { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px } .mh-nf button { all: unset; flex: none; padding: 5px 11px; border-radius: 14px; background: var(--panel2); font-size: 12px; font-weight: 700; color: var(--muted); cursor: pointer } .mh-nf button.on { background: var(--blue); color: #fff }
 .mh-nw { display: flex; gap: 10px; align-items: flex-start; padding: 9px 2px; border-bottom: 1px solid var(--line) } .mh-nw[role=button] { cursor: pointer } .mh-nw .gd-nl { flex: none; width: 26px; height: 26px } .mh-nw p { margin: 0; font-size: 13.5px; line-height: 1.35 } .mh-nw small { color: var(--muted); font-size: 11px } .mh-nw em { font-style: normal; font-weight: 800 } .mh-nw.mine p { color: #dfe9ff }
 .mh-more { align-self: center }
+.mh-sb { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -2px } .mh-sb::-webkit-scrollbar { display: none }
+.mh-sbi { all: unset; box-sizing: border-box; flex: none; width: 92px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 7px; display: flex; flex-direction: column; gap: 2px } button.mh-sbi { cursor: pointer } .mh-sbi.me { border-color: var(--blue) }
+.mh-sbi small { font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted) }
+.mh-sbl { display: flex; align-items: center; gap: 5px; font-size: 12.5px } .mh-sbl b { flex: 1; font-family: var(--f-display); letter-spacing: .03em } .mh-sbl em { font: 800 14px var(--f-display); font-style: normal } .mh-sbl.lo { opacity: .55 }
+.mh-story { display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--gold, #f2c14e); border-radius: 0 10px 10px 0; padding: 8px 10px; cursor: pointer }
+.mh-story em { flex: none; font: 800 10px var(--f-display); letter-spacing: .06em; text-transform: uppercase; font-style: normal; color: #fff; padding: 2px 6px; border-radius: 3px } .mh-story p { margin: 0; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden }
+.mh-race { margin-bottom: 6px } .mh-race h4 { margin: 2px 0 2px; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+.mh-rc { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 14px 20px 1fr auto; gap: 6px; align-items: center; padding: 2px 0; font-size: 13px; cursor: pointer } .mh-rc > span { color: var(--muted); font-size: 11px } .mh-rc em { font: 800 14px var(--f-display); font-style: normal } .mh-rc.me b { color: #7fb4ff }
 .mh-simlist { display: flex; flex-direction: column; gap: 8px; margin-top: 10px } .mh-simlist .btn { justify-content: center; padding: 12px 0 }
 body.mobile .mhome .gd-strip { margin: 0 }
 body.mobile .mhome .gd-sday.hm { background: rgba(47,125,225,.26) !important } body.mobile .mhome .gd-sday.aw { background: rgba(240,140,42,.24) !important }
@@ -13401,8 +13409,24 @@ function mHome(t) {
     <div class="mh-vs">${side(aT)}<b class="mh-at">@</b>${side(hT)}</div>
     <div class="mh-gs">${gl(aT, false)}<span>Starters</span>${gl(hT, true)}</div>
     <div class="mh-cta">${btns}</div></div>`;
+  // around the league (2026-10, the user: more of the league on the first tab): a scoreboard strip - last night's finals,
+  // then tonight's other games - the latest big story, and the league's scoring and goalie races as a swipe card
+  const sb = [];
+  if (!po && L.day > 0 && L.schedule[L.day - 1]) for (const x of L.schedule[L.day - 1].games) if (x.res) sb.push([x, L.day - 1]);
+  if (L.schedule[L.day]) for (const x of L.schedule[L.day].games) if (!x.res && x !== g) sb.push([x, -1]);
+  const sbIt = ([x, d]) => { const A = L.teams[x.a], H = L.teams[x.h], fin = !!x.res, as = fin ? x.res.s[1] : '', hs = fin ? x.res.s[0] : '', mine = x.h === L.userTid || x.a === L.userTid;
+    const ln = (tm, s, w) => `<span class="mh-sbl${fin && !w ? ' lo' : ''}">${lgImg(tm, 'sm')}<b>${esc(tm.abbr)}</b><em>${s}</em></span>`;
+    return `<${fin ? 'button' : 'div'} class="mh-sbi${mine ? ' me' : ''}"${fin ? ` data-act="boxDay" data-day="${d}" title="Box score"` : ''}><small>${fin ? (x.res.so ? 'Final/SO' : x.res.ot ? 'Final/OT' : 'Final') : 'Tonight'}</small>${ln(A, as, as > hs)}${ln(H, hs, hs > as)}</${fin ? 'button' : 'div'}>`; };
+  const board = sb.length ? `<div class="mh-sb">${sb.map(sbIt).join('')}</div>` : '';
+  const big = L.news.find(n => n.s === L.season && L.day - n.d <= 3 && ['trade', 'award', 'milestone', 'txn'].includes(n.cat) && (n.cat !== 'txn' || /signed|extension/i.test(n.text)) && (n.tid === -1 || n.tid !== L.userTid || n.cat === 'trade'));
+  const story = big ? (() => { const tm = big.tid >= 0 ? L.teams[big.tid] : null, tg = GD_TAG[big.cat] || ['News', '#475569'], act = big.cat === 'trade' ? ` data-act="tradeNews" data-i="${L.news.indexOf(big)}"` : big.pid ? ` data-act="player" data-pid="${big.pid}"` : ' data-act="nav" data-v="news"';
+    return `<div class="mh-story" role="button" tabindex="0"${act}><em style="background:${tg[1]}">${tg[0]}</em>${tm ? lgImg(tm, 'sm') : ''}<p>${esc(big.text)}</p></div>`; })() : '';
+  const lgRace = (() => { const all = L.teams.flatMap(x => L.rosterOf(x)), st2 = p => (po ? p.pstats : p.stats) || {};
+    const sk = all.filter(p => p.pos !== 'G' && st2(p).gp), gs2 = all.filter(p => p.pos === 'G' && st2(p).gp), minG = Math.max(1, Math.round(Math.max(0, ...gs2.map(p => st2(p).gp)) / 3));
+    const col = (lab, ps, f, fmt) => `<div class="mh-race"><h4>${lab}</h4>${ps.slice().sort((a, b) => f(st2(b)) - f(st2(a))).slice(0, 3).map((p, i) => `<button class="mh-rc${p.tid === L.userTid ? ' me' : ''}" data-act="player" data-pid="${p.id}"><span>${i + 1}</span>${lgImg(L.teams[p.tid], 'sm')}<b>${esc(p.last)}</b><em>${fmt(f(st2(p)))}</em></button>`).join('') || '<p class="muted small">No games yet.</p>'}</div>`;
+    return `<section class="gd-card"><h3 class="gd-cap">League leaders${po ? ' · playoffs' : ''}<button class="gd-more" data-act="nav" data-v="stats">Stats ›</button></h3>${col('Points', sk, s => s.g + s.a, v => v)}${col('Goals', sk, s => s.g, v => v)}${col('Save %', gs2.filter(p => st2(p).gp >= minG && st2(p).sa), s => 1 - s.ga / s.sa, v => v.toFixed(3).replace(/^0/, ''))}</section>`; })();
   // the matchup cards (the PC Home's), one screen wide each, swiped sideways
-  const sw = [gdTape(aT, hT), gdForm(aT, hT, t), gdWatch(aT, hT), gdInj(aT, hT)];
+  const sw = [gdTape(aT, hT), lgRace, gdForm(aT, hT, t), gdWatch(aT, hT), gdInj(aT, hT)];
   const swipe = `<div class="mh-sw">${sw.map(h => `<div class="mh-sl">${h}</div>`).join('')}</div><div class="mh-dots">${sw.map((_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>`;
   // your club
   const r = t.rec, dpl = L.standings(x => x.div === t.div).indexOf(t) + 1, pay = L.payroll(t), sp = CAP - pay + L.ltirRelief(t);
@@ -13427,7 +13451,7 @@ function mHome(t) {
     ${ns.length ? ns.map(item).join('') : '<p class="muted small">Nothing here yet.</p>'}${L.news.filter(F[nf][1]).length > ns.length ? '<button class="btn ghost mh-more" data-act="mhMore">Show more</button>' : ''}`;
   // (three tabs, each about a screen - one long page took too much scrolling, the user found)
   const tab = sub.mht || 'game', tb = (k, lab) => `<button class="${tab === k ? 'on' : ''}" data-act="mhTab" data-k="${k}">${lab}</button>`;
-  const body = tab === 'team' ? `${stats}${leaders}${div}` : tab === 'news' ? news : `${card}${gdStrip()}${swipe}${po || L.playoffs ? bracket() : ''}`;
+  const body = tab === 'team' ? `${stats}${leaders}${div}` : tab === 'news' ? news : `${board}${card}${story}${gdStrip()}${swipe}${po || L.playoffs ? bracket() : ''}`;
   return `<div class="mhome" style="--hc:${t.c1}"><div class="mh-tabs">${tb('game', 'Game')}${tb('team', esc(t.name))}${tb('news', 'News')}</div>${body}</div>`;
 }
 // the phone Home's Sim button: the longer sims in a sheet
