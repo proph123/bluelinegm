@@ -1491,8 +1491,16 @@ body.mobile .tbl.stats th, body.mobile .tbl.stats td { padding: 7px 5px }
 /* a player's profile: full screen (it was a box inside a box), its pairs of cards one under the other; no tab bar over
    any pop-up */
 body.mobile:has(#modal:not([hidden])) #mtab { display: none }
-body.mobile #modal:has(.pf-modal) { padding: 0 !important }
-body.mobile .mbox.wide.pf-modal { width: 100% !important; max-height: 100vh; min-height: 100vh; border-radius: 0; padding: 0 0 24px !important }
+body.mobile #modal:has(.pf-modal) { padding: 0 !important; align-items: stretch !important }
+/* (any tab strip stays the screen's width and scrolls inside itself - the Roster's ran 477px wide, which made the phone
+   lay the whole page out wider and cut the profile off on the right) */
+body.mobile .tabs { max-width: 100% !important; min-width: 0 !important; box-sizing: border-box; overflow-x: auto }
+body.mobile .card { min-width: 0; max-width: 100% }
+/* the profile on a phone: Overview / Stats / Career tabs, the cards one under another, ratings in two columns */
+body.mobile .pf-mt { margin: 10px 10px 0; top: 0 } body.mobile .pf-grid.pf-m { display: flex !important; flex-direction: column; gap: 10px; padding: 10px !important }
+body.mobile .pf-grid.pf-m > * { width: 100% !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box }
+body.mobile .pf-m table { font-size: 12px } body.mobile .pf-m th, body.mobile .pf-m td { padding: 6px 5px !important }
+body.mobile .pf-m .pf-attrs { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px 14px !important }body.mobile .mbox.wide.pf-modal { width: 100% !important; max-height: 100vh; min-height: 100vh; border-radius: 0; padding: 0 0 24px !important }
 body.mobile .pf-modal .pf { padding: 0 !important } body.mobile .pf-modal .pf-grid { padding: 8px !important; gap: 8px !important }
 body.mobile .pf-modal .pf-card { padding: 12px !important }
 body.mobile .pf-modal .pf-pair { grid-template-columns: minmax(0, 1fr) !important }
@@ -16660,7 +16668,12 @@ function playerModal(pid) {
       if ((p.sp || 0) >= 40) { const est = keys.map(k => [k, (L.scoutRating(p, k)[0] + L.scoutRating(p, k)[1]) / 2]).sort((a, b) => b[1] - a[1]); rep = `<p class="small"><b>Strengths:</b> ${est.slice(0, 2).map(x => RLAB[x[0]]).join(', ')}. <b>Weakness:</b> ${RLAB[est[est.length - 1][0]]}.</p>`; }
       report = scoutReportCard(p, (p.sp || 0) >= 25 ? '' : rep);   // the skill rows replace the strengths line once they show
     }   // (a drafted player's "Draft report" card - our scouts' read, the lists', now - came off the profile at the user's call; p.scSnap still feeds the scouts' record)
-    body = `<div class="pf-grid">
+    // on a phone: three tabs instead of one long column - the bio and ratings, the numbers, the career (the user's call)
+    const mk = sub.pfm || 'ov', mtb = (k, lab) => `<button class="${mk === k ? 'on' : ''}" data-act="pfM" data-k="${k}">${lab}</button>`;
+    if (MOBILE) body = `<div class="mh-tabs pf-mt">${mtb('ov', 'Overview')}${mtb('st', 'Stats')}${mtb('cr', 'Career')}</div><div class="pf-grid pf-m">${mk === 'st' ? `<div class="pf-card"><h3 class="pf-band">Stats</h3>${profStats(p)}</div><div class="pf-card"><h3>Milestones</h3>${profMilestones(p)}</div>`
+      : mk === 'cr' ? `${awardsCard}<div class="pf-card"><h3>History</h3>${profHistory(p)}</div><div class="pf-card"><h3>Development</h3>${profDevChart(p)}</div><div class="pf-card pf-jcard"><h3>Jersey</h3>${profJersey(p, t)}<p class="muted small pf-cap">${t ? esc(t.city) : ''}</p></div>`
+      : `${bio}${attrs}${report}`}</div>`;
+    else body = `<div class="pf-grid">
       <div class="pf-col">${bio}${awardsCard}<div class="pf-card"><h3>History</h3>${profHistory(p)}</div></div>
       <div class="pf-col">${attrs}${report}
         <div class="pf-pair"><div class="pf-card"><h3>Development</h3>${profDevChart(p)}</div><div class="pf-card pf-jcard"><h3>Jersey</h3>${profJersey(p, t)}<p class="muted small pf-cap">${t ? esc(t.city) : ''}</p></div></div></div>
@@ -17355,6 +17368,7 @@ const ACT = {
   homeLead: d => { sub.hlead = d.k; render(); },
   pfTab: d => { sub.pft = d.k; playerModal(sub.pfid); },
   pfStat: d => { sub.pfst = d.k; playerModal(sub.pfid); },
+  pfM: d => { sub.pfm = d.k; playerModal(sub.pfid); const b = document.querySelector('#modal .mbox'); if (b) b.scrollTop = 0; },
   hlmPick: d => hlmLoad(hlmDeskSrc(d.dir, d.name)),
   hlmClear: () => { hlmData = null; hlmSkip = true; hlmWait = null; render(); },
   mainMenu: async () => { if (L) { save(); await deskFlush(); } L = null; menu = 'start'; saveList = null; view = 'home'; sub = {}; pendingStart = null; closeModal(); render(); window.scrollTo(0, 0); },
