@@ -1507,6 +1507,16 @@ body.mobile .tg-bar { position: sticky; bottom: 60px; z-index: 6; display: flex;
 body.mobile .tg-bar[hidden] { display: none }
 body.mobile .tg-bm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px } body.mobile .tg-bm .tmeter { margin: 0 !important } body.mobile .tg-bm small { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
 body.mobile .card:has(.tg-pages) > .partner .small, body.mobile .card:has(.tg-pages) > p.muted.small { display: none }
+/* League leaders on a phone (vStats): switches, sort chips and a leaderboard */
+.ms .mh-tabs { position: static; margin-bottom: 8px }
+.ms-flt { display: flex; gap: 4px; margin-bottom: 8px } .ms-flt span { flex: 1 } .ms-flt button { all: unset; padding: 5px 10px; border-radius: 14px; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--panel2); cursor: pointer } .ms-flt button.on { background: color-mix(in srgb, var(--blue) 35%, var(--panel2)); color: #fff }
+.ms-sort { margin-bottom: 8px }
+.ms-list { display: flex; flex-direction: column }
+.ms-row { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 22px 38px minmax(0, 1fr) auto; gap: 9px; align-items: center; padding: 8px 2px; border-bottom: 1px solid var(--line); cursor: pointer }
+.ms-row.mine { background: color-mix(in srgb, var(--blue) 10%, transparent) }
+.ms-rk { font: 800 13px var(--f-display); color: var(--muted); text-align: center } .ms-f { width: 38px; height: 38px; border-radius: 50%; overflow: hidden; line-height: 0 } .ms-f svg, .ms-f .phwrap { width: 38px; height: 38px }
+.ms-n { min-width: 0; display: flex; flex-direction: column; gap: 1px } .ms-n b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis } .ms-n small { font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 4px; white-space: nowrap; overflow: hidden } .ms-n small b { font-size: 11.5px; color: var(--ink) }
+.ms-v { display: flex; flex-direction: column; align-items: flex-end } .ms-v b { font: 800 20px var(--f-display) } .ms-v small { font-size: 10px; color: var(--muted); letter-spacing: .06em }
 /* the profile on a phone: Overview / Stats / Career tabs, the cards one under another, ratings in two columns */
 body.mobile .pf-mt { margin: 10px 10px 0; top: 0 } body.mobile .pf-grid.pf-m { display: flex !important; flex-direction: column; gap: 10px; padding: 10px !important }
 body.mobile .pf-grid.pf-m > * { width: 100% !important; min-width: 0 !important; max-width: 100% !important; box-sizing: border-box }
@@ -14500,6 +14510,19 @@ function vStats() {
   const rows = ps.map((p, i) => { const s = p[key], t = L.teams[p.tid]; return kind === 'g' ? `<tr class="${p.tid === L.userTid ? 'mine' : ''}"><td class="muted">${i + 1}</td><td class="l"><span class="st-pl"><span class="avatar">${faceSVG(p, t, 32)}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button></span></td><td>${teamBadge(t)}</td><td>${s.gp}</td><td>${s.w}</td><td>${s.l}</td><td>${s.otl}</td><td>${s.sa}</td><td>${s.ga}</td><td><b>${sv(s.ga, s.sa)}</b></td><td>${(s.ga / (s.toi / 3600 || 1)).toFixed(2)}</td><td>${s.so}</td></tr>`
     : `<tr class="${p.tid === L.userTid ? 'mine' : ''}"><td class="muted">${i + 1}</td><td class="l"><span class="st-pl"><span class="avatar">${faceSVG(p, t, 32)}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button></span></td><td>${teamBadge(t)}</td><td>${p.pos}</td><td>${s.gp}</td><td>${s.g}</td><td>${s.a}</td><td><b>${s.g + s.a}</b></td><td>${s.pm > 0 ? '+' : ''}${s.pm}</td><td>${s.ppg}</td><td>${s.sog}</td><td>${s.sog ? (s.g / s.sog * 100).toFixed(1) : '—'}</td><td>${s.hit}</td><td>${s.blk}</td><td>${s.pim}</td><td>${toiFmt(s.toi / s.gp)}</td><td>${s.fow + s.fol > 20 ? (s.fow / (s.fow + s.fol) * 100).toFixed(1) : '—'}</td></tr>`; }).join('');
   const tb = (grp, val, lab, cur) => `<button class="${cur === val ? 'on' : ''}" data-act="stset" data-g="${grp}" data-k="${val}">${lab}</button>`;
+  // on a phone: a leaderboard - each player a row with the stat it's sorted by big on the right and his line under his
+  // name, the filters as two switches and the sorts as chips (the 17-column table scrolled sideways)
+  if (MOBILE) {
+    const SH = { pts: 'PTS', g: 'G', a: 'A', pm: '+/-', ppg: 'PPG', sog: 'SOG', shp: 'SH%', hit: 'HIT', blk: 'BLK', pim: 'PIM', toi: 'TOI', fo: 'FO%', gp: 'GP', svp: 'SV%', gaa: 'GAA', w: 'W', l: 'L', otl: 'OTL', sa: 'SA', ga: 'GA', so: 'SO' };
+    const val = (p, s) => ({ pts: s.g + s.a, g: s.g, a: s.a, pm: (s.pm > 0 ? '+' : '') + s.pm, ppg: s.ppg, sog: s.sog, shp: s.sog ? (s.g / s.sog * 100).toFixed(1) : '—', hit: s.hit, blk: s.blk, pim: s.pim, toi: toiFmt(s.toi / s.gp), fo: s.fow + s.fol > 20 ? (s.fow / (s.fow + s.fol) * 100).toFixed(1) : '—', gp: s.gp,
+      svp: sv(s.ga, s.sa), gaa: (s.ga / (s.toi / 3600 || 1)).toFixed(2), w: s.w, l: s.l, otl: s.otl, sa: s.sa, ga: s.ga, so: s.so })[sk];
+    const line = (p, s) => kind === 'g' ? `${s.gp} GP · ${s.w}-${s.l}-${s.otl} · ${sv(s.ga, s.sa)} · ${(s.ga / (s.toi / 3600 || 1)).toFixed(2)} GAA` : `${s.gp} GP · ${s.g}G ${s.a}A <b>${s.g + s.a}P</b> · ${s.pm > 0 ? '+' : ''}${s.pm}`;
+    const items = ps.map((p, i) => { const s = p[key], t = L.teams[p.tid]; return `<button class="ms-row${p.tid === L.userTid ? ' mine' : ''}" data-act="player" data-pid="${p.id}"><span class="ms-rk">${i + 1}</span><span class="ms-f">${faceSVG(p, t, 38)}</span><span class="ms-n"><b>${esc(nm(p))}</b><small>${lgImg(t, 'sm')} ${esc(t.abbr)} · ${p.pos}</small><small>${line(p, s)}</small></span><span class="ms-v"><b>${val(p, s)}</b><small>${SH[sk] || ''}</small></span></button>`; }).join('');
+    const chips = `<div class="mh-nf ms-sort">${SORTS.map(([k, lab]) => `<button class="${sk === k ? 'on' : ''}" data-act="stsort" data-k="${k}">${lab}${sk === k ? (dir < 0 ? ' ▼' : ' ▲') : ''}</button>`).join('')}</div>`;
+    return `<div class="card ms"><div class="mh-tabs">${tb('stk', 'sk', 'Skaters', kind)}${tb('stk', 'g', 'Goalies', kind)}</div>
+      <div class="ms-flt">${tb('sts', 'all', 'All teams', scope)}${tb('sts', 'mine', 'My team', scope)}<span></span>${tb('stp', 'rs', 'Season', po ? 'po' : 'rs')}${tb('stp', 'po', 'Playoffs', po ? 'po' : 'rs')}</div>
+      ${chips}<div class="ms-list">${items || '<p class="muted">No games played yet.</p>'}</div>${kind === 'g' ? '<p class="muted small">SV% and GAA rankings require 10 games played.</p>' : ''}</div>`;
+  }
   return `<div class="card"><div class="cardhead"><h2>League leaders</h2><div class="ctrls"><div class="tabs inline">${tb('stk', 'sk', 'Skaters', kind)}${tb('stk', 'g', 'Goalies', kind)}</div><div class="tabs inline">${tb('sts', 'all', 'All teams', scope)}${tb('sts', 'mine', 'My team', scope)}</div><div class="tabs inline">${tb('stp', 'rs', 'Regular season', po ? 'po' : 'rs')}${tb('stp', 'po', 'Playoffs', po ? 'po' : 'rs')}</div>${sortSel}</div></div>
   <div class="tblwrap"><table class="tbl stats"><thead><tr>${head}</tr></thead><tbody>${rows || '<tr><td colspan="18" class="muted">No games played yet.</td></tr>'}</tbody></table></div>${kind === 'g' ? '<p class="muted small">SV% and GAA rankings require 10 games played.</p>' : ''}</div>`;
 }
