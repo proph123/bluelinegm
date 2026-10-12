@@ -6960,7 +6960,7 @@ class League {
     }
     if ((tier >= 4 && Math.random() < .5) || (type === 'concussion' && p.conc >= 3)) { p.dur = Math.max(0, d - 1); p.durK = 1; }
     p.injN = (p.injN || 0) + (tier >= 3 ? 2 : 1);   // (a serious one tells you as much as two small ones: durKnown)
-    p.inj = ends ? 999 : games; p.injType = type;
+    p.inj = ends ? 999 : games; p.injType = type; delete p.injLive;   // (the sim's own now: the real report leaves it be)
     if (ends) p.cEnd = this.season;
     if (games >= 10 || ends) { (p.ih = p.ih || []).push([this.season, type, ends ? 0 : games, ends ? 1 : 0]); if (p.ih.length > 8) p.ih.shift(); }
     const who = p.first + ' ' + p.last + (t ? ' (' + t.abbr + ', ' + type + ')' : ' (' + type + ')');
@@ -6974,14 +6974,18 @@ class League {
     // game of his time each day his club plays; prospects and free agents at the season clock's pace. (On the round robin
     // every club played every day; counted by date on the real calendar, a 10-game injury cost 4-5 games.)
     const played = this.played, step = this.clkStep();
-    for (const p of Object.values(P)) if (p.inj && !p.cEnd && !p.ltirHold) { const w = played && p.tid >= 0 && !p.prospect ? (played.has(p.tid) ? 1 : 0) : step; if (!w) continue; const was = p.inj; p.inj -= w; if (p.inj <= 0) {
+    for (const p of Object.values(P)) if (p.inj && !p.cEnd && !p.ltirHold) { const w = played && p.tid >= 0 && !p.prospect ? (played.has(p.tid) ? 1 : 0) : step; if (!w) continue; const was = p.inj, lt0 = onLtir(p); p.inj -= w; if (p.inj <= 0) {
       // back from long-term injured reserve with no room for him: a club that spent the relief keeps him there until the
       // playoffs (no cap) instead of dumping contracts to fit him back in (Florida sent out three in a day doing that)
       const t = p.tid >= 0 ? this.teams[p.tid] : null;
-      if (t && was >= 24 && this.phase === 'regular' && (t.tid !== this.userTid || this.isAuto('roster')) && this.where(p) === 'roster' && this.payroll(t) - (this.ltirRelief(t) - this.capHit(p)) > CAP + 0.004) {
+      // (his count is already 0 here, so ltirRelief has dropped him: taking his hit off it again held men who fit. A man on
+      // the real injury report - injLive - is activated at ESPN's date, as in real life: his club makes its cap move; after
+      // the trade deadline, with no room, ltirKeep holds him)
+      if (p.injLive) { p.inj = 0; if (this.ltirKeep(p, lt0, was)) continue; }
+      else if (t && was >= 24 && this.phase === 'regular' && (t.tid !== this.userTid || this.isAuto('roster')) && this.where(p) === 'roster' && this.payroll(t) - this.ltirRelief(t) > CAP + 0.004) {
         p.inj = 24; p.ltirHold = true; this.addNews('The ' + t.name + ' keep ' + p.first + ' ' + p.last + ' on long-term injured reserve: no cap room to activate him until the playoffs.', t.tid, 'txn', p.id); continue;
       }
-      p.inj = 0; if (p.tid === this.userTid) this.addNews(p.first + ' ' + p.last + ' is healthy and available again.', p.tid, 'injury', p.id); else if (p.tid >= 0) this.autoLines(this.teams[p.tid]); } }
+      p.inj = 0; if (p.tid === this.userTid) this.backNews(p, lt0); else if (p.tid >= 0) this.autoLines(this.teams[p.tid]); } }
     for (const t of this.teams) { if (t.roster.length <= ROSTER_MAX) continue; if (t.tid !== this.userTid) this.aiFarmMoves(t); else { const er = this.rosterOf(t).find(p => p.er && !p.inj); if (er && this.healthyOk(t, er)) { this.sendDown(t, er, { silent: true }); this.addNews(er.first + ' ' + er.last + ' was returned to ' + this.affName(t) + ' now that the roster is healthy.', t.tid, 'txn', er.id); } } }
     // (the week's stories by schedule day - a real week on the NHL calendar; the rest on the season clock, sclk, whose
     // rhythm they were tuned on: the draft board's monthly drift, AI extensions, coach firings, moods, the deadline rumors)
@@ -7606,7 +7610,24 @@ class League {
   }
   // long-term injured reserve: a man out 24 days or more doesn't count against compliance (real rosters carry teams like
   // Vegas well over the cap this way; the game marks those players injured but kept counting them)
-  ltirRelief(t) { return this.rosterOf(t).filter(p => p.inj >= 24).reduce((s, p) => s + this.capHit(p), 0); }
+  ltirRelief(t) { return this.rosterOf(t).filter(onLtir).reduce((s, p) => s + this.capHit(p), 0); }
+  // the user's man back from injury: the news, and when his long-term IR relief ends with the club over the cap, by how
+  // much (one line; on a manual roster nothing moves - the user makes the cap move, as on opening night)
+  backNews(p, lt0) {
+    const t = this.teams[p.tid], over = lt0 && t ? this.payroll(t) - this.ltirRelief(t) - CAP : 0;
+    const cap = over > 0.004 ? ' His return puts you ' + money(over) + ' over the $' + CAP + 'M cap: ' + (this.isAuto('roster') ? 'your staff will make a cap move.' : 'trade or buy out a contract, or send a player to the AHL (only ' + money(BURY) + ' less than his salary comes off the cap), to get under it.') : '';
+    this.addNews(p.first + ' ' + p.last + (p.injLive && p.injLive.non ? ' is available again.' : ' is healthy and available again.') + cap, p.tid, 'injury', p.id);
+  }
+  // a man back from the report's long-term IR (lt0) after the trade deadline, to an AI club (or the user's on auto roster)
+  // his return puts over the cap: that club can only send players down now, so he stays on long-term IR until the
+  // playoffs (ltirHold), as before. Before the deadline he's activated and the club makes its cap move. Call with p.inj 0.
+  ltirKeep(p, lt0, was) {
+    const t = p.tid >= 0 ? this.teams[p.tid] : null;
+    if (!t || !lt0 || this.phase !== 'regular' || this.day < this.tradeDeadline || (t.tid === this.userTid && !this.isAuto('roster')) || this.where(p) !== 'roster' || this.payroll(t) - this.ltirRelief(t) <= CAP + 0.004) return false;
+    p.inj = Math.max(24, was || 0); p.ltirHold = true;
+    this.addNews('The ' + t.name + ' keep ' + p.first + ' ' + p.last + ' on long-term injured reserve: no cap room to activate him until the playoffs.', t.tid, 'txn', p.id);
+    return true;
+  }
   // (the user's team only on auto roster management, and then only by sending players down; after the trade deadline
   // everyone can only send players down)
   aiCapComply(t) {
@@ -7625,7 +7646,7 @@ class League {
       const core = new Set([...best(p => grpOf(p) === 'F', 9), ...best(p => p.pos === 'D', 4), ...best(p => p.pos === 'G', 1)]);
       const starter = ros.filter(p => p.pos === 'G').sort((a, b) => ((b.stats && b.stats.gp) || 0) - ((a.stats && a.stats.gp) || 0))[0]; if (starter) core.add(starter.id);   // and whoever has been starting (Colorado sent Blackwood down)
       const nmc = p => this.clauseOf(p) && this.clauseOf(p).t === 'NMC';
-      const mine = [...t.roster, ...(t.farm || [])].map(id => P[id]).filter(p => p && p.contract && hitOf(p) >= 0.9 && !core.has(p.id) && !(p.inj >= 24));   // (a man on LTIR already doesn't count)
+      const mine = [...t.roster, ...(t.farm || [])].map(id => P[id]).filter(p => p && p.contract && hitOf(p) >= 0.9 && !core.has(p.id) && !onLtir(p));   // (a man on LTIR already doesn't count)
       const ov = over();
       // 1. send a depth player down to the AHL (only the part of his hit over the burial allowance still counts): the
       //    weakest one whose contract covers the overage, else the one that saves the most. (The Rangers, 0.63 over,
@@ -7765,7 +7786,7 @@ class League {
     const salOut = get.players.reduce((s, id) => s + (P[id].contract ? P[id].contract.sal - rt(id) : 0), 0);
     // (the 23 counted as the league counts them, injured reserve left out - activeLen: a club at 26 with 6 hurt could
     // make no trade at all, not even one for one, and the AI's offers to it never came - the phone audit, 2026-10)
-    const rosterOnly = ids => ids.filter(id => this.where(P[id]) === 'roster' && !(P[id].inj >= 7));
+    const rosterOnly = ids => ids.filter(id => this.where(P[id]) === 'roster' && !onIR(P[id]));
     const utRos = this.activeLen(ut) - rosterOnly(give.players).length + rosterOnly(get.players).length;
     const otRos = this.activeLen(ot) + rosterOnly(give.players).length - rosterOnly(get.players).length;
     let msg = null;
@@ -8527,7 +8548,7 @@ Object.assign(League.prototype, {
   // ---------- AI management ----------
   // the roster as the 23-man limit counts it: a man out a week or more is on injured reserve and doesn't count (as in
   // the NHL). Without it, a club at 23 with Nylander out a month played eleven forwards and a D on the wing.
-  activeLen(t) { return t.roster.filter(id => !(this.players[id] && this.players[id].inj >= 7)).length; },
+  activeLen(t) { return t.roster.filter(id => !onIR(this.players[id])).length; },
   aiFarmMoves(t, offseason) {
     if (t.tid === this.userTid && !this.isAuto('roster')) return;
     let guard = 0;
@@ -8907,6 +8928,13 @@ function injLen(p, short) {
   if (wk < 9) return short ? wk + 'w' : 'out about ' + wk + ' week' + (wk > 1 ? 's' : '');
   const mo = Math.round(p.inj * 2.3 / 30.4); return short ? mo + 'mo' : 'out about ' + mo + ' months';
 }
+// (injured reserve, off the 23: a man out a week or more - or on the real report's injured reserve, however soon he's due
+// back (liveInj). Long-term IR, whose cap hit is relief: out 24 games or more - but a man on the real injury report only
+// when ESPN has him on long-term IR, while he's out (injLive.ltir, liveLtir: plain IR never gives relief in the NHL; at
+// exactly 24 games the relief ended after one game and the AI dumped contracts). One held there for the cap (ltirHold)
+// counts by his games.
+function onIR(p) { return !!p && (p.inj >= 7 || (p.inj > 0 && !!p.injLive && !!p.injLive.ir)); }
+function onLtir(p) { return !!p && (p.injLive && !p.ltirHold ? p.inj > 0 && !!p.injLive.ltir : p.inj >= 24); }
 const ROLE_PROMISE = ['Top line / top pair', 'Top six / top four', 'Middle six / third pair', 'Depth / extra'];
 const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 Object.assign(League.prototype, {
@@ -13187,6 +13215,9 @@ League.prototype.liveStart = function (X, D) {
   // 5. injuries since the data's date: a player who has played a real game since is healthy; the others have missed their
   // club's real games since (still out in real life: at least a game to go)
   if (upd) for (const p of Object.values(P)) { if (!p.inj || p.cEnd || p.tid < 0) continue; if (back.has(p)) { p.inj = 0; delete p.ltirHold; } else if (since[p.tid]) p.inj = Math.max(1, p.inj - since[p.tid]); }
+  // 5c. the real injuries as of now: ESPN's injury report in place of the data's IR flags (liveInj; none in the file -
+  // an older update-live.ps1, a failed fetch - keeps step 5's)
+  const inj = this.liveInj(X, N, true);
   // 5b. the NHL rosters as they really are (2026-10 review: Askarov, Lankinen, Jarry and Silovs - their clubs' last real
   // starters - opened a live league in the minors, with 77 more who are playing NHL games. League.fromNHL trims each roster
   // to 23 counting the men on injured reserve, so a club with players hurt sent healthy regulars down.) A player is with his
@@ -13204,9 +13235,18 @@ League.prototype.liveStart = function (X, D) {
     const dr = dressed[t.tid] || new Map(), li = lastIn[t.tid] || new Set();
     const real = p => p.tid === t.tid && (li.has(p.id) || (dr.has(p.id) && onRos.has(String(p.hlm) + '|' + t.abbr)));
     for (const id of this.org(t)) { const p = P[id]; if (p && p.contract && real(p) && this.where(p) !== 'roster') { this.attach(t, p, 'roster'); p.er = 0; up++; } }
-    for (let k = 0; k < 30 && this.activeLen(t) > ROSTER_MAX; k++) {
+    // (the report's men are the NHL club's: its long-term IR the data has in the AHL - Merzlikins - goes on its injured
+    // reserve, where his hit is relief, and one the data has on the NHL roster comes back up (League.fromNHL's 23 counted
+    // the injured: Nugent-Hopkins, due back October 13, opened in the AHL), never sent down below; and with a goalie ruled
+    // out, two healthy ones dress - the Rangers had Shesterkin, out for the season, as Garand's backup and Tung in the AHL)
+    for (const id of (t.farm || []).slice()) { const p = P[id]; if (p && p.contract && p.injLive && ((p.inj > 0 && p.injLive.lt) || onRos.has(String(p.hlm) + '|' + t.abbr))) { this.attach(t, p, 'roster'); up++; } }
+    for (let k = 0; k < 2 && this.rosterOf(t).filter(q => q.pos === 'G' && !q.inj).length < 2; k++) { const g = (t.farm || []).map(id => P[id]).filter(q => q && q.pos === 'G' && !q.inj && q.contract).sort((a, b) => b.ovr - a.ovr)[0]; if (!g) break; this.attach(t, g, 'roster'); up++; }
+    // (the 23 here counts a man back within the week, the report's injured reserve too - activeLen leaves him off it: the
+    // healthy extras went nowhere, and Edmonton was at 26 once its four men due back in 1-5 games were)
+    const on23 = () => t.roster.filter(id => !(P[id] && P[id].inj >= 7)).length;
+    for (let k = 0; k < 30 && on23() > ROSTER_MAX; k++) {
       const ros = this.rosterOf(t).filter(q => !q.inj), nG = ros.filter(q => q.pos === 'G').length, nD = ros.filter(q => q.pos === 'D').length, nF = ros.length - nG - nD;
-      const c = ros.filter(q => !li.has(q.id) && (q.pos === 'G' ? nG > 2 : q.pos === 'D' ? nD > 7 : nF > 13)).sort((a, b) => (real(a) ? 1 : 0) - (real(b) ? 1 : 0) || (dr.get(a.id) || 0) - (dr.get(b.id) || 0) || a.ovr - b.ovr)[0];
+      const c = ros.filter(q => !li.has(q.id) && !q.injLive && (q.pos === 'G' ? nG > 2 : q.pos === 'D' ? nD > 7 : nF > 13)).sort((a, b) => (real(a) ? 1 : 0) - (real(b) ? 1 : 0) || (dr.get(a.id) || 0) - (dr.get(b.id) || 0) || a.ovr - b.ovr)[0];
       if (!c) break;
       // (a junior 19 or under goes back to his junior club, as in League.fromNHL)
       const jx = xBy[String(c.hlm)], jl = jx && nhlDataLeague(jx);
@@ -13216,11 +13256,15 @@ League.prototype.liveStart = function (X, D) {
     // (still over: a man hurt a few more days counts on the 23 here, but every injury at a live start is the data's injured
     // reserve - IR, LTIR, SOIR - so he is on IR, out at least the week IR means. Vancouver had Thomas and Thompson at 5-6
     // days with 23 who play, and aiFarmMoves sent down Ohgren, Pettersson and Brisebois from the last real lineup)
-    for (const q of this.rosterOf(t)) { if (this.activeLen(t) <= ROSTER_MAX) break; if (q.inj > 0 && q.inj < 7 && !li.has(q.id)) q.inj = 7; }
+    // (with the real injury report - step 5c - its injured reserve keeps ESPN's return date, off the 23 in the season
+    // (onIR): held to 7 games, 23 men due back within a game read "out about 2 weeks")
+    for (const q of this.rosterOf(t)) { if (on23() <= ROSTER_MAX) break; if (q.inj > 0 && q.inj < 7 && !li.has(q.id) && !q.injLive) q.inj = 7; }
   }
   // (and, as League.fromNHL does for opening night, a club the call-ups put over the cap is using long-term IR the data
-  // doesn't label: its priciest injured players go on it - else aiCapComply sent a real regular straight back down)
-  if (up) for (const t of T) for (const p of this.rosterOf(t).filter(q => q.inj && q.inj < 24).sort((a, b) => this.capHit(b) - this.capHit(a))) { if (this.payroll(t) - this.ltirRelief(t) - CAP <= 0) break; p.inj = ri(30, 60); }
+  // doesn't label: its priciest injured players go on it - else aiCapComply sent a real regular straight back down. With
+  // the real report, its injured reserve as liveLtir picks it, out to ESPN's dates)
+  if (inj) for (const t of T) this.liveLtir(t);
+  else if (up) for (const t of T) for (const p of this.rosterOf(t).filter(q => q.inj && q.inj < 24).sort((a, b) => this.capHit(b) - this.capHit(a))) { if (this.payroll(t) - this.ltirRelief(t) - CAP <= 0) break; p.inj = ri(30, 60); }
   // 6. the day: the first date after the last real one. Then what opening night does for every club (simDay at day 0,
   // which a live start never plays): cap-compliant, legal rosters, lines
   this.day = N; if (this._clk) this._clk = null; this.tradeDeadline = this.dlIndex();
@@ -13239,9 +13283,148 @@ League.prototype.liveStart = function (X, D) {
   // (a check against NHL.com's standings on the same date: only a game the calendar couldn't place makes them differ)
   const bad = []; for (const t of T) { const s = X.std && X.std[t.abbr], r = t.rec; if (s && (r.w !== s[1] || r.l !== s[2] || r.otl !== s[3] || r.rw !== s[7] || r.gf !== s[5] - s[8] || r.ga !== s[6] - s[9])) bad.push(t.abbr); }
   if (bad.length) console.warn('live start: records differ from NHL.com\'s standings for ' + bad.join(', '));
-  this.lstart = { asOf, day: N, n: pairs.length, upd: X.updated || null, miss: miss.length, lost: lost.size, chk: bad.length };
+  this.lstart = { asOf, day: N, n: pairs.length, upd: X.updated || null, miss: miss.length, lost: lost.size, chk: bad.length, injAt: inj ? inj.at : null, inj: inj ? inj.matched + '/' + inj.listed : null };
   this.addNews('Live start: the league picks up on ' + md(S[N].date) + ' with the real season so far - ' + pairs.length + ' games played through ' + md(asOf) + ', with their scores, box scores and standings, and every player\'s stats, from NHL.com.');
+  if (inj) this.liveInjNews(inj, X, true);
   return Object.assign({ moved, strand, up, down }, this.lstart);
+};
+// ---------- the real injuries ----------
+// (2026-10, the user's ask: "there has to be somewhere where you can pull current injuries from") NHL.com publishes none;
+// update-live.ps1 puts ESPN's injury report in live.json (injuries, injAt). Each listed player is out the games his club
+// plays before ESPN's expected return date (a date that's today: he plays; a date past the regular season's end is the
+// rest of it), typed as ESPN has it ("Knee surgery (left)"); with no date, by his status - day-to-day 1-3 games, out
+// 7-14, injured reserve 7-14, long-term IR 24-40. p.injLive marks an injury the report made (k: status|date|type), so a
+// later report moves it (a new date or status: counted again from the next day), ends it (no longer listed: healthy and
+// activated, as at ESPN's date - no long-term IR hold for him) or leaves the sim's count alone (the
+// same report). An injury the sim made (no injLive) is never touched; injure() clears injLive. At a live start (start) the
+// data's own IR flags (CapWages', at its date) give way to the report: a man it doesn't list is healthy - unless he's on
+// long-term IR his club's cap needs. Personal leave, a suspension or a contract dispute keeps a man out but never on
+// injured reserve (23 games at most). A matched player is by name and club (accents and punctuation aside), then first
+// initial and last name on the club (Matt / Matthew), then name alone (traded since), then initial alone - a name two men
+// share told apart by position (Vancouver's two Elias Petterssons), any but the first only with the position agreeing;
+// the misses go to the console only. A report more than three days older than today (or the league's day, if later) is a
+// feed that stopped (ESPN down or changed): none at all, the data's flags at a start)
+League.prototype.liveInj = function (X, from, start) {
+  const R = X && Array.isArray(X.injuries) ? X.injuries : null;
+  if (!R || R.length < 5) return null;   // (a short or missing report is a failed fetch, not a healthy league)
+  const T = this.teams, P = this.players, S = this.schedule, ut = this.userTid;
+  const fromD = S[from] && S[from].date, endD = S.length ? S[S.length - 1].date : null;
+  if (!fromD) return null;
+  // (its age by today - or the league's day, the last one it played, when that's later: by the next game date a report
+  // fetched on December 22nd was 4 days old at a start in the Christmas break and was dropped)
+  { const td = liveYmd(new Date()), cur = from > 0 && S[from - 1] && S[from - 1].date > td ? S[from - 1].date : td;
+    const a = /^\d{4}-\d\d-\d\d/.test(X.injAt || '') ? String(X.injAt).slice(0, 10).split('-').map(Number) : null, b = cur.split('-').map(Number);
+    if (!a || (Date.UTC(b[0], b[1] - 1, b[2]) - Date.UTC(a[0], a[1] - 1, a[2])) / 864e5 > 3) return null; }
+  const tidOf = {}; for (const t of T) tidOf[t.abbr] = t.tid;
+  const nk = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]/g, '');
+  const dn = s => { const [y, m, d] = String(s).split('-').map(Number); return Date.UTC(y, m - 1, d) / 864e5; };
+  // (one: the only man under the key - or the only one of the listed position group; strict: his position group must agree)
+  const by = new Map(), add = (k, p) => { const a = by.get(k); if (a) a.push(p); else by.set(k, [p]); };
+  const one = (k, g, strict) => { const a = by.get(k); if (!a) return null; if (a.length === 1) return !strict || !g || grpOf(a[0]) === g ? a[0] : null; const b = g ? a.filter(p => grpOf(p) === g) : []; return b.length === 1 ? b[0] : null; };
+  for (const p of Object.values(P)) if (p.tid >= -1) { const f = nk(p.first), l = nk(p.last); add('n|' + f + l + '|' + p.tid, p); add('n|' + f + l, p); add('i|' + f.charAt(0) + l + '|' + p.tid, p); add('i|' + f.charAt(0) + l, p); }
+  // (his club's games from the next day up to the return date; a man with no club at about 2.3 days a game, as injLen -
+  // to the season's end at most: '9999' for him was NaN games)
+  const left = (tid, r) => { if (tid < 0) return Math.max(0, Math.round((dn(endD && r > endD ? endD : r) - dn(fromD)) / 2.3)); let n = 0; for (let i = from; i < S.length && S[i].date < r; i++) if (S[i].games.some(g => g.h === tid || g.a === tid)) n++; return n; };
+  // (ESPN's words as a sentence: "Lower Body" -> "Lower body", an acronym kept - "ACL surgery", not "Acl")
+  const cap1 = s => s.split(' ').map((w, i) => /^[A-Z]{2,}$/.test(w) ? w : i ? w.toLowerCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  const kind = e => {
+    const ty = String(e.type || '').trim();
+    if (/susp/i.test(ty) || /susp/i.test(e.status || '')) return 'Suspended';
+    if (/^personal$/i.test(ty)) return 'Personal leave';
+    if (/contract/i.test(ty)) return 'Contract dispute';
+    let s = cap1(ty && !/^not specified$/i.test(ty) ? ty : 'Undisclosed'); if (/^surgery$/i.test(e.detail || '')) s += ' surgery';
+    if (/^(left|right)$/i.test(e.side || '')) s += ' (' + e.side.toLowerCase() + ')';
+    return s;
+  };
+  const seen = new Set(), miss = [], newly = [], moved = [], healed = [], touched = new Set(); let matched = 0, cleared = 0, kept = 0;
+  // (back from the report: activated, as in real life - no hold until the playoffs; an AI club his return puts over the
+  // cap makes its cap move, the user hears by how much he's over: backNews. After the trade deadline a club with no room
+  // keeps him on long-term IR until the playoffs: ltirKeep)
+  const back = p => {
+    const t = p.tid >= 0 ? T[p.tid] : null, lt0 = onLtir(p), w0 = p.inj;
+    p.inj = 0; delete p.ltirHold; if (t) touched.add(t.tid);
+    if (this.ltirKeep(p, lt0, w0)) { kept++; return; }
+    healed.push(p);
+    if (p.tid === ut) this.backNews(p, lt0);
+  };
+  for (const e of R) {
+    if (!e || !e.last) continue;
+    const tid = tidOf[e.team], f = nk(e.first), l = nk(e.last), gp = /^G$/i.test(e.pos || '') ? 'G' : /^D$/i.test(e.pos || '') ? 'D' : e.pos ? 'F' : null;
+    const p = (tid != null && one('n|' + f + l + '|' + tid, gp)) || (tid != null && one('i|' + f.charAt(0) + l + '|' + tid, gp, true)) || one('n|' + f + l, gp, true) || one('i|' + f.charAt(0) + l, gp, true);
+    if (!p) { miss.push(e.name + ' (' + e.team + ', ' + (e.fs || e.status) + ')'); continue; }
+    if (seen.has(p.id)) continue; seen.add(p.id); matched++;
+    if (p.cEnd || (!start && p.ltirHold)) continue;   // (held on long-term IR until the playoffs: ltirKeep)
+    const k = [e.fs || e.status || '', e.returnDate || '', e.type || ''].join('|');
+    if (!start && p.injLive && p.injLive.k === k) continue;   // (the same report: the sim's count goes on)
+    if (!start && !p.injLive && p.inj > 0) continue;          // (hurt in the sim: his own injury stands)
+    const fs = String(e.fs || ''), st = String(e.status || ''), r = /^\d{4}-\d\d-\d\d$/.test(e.returnDate || '') ? e.returnDate : '';
+    const non = /^(personal|contract dispute|suspension)$/i.test(String(e.type || '').trim()) || /susp/i.test(st), lt = /^IR-LT$/i.test(fs);
+    const ir = /^IR/i.test(fs) || /injured reserve/i.test(st), dtd = /day/i.test(st) || /day/i.test(fs);
+    // (a return date today, or before his club plays again: he plays - Sanderson, back October 12, sat that night)
+    let g;
+    if (r && r > fromD) g = endD && r > endD ? left(p.tid, '9999') + Math.min(30, Math.round((dn(r) - dn(endD)) / 2.3)) : left(p.tid, r);
+    else if (r === fromD) g = 0;
+    else if (r) g = dtd ? 1 : ri(2, 4);   // (the date's gone by and he's still listed: a few more games)
+    else g = dtd ? ri(1, 3) : lt ? ri(24, 40) : ir ? ri(7, 14) : /knee|shoulder|surgery|hip|ankle/i.test(kind(e)) ? ri(10, 14) : ri(7, 10);
+    g = Number.isFinite(g) ? Math.max(0, g) : 1; if (non) g = Math.min(g, 23);
+    // (a moved entry keeps his long-term IR while he's still out - moved from IR to day-to-day, Barkov's relief went at
+    // once and Florida dumped two contracts with him still out; onLtir ends it when he's back)
+    const was = p.injLive ? p.inj || 0 : 0, lt0 = !start && was > 0 && p.injLive.ltir;
+    p.injType = kind(e);
+    p.injLive = { k, r: r || null, s: fs || st, lt: lt ? 1 : 0, ir: ir && !non ? 1 : 0 }; if (non) p.injLive.non = 1; if (lt0) p.injLive.ltir = 1;
+    if (p.tid >= 0) touched.add(p.tid);
+    if (!start && was > 0 && !g) { back(p); continue; }
+    p.inj = g; delete p.ltirHold;
+    if (!start && g) (was > 0 ? moved : newly).push(p);
+  }
+  if (start) {
+    // the data's injuries the report doesn't list are over - but a club still over the cap with the report's injured
+    // reserve on long-term IR (liveLtir) keeps its long-term IR man there, as the heal loop does (ltirHold: at the 24
+    // games Hemmerling had, the relief went after a game)
+    const drop = Object.values(P).filter(p => p.inj && !p.cEnd && !seen.has(p.id)), was = new Map(drop.map(p => [p, p.inj]));
+    for (const p of drop) p.inj = 0;
+    for (const t of T) this.liveLtir(t);
+    for (const p of drop.sort((a, b) => this.capHit(b) - this.capHit(a))) {
+      const t = p.tid >= 0 ? T[p.tid] : null;
+      if (t && was.get(p) >= 24 && this.where(p) === 'roster' && this.payroll(t) - this.ltirRelief(t) > CAP + 0.004) { p.inj = Math.max(24, was.get(p)); p.ltirHold = true; kept++; continue; }
+      delete p.ltirHold; delete p.injLive; cleared++; if (t) touched.add(t.tid);
+    }
+  } else {
+    // off the report: back. Then the report's long-term IR for every club (the user's too: it only gives relief), and an
+    // AI club a return still leaves over the cap makes its cap move now
+    for (const p of Object.values(P)) { if (!p.injLive || seen.has(p.id)) continue; if (p.inj > 0 && !p.cEnd && !p.ltirHold) back(p); delete p.injLive; }
+    for (const t of T) this.liveLtir(t);
+    for (const tid of touched) if (tid !== ut && this.payroll(T[tid]) - this.ltirRelief(T[tid]) > CAP + 0.004) this.aiCapComply(T[tid]);
+  }
+  if (miss.length) console.info('live injuries: ' + miss.length + ' of ' + R.length + ' on the report not matched - ' + miss.join('; '));
+  if (!start) for (const tid of touched) if (tid !== ut || this.isAuto('lines')) this.autoLines(T[tid]);
+  return { listed: R.length, matched, miss: miss.length, cleared, kept, newly, moved, healed, at: X.injAt || null };
+};
+// long-term IR from the report (injLive.ltir: onLtir counts his hit while he's out, to ESPN's date - set to exactly 24
+// games, the relief went after one and the AI dumped Faksa, Mikkola, Hathaway). Only ESPN's long-term IR (IR-LT) gives
+// relief, as in the real NHL - plain IR and IR-NR never (Dvorak, back in two weeks, sat until the playoffs for it): a man
+// out 24 games or more always (counted by his games, the relief ended at 23 to go, weeks before ESPN's date), one due back
+// sooner while his club is over the cap, the longest out first. His games are left alone.
+League.prototype.liveLtir = function (t) {
+  const over = () => this.payroll(t) - this.ltirRelief(t) - CAP;
+  const c = this.rosterOf(t).filter(q => q.injLive && q.injLive.lt && q.injLive.ir && !q.injLive.ltir && q.inj > 0 && !q.cEnd).sort((a, b) => b.inj - a.inj);
+  let n = 0; for (const p of c) { if (p.inj < 24 && over() <= 0.004) break; p.injLive.ltir = 1; n++; }
+  return n;
+};
+// the news: at a live start one league-wide injury report and the user's club's list; on an update, one line for what
+// changed league-wide and each new injury on the user's club (the healthy ones had theirs in liveInj)
+League.prototype.liveInjNews = function (r, X, start) {
+  const ut = this.userTid, T = this.teams, nm = p => p.first + ' ' + p.last + (p.tid >= 0 ? ' (' + T[p.tid].abbr + ')' : '');
+  const md = s => { const [y, mo, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, mo - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); };
+  const big = a => a.slice().sort((x, y) => (y.inj > 3) - (x.inj > 3) || y.ovr - x.ovr).slice(0, 5).map(p => nm(p) + ' - ' + p.injType + ', ' + injLen(p)).join('; ');
+  if (start) {
+    const out = Object.values(this.players).filter(p => p.injLive && p.inj > 0 && p.tid >= 0), mine = out.filter(p => p.tid === ut);
+    this.addNews('Injury report' + (r.at ? ' (' + md(r.at) + ')' : '') + ': ' + out.length + ' players start out hurt, from ESPN\'s injury report' + (out.length ? '. The biggest names: ' + big(out) : '') + '.', -1, 'injury');
+    if (mine.length) this.addNews('Your injuries: ' + mine.sort((x, y) => y.ovr - x.ovr).map(p => p.first + ' ' + p.last + ' (' + p.injType + ', ' + injLen(p) + ')').join(', ') + '.', ut, 'injury');
+    return;
+  }
+  for (const p of r.newly) if (p.tid === ut) this.addNews('Injury: ' + p.first + ' ' + p.last + ' (' + T[ut].abbr + ', ' + p.injType + ') is ' + injLen(p) + '.', ut, 'injury', p.id);
+  if (r.newly.length || r.healed.length) this.addNews('Injury report' + (r.at ? ' (' + md(r.at) + ')' : '') + ': ' + [r.newly.length ? r.newly.length + ' newly hurt - ' + big(r.newly) : '', r.healed.length ? r.healed.length + ' back healthy' : ''].filter(Boolean).join('; ') + '.', -1, 'injury');
 };
 async function hlmLogo(blob, size) {   // shrink a logo to a small PNG data URL that lives in the save
   try {
@@ -13841,6 +14024,33 @@ async function livePoll() {
   if (st && st.refreshing) { liveSt = st; setTimeout(livePoll, 5000); return; }
   livePolling = false; liveSt = st; liveLoad();
 }
+// (a live league's real injuries stay current - liveInj: every 10 minutes, and soon after the program opens, a newer
+// injury report in live.json moves, ends and adds them, while the league is on the real calendar - the last day it played
+// no more than two days past the report's. Not mid-sim. The program refreshes live.json at startup and when asked: a long
+// session asks again when the report is three hours old, at most every three hours)
+let liveInjAsk = 0;
+async function liveInjTick() {
+  // (the league's day against today's before anything is fetched: a league simmed past real life is left alone, with
+  // no 3-4 MB live.json read and no refresh asked; nor mid-game, nor on Deadline Day)
+  const ok = () => L && L.lstart && L.phase === 'regular' && !pendingStart && $('#busy').hidden && !liveGame && !(L.ddOn && L.ddOn());
+  const dn = s => { const [y, m, d] = String(s).slice(0, 10).split('-').map(Number); return Date.UTC(y, m - 1, d) / 864e5; };
+  const L0 = L; if (!ok()) return;
+  // (the league's day: the last one it played - its next game date sat 4-5 days ahead in the December and February breaks)
+  const cur = Lx => { const S = Lx.schedule, i = Math.min(Lx.day, S.length) - 1; return i >= 0 && S[i] ? S[i].date : null; };
+  const now = new Date(), today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 864e5, c0 = cur(L0);
+  if (c0 && dn(c0) - today > 2) return;
+  let X = null; try { const r = await fetch('/api/nhl/live', { cache: 'no-store' }); if (r.ok) X = await r.json(); } catch (err) { X = null; }
+  if (!X || !X.injAt || !Array.isArray(X.injuries)) return;
+  if (DESK && !MOBILE && Date.now() - liveInjAsk > 108e5 && Date.now() - new Date(X.injAt).getTime() > 108e5) { liveInjAsk = Date.now(); fetch('/api/nhl/live', { method: 'POST', headers: { 'X-BLGM': '1' } }).catch(() => { }); }
+  if (L !== L0 || !ok() || X.injAt <= (L.lstart.injAt || '')) return;
+  const c2 = cur(L);
+  if (c2 && dn(c2) - dn(X.injAt) > 2) return;
+  const r = L.liveInj(X, Math.min(L.day, L.schedule.length - 1), false); if (!r) return;
+  L.lstart.injAt = X.injAt; L.liveInjNews(r, X, false); save();
+  if (r.newly.length || r.moved.length || r.healed.length) render();   // (the roster tags, lines and news on screen)
+  console.info('live injuries', { matched: r.matched + '/' + r.listed, newly: r.newly.length, moved: r.moved.length, healed: r.healed.length });
+}
+setTimeout(liveInjTick, 15000); setInterval(liveInjTick, 6e5);
 function renderSetup() {
   const ps = pendingStart, H = hlmData;
   const t = ps.kind === 'hlm' ? H.teams[ps.i] : (x => ({ city: x[0], name: x[1], abbr: x[2], c1: x[5], c2: x[6] }))(TEAMS[ps.tid]);
@@ -17145,7 +17355,7 @@ function playerModal(pid) {
       <div class="pf-trio"><div>${tierChip(p, 'pot')}<span>Potential</span></div><div><b>${c ? (c.ext && L.capSeason() > c.exp ? (c.ext.exp - L.capSeason() + 1) + 'x' + money(c.ext.sal) : (c.exp - L.capSeason() + 1) + 'x' + money(c.sal)) : p.ask ? 'Asks ' + money(p.ask.sal) : '—'}</b><span>Contract</span></div><div>${posRank ? `<button class="pf-rank" data-act="posRank" data-pid="${p.id}" title="League rankings at his position"><b>#${posRank} ${posName}</b></button>` : `<b>${expRoleLab(p)}</b>`}<span>${posRank ? 'Position rank' : 'Expected role'}</span></div></div>
       <div class="pf-pers"><span class="muted small">Personality</span>${(!H || (p.sp || 0) >= 40) ? (() => { const T = traitsOf(p), sh = TRAITS.filter(([k]) => T[k] !== 0); return sh.length ? `<span class="traits">${sh.map(([k, n, d]) => { const x = TRAIT_TXT[k], good = (T[k] > 0) === !!x[2]; return `<span class="trait tr${good ? 1 : -1}" title="${esc(n + ' ' + (T[k] > 0 ? 'high' : 'low') + '. ' + d)}">${esc(T[k] > 0 ? x[0] : x[1])}</span>`; }).join('')}</span>` : '<span class="small">Even-keeled: nothing stands out</span>'; })() : '<span class="small muted">Unknown until he\'s scouted</span>'}${durShown(p) || p.conc >= 2 ? `<span class="small">${durShown(p) ? `<span class="dur d${durOf(p)}" title="${esc(DUR_TXT[durOf(p)])}">${DUR[durOf(p)]}</span>` : ''}${p.conc >= 2 ? `${durShown(p) ? '· ' : ''}${p.conc} concussions` : ''}</span>` : ''}</div>
       ${moodOn() && mine && !p.prospect ? (() => { const ml = L.moodLab(p); return `<p class="small">Mood: <span class="pill ${ml.cls}" title="${esc(moodWhy(p))}">${ml.lab}</span>${p.prom ? ' <span class="small muted">· you promised him a bigger role</span>' : ''}</p>`; })() : ''}
-      ${p.inj ? `<p class="pill bad">Injured (${esc(p.injType || 'injury')}) · ${injLen(p)}</p>` : ''}${moodOn() && p.wantsTrade ? '<p class="pill bad">Has requested a trade</p>' : ''}
+      ${p.inj ? (p.injLive && p.injLive.non ? `<p class="pill bad">${esc(p.injType)} · out ${p.inj} game${p.inj > 1 ? 's' : ''}</p>` : `<p class="pill bad">Injured (${esc(p.injType || 'injury')}) · ${injLen(p)}</p>`) : ''}${moodOn() && p.wantsTrade ? '<p class="pill bad">Has requested a trade</p>' : ''}
       <div class="btnrow">${acts}</div><div id="pmsg"></div></div>`;
     const awards = profAwards(p), aw = {};
     for (const a of awards) aw[a.lab] = (aw[a.lab] || 0) + 1;
