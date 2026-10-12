@@ -4570,11 +4570,13 @@ const G_NAMES = { 'Top 6 F / Top 4 D': 'Starter', 'Top 9 F / Top 6 D': 'Backup G
 // cut-offs only 101 D showed as Top 4 for 128 jobs (the 128th D rates 82, the 192nd 78; the 32nd goalie 83, the 64th 76).
 // Goalies have no middle tier: a club has a starter and a backup, so everyone from 77 to the starter line is a backup
 // (the second goalie cut equals the first, so that tier is never reached). The starter line is 83.
-// The bands (2026-10, on the scale with the extra point): F Top 6 84-88, Top 9 81-83, 4th line 78-80, AHL 77 and under;
+// The bands (2026-10, on the scale with the extra point): F Top 6 84-88, Top 9 81-83, 4th line 77-80, AHL 76 and under;
 // D Top 4 83-88, Bottom pair 80-82, 7th D 77-79, AHL 76 and under (a club dresses 6 D to 12 F, so a 4th D is a deeper
 // role than a 4th forward: with the forwards' numbers only 64% of real top-4 D read Top 4); G Starter 83-88, Backup
 // 77-82. Nobody is "Depth" any more (each depth cut equals the cut above it).
-const ROLE_CUTS = { F: [85, 81, 78, 78], D: [83, 80, 77, 77], G: [83, 83, 77, 77] };   // Top 6 / Top 4 / Starter, Top 9 / Bottom pair / -, 4th line / 7th D / backup, depth
+// (2026-10 audit S13: the 4th line F from 77, not 78 - everyday NHL 4th-liners, Goodrow, Duhaime, Kastelic, Cousins, showed
+// the AHL chip, 18 forwards with 60+ NHL games last season)
+const ROLE_CUTS = { F: [85, 81, 77, 77], D: [83, 80, 77, 77], G: [83, 83, 77, 77] };   // Top 6 / Top 4 / Starter, Top 9 / Bottom pair / -, 4th line / 7th D / backup, depth
 function tierIdx(pos, v) {   // index into TIERS, or -1 below them (AHL)
   if (v >= 89) return TIERS.findIndex(t => v >= t.min);
   const i = ROLE_CUTS[pos === 'D' ? 'D' : pos === 'G' ? 'G' : 'F'].findIndex(c => v >= c);
@@ -4622,7 +4624,8 @@ const certGrow = ce => .625 + .75 * ce;
 //    and position, weighted by his NHL games (p.prd: nhlProdZ at the start, prodRead each summer)
 //  - from 22, not being an NHL regular yet (most who make it have by then)
 // It isn't only a label: each player has a hidden roll (p.potU), fixed for his career, and he grows to his ceiling only if
-// it falls inside his odds - otherwise he tops out 1-3 under the tier (devPot). The likelihood is read again every season,
+// it falls inside his odds - otherwise he tops out short of the tier (devPot: 1-3 under it for an NHL regular, anywhere
+// down to where he stood for anyone else - 2026-10 audit S2). The likelihood is read again every season,
 // so a breakout that lifts a Low to a High lifts the same roll over the line with it. (It used to be a simulation of his
 // summers at his work ethic and IQ: under it nearly everyone reached his ceiling - 211 of 222 young NHL regulars, a #1 pick
 // with 35 points at 23 included - and the odds per label weren't fixed.)
@@ -4633,6 +4636,19 @@ let LIKE_HI = .6, LIKE_LO = -.4;   // the score's cut-offs (let: the test harnes
 // headed for each tier score against their age group (TIERS order: Generational ... Depth; a z-score)
 const GROW_LEFT = { 17: 3.4, 18: 3, 19: 2.6, 20: 2.25, 21: 1.9, 22: 1.5, 23: 1.1, 24: .75, 25: .5, 26: .3 };   // (a third more and 133 of 144 19-20-year-old prospects with NHL ceilings read High)
 const TIER_Z = [2.3, 2, 1.3, .5, -.2, -.8, -1.2];
+// (2026-10 audit S1) his scoring against everyone his age in every league (pz) has its own targets: TIER_Z was drawn for
+// the NHL read (npz), and with it an ordinary junior (pz 0) beat the 4th-line target (-.8) by almost a whole standard
+// deviation - the game expected 263 of the 388 skaters drafted in 2025-26 to make the NHL, where draft history says
+// about 94, and a 7th-rounder read High more often than not. And the climb counts .35 at most: on its own it carried any
+// teenager with a modest ceiling to High (a 19-year-old at 75 with a 78 ceiling scored .72 from it alone)
+// (let: the test harness tunes them)
+let TIER_ZP = [2.5, 2.5, 2.3, 1.7, 1.3, 1, .7], CLIMB_CAP = .35;
+// (2026-10 audit S4) goalies: their stopping against goalies their age (prd.gz, gProdZ, capped at 1.5 either way) against
+// what a goalie headed for each tier stops at his age - about 3 of the 21 young goalies an age group holds become
+// starters (the established 27-33-year-olds hold 3.1 starters or better an age), so a starter's target is about a
+// standard deviation up. The "not an NHL regular yet" penalty starts at 24, not 22 (they arrive later: their ceilings
+// grow to 29), and from 23 a goalie's growth left is read as a skater's two years younger (his ceiling's room is)
+let G_TZ = [2.2, 2.2, 2, 1.6, .3, .3, .3], G_LATE = 24;
 function tierMin(pos, i) { return i < 3 ? TIERS[i].min : ROLE_CUTS[pos === 'D' ? 'D' : pos === 'G' ? 'G' : 'F'][i - 3]; }
 // his likelihood: { c: 'High' | 'Medium' | 'Low', sc: the score } or null once he's done developing. Shown (truth false)
 // it reads a player still being scouted through your scouts' estimates; the sim's own (truth true) reads the real numbers.
@@ -4650,32 +4666,40 @@ function potLike(p, truth) {
   else {
     // the climb: the points to his ceiling's tier against the growth a player his age usually has left (a 19-year-old
     // has years of it, a 23-year-old little: GROW_LEFT)
-    let left = 0; for (let a = p.age; a < potAge(p); a++) left += GROW_LEFT[Math.min(26, Math.max(17, a))] * (p.pos === 'G' ? 1.3 : 1);
-    const need = tierMin(p.pos, goal) - R(o), climb = (left - need) / Math.max(2, left);
-    // his scoring - in the NHL against NHL players his age and position by his NHL games, else against everyone his age
-    // in every league - against what players headed for that tier score at his age (TIER_Z): a #1 pick at 23 scoring like
-    // an ordinary young D isn't on an Elite track, whatever the average says (Power)
+    const G = p.pos === 'G', gy = G && p.age >= 23 ? 2 : 0;   // (S4: a goalie from 23 read two years younger)
+    let left = 0; for (let a = p.age; a < potAge(p); a++) left += GROW_LEFT[Math.min(26, Math.max(17, a - gy))] * (G ? 1.3 : 1);
+    const need = tierMin(p.pos, goal) - R(o), climb = Math.min(CLIMB_CAP, (left - need) / Math.max(2, left));   // (S1: .35 at most)
+    // his scoring - in the NHL against NHL players his age and position by his NHL games (TIER_Z), else against everyone
+    // his age in every league (TIER_ZP, S1) - against what players headed for that tier score at his age: a #1 pick at 23
+    // scoring like an ordinary young D isn't on an Elite track, whatever the average says (Power). A goalie: his stopping
+    // against goalies his age (G_TZ, S4; it was always even, so his save percentage never counted)
     const pr = p.prd || {}, ngp = pr.ngp || 0, w = pr.npz != null ? Math.min(1, ngp / 60) : 0;
-    const z = p.pos === 'G' ? TIER_Z[goal] : cl(w * (pr.npz || 0) + (1 - w) * (pr.pz || 0), -2.5, 2.5);
+    const zt = G ? cl(pr.gz || 0, -1.5, 1.5) - G_TZ[goal] : w * (cl(pr.npz || 0, -2.5, 2.5) - TIER_Z[goal]) + (1 - w) * (cl(pr.pz || 0, -2.5, 2.5) - TIER_ZP[goal]);
     // his draft slot: a top pick's pedigree counts at 18-19 and is gone by 23 (undrafted, the other way)
     const pk = p.draft && p.draft.pick, sd = pk ? slotDisp(pk) : null;
     const d = (sd != null ? (sd - 80) / 10 : (p.undr || (!p.draft && p.tid !== -2 && p.age >= 19)) ? -.4 : 0) * cl(1 - (p.age - 19) / 4, 0, 1);
-    const late = ngp < 60 && p.age >= 22 ? (p.age - 21) * .35 : 0;   // (still not an NHL regular from 22)
-    sc = climb + (z - TIER_Z[goal]) * .55 + d * .45 - late;
+    const la = G ? G_LATE : 22, late = ngp < 60 && p.age >= la ? (p.age - la + 1) * .35 : 0;   // (still not an NHL regular from 22; a goalie from 24 - S4)
+    sc = climb + zt * .55 + d * .45 - late;
     c = sc >= LIKE_HI ? 'High' : sc <= LIKE_LO ? 'Low' : 'Medium';
     if (hid && c === 'High' && (p.sp || 0) < 50) c = 'Medium';   // (not called High until your scouts know him well)
   }
   return (p[ck] = { k: key, c, sc: sc == null ? null : Math.round(sc * 100) / 100 });
 }
 function potConf(p) { const r = potLike(p); return r ? r.c : null; }
-// where he's actually headed (internal): his ceiling if his roll falls inside his odds, else 1-3 under its tier
+// where he's actually headed (internal): his ceiling if his roll falls inside his odds, else short of its tier
+// (2026-10 audit S2) how far short: not yet an NHL regular (under 60 NHL games the last two seasons, prd.ngp), anywhere
+// from where he stood when his roll was drawn (p.potO) to one point under the tier, by the roll; a regular 1-3 under it.
+// (Every miss was 1-3 under: a missed Top 9 F still made the 4th line, a missed Top 6 D the 7th D, so every first-rounder
+// had an NHL career whatever his label - in reality about 37% never reach 200 NHL games)
 function devPot(p) {
   const lk = potLike(p, true); if (!lk) return p.pot;
   if (p.potU == null) p.potU = Math.round(Math.random() * 1000) / 1000;
+  if (p.potO == null) p.potO = p.ovr;   // (S2: the overall his miss range starts from, fixed with his roll)
   const P = Math.min(.95, PLIKE[lk.c] + (typeof L !== 'undefined' && L && L.gmPotB ? L.gmPotB(p) : 0)), goal = tierIdx(p.pos, R(p.pot)), now = tierIdx(p.pos, R(p.ovr));   // (gmPotB: the GM's Hidden Gems, Draft Day Genius and Finishing School on his own players)
   if (p.potU < P || goal < 0 || (now >= 0 && now <= goal)) return p.pot;
-  const short = 1 + Math.floor((p.potU - P) / (1 - P) * 3);
-  return Math.max(p.ovr, Math.min(p.pot, invShowR(tierMin(p.pos, goal) - short)));
+  const f = (p.potU - P) / (1 - P), tm = tierMin(p.pos, goal);
+  if (((p.prd && p.prd.ngp) || 0) < 60) return Math.max(p.ovr, Math.min(p.pot, invShowR(tm - 1 - f * Math.max(0, tm - 1 - R(p.potO)))));
+  return Math.max(p.ovr, Math.min(p.pot, invShowR(tm - 1 - Math.floor(f * 3))));
 }
 function growBase(p, a) { return a <= 23 ? .4 : a <= 26 ? .2 : 0; }
 // (1.15 of an even share of the remaining gap each summer had made-up prospects NHL-ready a year or two after real ones:
@@ -4697,24 +4721,28 @@ function potFix(p) { if (p.age >= potAge(p) && !p.lateBloom) p.pot = p.ovr; else
 // Applied at import, after every stats refresh and once to existing saves (bump RATING_ADJ_V when this list changes)
 // Or an object { ovr, pot, like, shift: {skill: +-points}, arch }: the skills moved first (his game reshaped), then the
 // overall set, his style anchor re-read from the new shape (shapePull doesn't drift him back), and, with arch, the style
-// checked (his top skill nudged until it reads that way)
-const RATING_ADJ = { 'Jesper Wallstedt': [87, 92, 'Medium'], 'Kirill Kaprizov': 93,
-  'Scott Wedgewood': 87, 'Jake Oettinger': 90, 'Jet Greaves': 87, 'Joey Daccord': 86,
-  'Igor Shesterkin': 94, 'Andrei Vasilevskiy': 93, 'Filip Gustavsson': [88, 88], 'Ilya Sorokin': 91, 'Logan Thompson': 91, 'Jeremy Swayman': 90,
-  'Gavin McKenna': { ovr: 81, pot: 95, like: 'Medium', shape: { pas: 8, ska: 6, hnd: 5, sht: 3, chk: -9, def: -13 }, arch: 'Playmaker' },
-  'Jonas Brodin': { ovr: 86, shape: { ska: 5, sht: -21, pas: 1, hnd: -4, def: 23 } },
-  'Jared Spurgeon': { ovr: 85, shape: { ska: -3, sht: -16, pas: 1, hnd: -5, def: 18 } },
-  'Alex Pietrangelo': { ovr: 81, cEnd: 'hip' } }, RATING_ADJ_V = 13;   // (didn't play 2025-26 - hip, on LTIR - and isn't expected to again; contract through 2026-27)   // (a better skater, a weaker shot - the user's call)
+// checked (his top skill nudged until it reads that way; arch needs an ovr - alone it does nothing)
+// (Removing an entry: bump MODEL_V as well as RATING_ADJ_V. ratingAdj can't undo an override already applied - it only
+// drops the hand-set likelihood - so the formula's ratings come back only through a re-rate, which a MODEL_V bump gives a
+// save still in the data's season; a save past it keeps the hand-set ratings, developed since. 2026-10 verify)
+// (2026-10-12, the user's call after the ratings audit: "let the formula generate all ratings and potentials first, then
+// later if I want to I can override specific players" - every rating override removed (Wallstedt, Kaprizov, Wedgewood,
+// Oettinger, Greaves, Daccord, Shesterkin, Vasilevskiy, Gustavsson, Sorokin, Thompson, Swayman, McKenna, Brodin, Spurgeon,
+// Pietrangelo's 81), pure formula. The mechanism stays for his own overrides later; career-end facts aren't ratings and stay)
+// (an entry may be career facts only, no ovr: Pietrangelo, out for good with his hip, is rated by the formula)
+const RATING_ADJ = { 'Alex Pietrangelo': { cEnd: 'hip' } }, RATING_ADJ_V = 14;   // (didn't play 2025-26 - hip, on LTIR - and isn't expected to again; contract through 2026-27)
 function ratingAdj(p) {
-  const adj = p.hlm != null && RATING_ADJ[p.first + ' ' + p.last]; if (!adj) return;
+  const adj = p.hlm != null && RATING_ADJ[p.first + ' ' + p.last];
+  // (no entry: nothing of his is hand-set - a likelihood left by an override since removed goes, the formula's reads)
+  if (!adj) { if (p.likeAdj) { delete p.likeAdj; delete p.pcf; delete p.pcfT; } return; }
   const o = Array.isArray(adj) ? { ovr: adj[0], pot: adj[1], like: adj[2] } : typeof adj === 'object' ? adj : { ovr: adj };
   const want = o.ovr, potW = o.pot, like = o.like, keys = p.pos === 'G' ? GKR : SKR;
   if (o.shift) for (const k in o.shift) if (p.r[k] != null) p.r[k] = cl(p.r[k] + o.shift[k], 20, 99);
   // (shape: each skill set at his average across them plus its offset - the same result however often it's applied, so
   // a re-run - a stats refresh, RATING_ADJ_V going up - doesn't push him further; prefer it to shift)
   if (o.shape) { const ks = Object.keys(o.shape).filter(k => p.r[k] != null), m = ks.reduce((s, k) => s + p.r[k], 0) / ks.length; for (const k of ks) p.r[k] = Math.round(cl(m + o.shape[k], 20, 99)); }
-  for (let i = 0; i < 30 && R(ovrOf(p)) !== want; i++) { const d = R(ovrOf(p)) < want ? 1 : -1; for (const k of keys) p.r[k] = cl(p.r[k] + d, 20, 99); }
-  if (o.arch && p.pos !== 'G') { const top = o.arch === 'Playmaker' ? 'pas' : o.arch === 'Sniper' ? 'sht' : null; for (let i = 0; i < 6 && top && archOf(p) !== o.arch; i++) { p.r[top] = cl(p.r[top] + 1, 20, 99); for (let j = 0; j < 4 && R(ovrOf(p)) > want; j++) p.r.def = cl(p.r.def - 1, 20, 99); } }
+  for (let i = 0; i < 30 && want != null && R(ovrOf(p)) !== want; i++) { const d = R(ovrOf(p)) < want ? 1 : -1; for (const k of keys) p.r[k] = cl(p.r[k] + d, 20, 99); }   // (no ovr in the entry - career facts only: his ratings stay the formula's. It used to walk every rating down 30 points chasing undefined)
+  if (o.arch && p.pos !== 'G' && want != null) { const top = o.arch === 'Playmaker' ? 'pas' : o.arch === 'Sniper' ? 'sht' : null; for (let i = 0; i < 6 && top && archOf(p) !== o.arch; i++) { p.r[top] = cl(p.r[top] + 1, 20, 99); for (let j = 0; j < 4 && R(ovrOf(p)) > want; j++) p.r.def = cl(p.r.def - 1, 20, 99); } }
   // (his style anchor re-read from the new shape, so shapePull doesn't drift him back. The measured detail readings keep
   // their reference, rx.c0: the detail ratings follow his core ratings' change from it - erased, a reshaped skater's
   // Speed or shot ratings barely moved)
@@ -4728,6 +4756,22 @@ function ratingAdj(p) {
   delete p.pcf; delete p.pcfT;
 }
 function recStrL(t) { return t.rec.w + '-' + t.rec.l + '-' + t.rec.otl; }
+// the quick sim (fastSim; the AHL's Calder Cup) and the team rating (teamOvr). A club's expected goals in a game: SIM_LAM,
+// times e^(SIM_SK x the points its attack has over the other side's defence), times e^(-SIM_GK x the points the other
+// side's goalie - team g - has over 70). SIM_AHL: what an AHL goalie's g gets on top (affStrength). (let: the test harness
+// tunes them)
+// (2026-10 audit S10, measured over 24 simulated regular seasons a setting from opening night 2026-27, every game in the
+// quick sim. SIM_GK .011 -> .0065: the goalie spread the clubs in goal difference about as far as all their skaters
+// together - starters' team g varies 6.2 across the 32 clubs, the skaters' part 1.8. Vasilevskiy's ratings swapped with
+// Schmid's, an elite starter over a weak one was worth 38 goals and 16 points a season; now 27 and 8.5 - over an average
+// starter about 19 goals, the elite goalies' usual goals saved above expected (their Vezina seasons run 30-40). Lowered
+// alone, the standings bunched up further (goal-difference SD 35.5 -> 33; the NHL's was 40.5 in 2025-26 and 44.3 in
+// 2024-25), so SIM_SK .023 -> .035: the skaters spread them about as the NHL's are spread (39-41, points 12.7-13.6 vs 13.0;
+// goals for 21.5 -> 25.3 vs 25.7, against 23.6 -> 20.9 vs 21.8), and the sim's standings follow the 2026-27 markets better
+// (FanDuel .27 -> .42, NHL.com's projected wins .34 -> .49). SIM_LAM 3.01 -> 2.81: 6.26 goals a game, the NHL's 6.25 in
+// 2025-26 (it was 6.56; power play 22.3% -> 20.9%, save % .896 -> .901). SIM_AHL 16 -> 8 keeps the AHL's scoring where
+// it was, 5.8 a game, so the prospects' AHL numbers read as before)
+let SIM_LAM = 2.81, SIM_SK = .035, SIM_GK = .0065, SIM_AHL = 8;
 class League {
   constructor(data) {
     Object.assign(this, data); CAP = this.cap || 88;
@@ -5003,7 +5047,10 @@ class League {
   capSeason() { return (this.phase === 'regular' || this.phase === 'playoffs') ? this.season : this.season + 1; }
   // how far over the cap your moves may take you: in the offseason (draft, re-signing, free agency) up to 10% over, as the
   // NHL allows, to be back under it by opening night (newSeason won't start until you are); in the season, the cap itself
-  capLimit() { return this.phase === 'regular' || this.phase === 'playoffs' ? CAP : Math.round(CAP * 1.1 * 100) / 100; }
+  // (given a club, in the season its long-term injured reserve relief on top, as the NHL allows and the AI's aiCapComply
+  // already counts - 2026-10, EDM opening night $2M over net of nothing couldn't sign, claim or recall a soul)
+  capLimit(t) { return this.phase === 'regular' || this.phase === 'playoffs' ? CAP + (t ? this.ltirRelief(t) : 0) : Math.round(CAP * 1.1 * 100) / 100; }
+  capRelief(t) { return this.phase === 'regular' || this.phase === 'playoffs' ? this.ltirRelief(t) : 0; }
   // the cap floor: the NHL's lower limit, ~74% of the cap ($76.9M on the $104M of 2026-27; on the nearest half million).
   // There was none - in the 20-year backtest the lowest payroll ran at 47% of the cap, rebuilding clubs well under it.
   capFloor() { const real = { 95.5: 70.6, 104: 76.9, 113.5: 84 }[CAP]; return real ?? Math.round(CAP * .74 * 2) / 2; }   // (the NHL's announced floors for its announced caps - 2025-26 to 2027-28 - then the same 74% of the cap)
@@ -5014,7 +5061,7 @@ class League {
   floorComply(t) {
     const floor = this.capFloor(); let n = 0;
     while (this.payroll(t) < floor - .004 && n < 6) {
-      const room = CAP - this.payroll(t), dest = t.roster.length < ROSTER_MAX ? 'roster' : 'farm';
+      const room = CAP - this.payroll(t), dest = this.activeLen(t) < ROSTER_MAX ? 'roster' : 'farm';   // (healthy players: injured reserve aside)
       const p = this.freeAgents().filter(x => !x.undr && x.age >= 20 && dispR(x.ovr) >= 70 && !this.rfaOf(x)).map(x => { if (!x.ask) this.setAsk(x); return x; }).filter(x => x.ask.sal <= room && (dest === 'roster' || this.contracts(t) < MAX_CONTRACTS)).sort((a, b) => b.ovr - a.ovr)[0];
       if (!p) break;
       const sal = p.ask.sal;   // (signing clears his ask: the news read it after and crashed opening night, 2026-10 soak)
@@ -5028,7 +5075,7 @@ class League {
       const cand = this.teams.filter(o => o !== t && o.tid !== this.userTid && CAP - this.payroll(o) < 6).flatMap(o => this.rosterOf(o).filter(p => p.contract && !p.contract.ao && p.contract.sal >= 1.5 && p.contract.sal <= room && !(p.contract.cl === 'NMC') && !p.elc).map(p => [p, o]))
         .sort((a, b) => Math.abs(a[0].contract.sal - need) - Math.abs(b[0].contract.sal - need))[0];
       if (!cand) break;
-      const [p, o] = cand; this.detach(p); this.attach(t, p, t.roster.length < ROSTER_MAX ? 'roster' : 'farm');
+      const [p, o] = cand; this.detach(p); this.attach(t, p, this.activeLen(t) < ROSTER_MAX ? 'roster' : 'farm');
       this.noteTrade([p.id], o, t, 'future considerations'); this.ensureRoster(o); this.autoLines(o);
       this.addNews('Cap floor: the ' + t.name + ' take on ' + p.first + ' ' + p.last + ' ($' + p.contract.sal.toFixed(2) + 'M) from the ' + o.name + ', who clear the room.', t.tid, 'trade', p.id);
     }
@@ -5040,7 +5087,7 @@ class League {
   openingIssues() {
     const t = this.teams[this.userTid], out = [], over = this.payroll(t) - this.ltirRelief(t) - CAP;
     if (over > 0.004) out.push('you are ' + money(over) + ' over the $' + CAP + 'M cap');
-    if (t.roster.length > ROSTER_MAX) out.push('your NHL roster has ' + t.roster.length + ' players (the limit is ' + ROSTER_MAX + ')');
+    if (this.activeLen(t) > ROSTER_MAX) out.push('your NHL roster has ' + this.activeLen(t) + ' healthy players (the limit is ' + ROSTER_MAX + ', injured reserve aside)');   // (healthy, as callUp and offer count them)
     return out;
   }
   payroll(t) { const cs = this.capSeason(); let s = 0; for (const id of t.roster) { const c = this.players[id].contract; if (!c) continue; if (c.ext && cs > c.exp) s += c.ext.sal; else if (c.exp >= cs) s += c.sal + (c.bon || 0); } for (const id of (t.farm || [])) { const p = this.players[id]; if (p) s += this.buried(p); } for (const d of t.dead) if (d.exp >= cs) s += d.sal; if (t.tid === this.userTid) s += [0, 0, .5, 1.5][this.scoutLevel || 2]; return Math.round(s * 100) / 100; }
@@ -5070,7 +5117,9 @@ class League {
     const take = (list, fallbackPos, n) => { const out = []; for (const p of list) { if (out.length >= n) break; if (!used.has(p.id)) { out.push(p.id); used.add(p.id); } } return out; };
     const fwd = ps.filter(p => p.pos !== 'D' && p.pos !== 'G');
     // natural positions first: wingers switch sides easily, but center (faceoffs, defensive duties) is a different job
-    const fwdOvr = (p, pos) => ovrOf(p, pos) + nod(p) - (plays(p, pos) ? 0 : pos === 'C' || p.pos === 'C' ? 8 : 2);   // (no cost at a second position)
+    // (2026-10 audit D8: a natural center on the wing costs what a winger on his off wing does - 2, not 8: the center's
+    // job is the hard one to learn, not the wing - so a fifth center rated above the wingers plays ahead of them)
+    const fwdOvr = (p, pos) => ovrOf(p, pos) + nod(p) - (plays(p, pos) ? 0 : pos === 'C' ? 8 : 2);   // (no cost at a second position)
     // Forwards, in three steps (the old builder filled slot by slot, natural centers only: Keller, 78, centered Edmonton's
     // second line with Nugent-Hopkins, 86 and able to center, on the third line's wing; Will Smith, 85, played fourth line):
     // 1. who dresses: the 12 best forwards at their best position (and enough who can center)
@@ -5087,6 +5136,18 @@ class League {
     if (cPool.length >= 5) { const bestW = dressF.filter(p => !cPool.slice(0, 4).includes(p)).sort((a, b) => wOf(b) - wOf(a))[0]; if (wOf(cPool[1]) - (bestW ? wOf(bestW) : 0) >= 5) { topWing = cPool[1]; cPool = cPool.filter(p => p !== topWing); } }
     const cs = cPool.slice(0, 4);
     for (const p of dressF.filter(x => !cs.includes(x) && x !== topWing).sort((a, b) => fwdOvr(b, 'C') - fwdOvr(a, 'C'))) { if (cs.length >= 4) break; cs.push(p); }
+    // (2026-10 audit D8: rating first - the fourth line's center, 3+ better (about 2 shown) at wing than the weakest wing on
+    // the top three lines, moves up to the wing when another man can center the fourth: Hertl, 87, centred Vegas's fourth
+    // line behind Lavoie, 80, on the second line's wing; Lindholm, Seguin, Bennett and Toffoli sat the same way at 15 clubs.
+    // Only the fourth: a second or third-line center keeps the middle - moving them too put Vegas's 81s at center and its
+    // 87s on the wing. The man who takes his place is one the top nine's wings don't need (not 3+ better than the weakest
+    // of them), else the problem only moved: Mittelstadt, 85, went to center Boston's fourth line for Lindholm. Chemistry
+    // only breaks near-ties after this - tuneLines)
+    if (cs[3]) {
+      const ws = (topWing ? [topWing] : []).concat(dressF.filter(x => !cs.includes(x) && x !== topWing).sort((a, b) => wOf(b) - wOf(a))), w = ws[5];
+      const r = w && wOf(cs[3]) >= wOf(w) + 3 ? dressF.filter(x => !cs.includes(x) && x !== topWing && canC(x) && wOf(x) < wOf(w) + 3).sort((a, b) => fwdOvr(b, 'C') - fwdOvr(a, 'C'))[0] : null;
+      if (r) cs[3] = r;
+    }
     cs.forEach(p => used.add(p.id));
     // 3. wings: the rest, best first, two to a line, each pair on the sides they play best
     const wings = dressF.filter(p => !used.has(p.id) && p !== topWing).sort((a, b) => wOf(b) - wOf(a));
@@ -5253,7 +5314,12 @@ class League {
     const D = t.lines.D.map(l => chemistryOf(l.map(id => P[id]), 'D'));
     return { F, D };
   }
-  teamOvr(t) { const s = this.teamStrength(t); return Math.round((s.off + s.def) / 2 * 0.75 + s.g * 0.25); }
+  // the team rating: skaters and goalie weighed as the quick sim weighs them - a point of the goalie's g against a point of
+  // both attack and defence (SIM_GK vs 2 x SIM_SK; about .085 for the goalie). (2026-10 audit S10: a fixed quarter gave the
+  // goalie two thirds of the team rating's spread - the Rangers 3rd on Shesterkin alone, the markets had them 22nd. The
+  // rating's order vs the 2026-27 markets on opening night, FanDuel / NHL.com's projected wins: .37-.43 / .55-.60 before,
+  // .62-.63 / .72-.75 now)
+  teamOvr(t) { const s = this.teamStrength(t), w = SIM_GK / (2 * SIM_SK + SIM_GK); return Math.round((s.off + s.def) / 2 * (1 - w) + s.g * w); }
   // height (inches) and weight (lb): generated once per player from position, physical game (Checking) and a
   // per-player roll, then kept on the player. Godot sizes the 3D model from these and uses weight in body contact.
   bodyOf(p) {
@@ -5433,7 +5499,7 @@ class League {
   }
   fastSim(ht, at, playoff, HS, AS) {
     const H = HS || this.teamStrength(ht), A = AS || this.teamStrength(at);
-    const lam = (o, d, g) => 3.01 * Math.exp(0.023 * (o - d)) * Math.exp(-0.011 * (g - 70));   // (3.12 before the late equalizers below)
+    const lam = (o, d, g) => SIM_LAM * Math.exp(SIM_SK * (o - d)) * Math.exp(-SIM_GK * (g - 70));   // (SIM_LAM: 3.12 before the late equalizers below)
     const tacMul = t => { if (t.bounce > 0) t.bounce--; return 1 + ((t.tactics.shoot - 50) / 50) * 0.04 + ((t.tactics.aggr - 50) / 50) * 0.03 + (t.bounce > 0 ? .04 : 0); };
     // coach abilities: the power-play / penalty-kill ones on the ~20% of goals scored on the power play, Bench Boss on the
     // late ones in close games, Iceman in the playoffs (and in overtime, below)
@@ -5568,7 +5634,7 @@ class League {
       const s = add(gid, side); s.sa = (s.sa || 0) + Math.max(scored[1 - side], keep(R.shots[1 - side])); s.ga = (s.ga || 0) + scored[1 - side]; s.toi = (s.toi || 0) + 3600 * f;
     }
     if (out.score[0] === out.score[1]) {   // overtime, then a shootout
-      const H = this.teamStrength(ht), A = this.teamStrength(at), ph = 1 / (1 + Math.exp(-.023 * ((H.off - A.def) - (A.off - H.def)) - .06));
+      const H = this.teamStrength(ht), A = this.teamStrength(at), ph = 1 / (1 + Math.exp(-SIM_SK * ((H.off - A.def) - (A.off - H.def)) - .06));
       const w = Math.random() < ph ? 0 : 1; out.ot = true;
       if (playoff || Math.random() < .62) {
         const sk = Object.entries(out.st).filter(([id, s]) => s.team === w && !gids.has(id) && this.players[id] && this.players[id].pos !== 'G');
@@ -6491,7 +6557,7 @@ class League {
       if (a <= 26 && dispR(p.ovr) >= 76) p.rfa = { tid: t.tid, s: this.season };
     }
   }
-  resign(p, yrs) { if (moodOn() && p.wantsTrade) return p.last + ' has asked for a trade and refuses to re-sign.'; const t = this.teams[p.tid]; const cur = p.contract && p.contract.exp >= this.capSeason() ? p.contract.sal : 0; if (this.payroll(t) - cur + p.ask.sal > this.capLimit()) return 'Re-signing ' + p.last + (this.capLimit() > CAP ? ' would take you more than 10% over the cap, the offseason limit.' : ' would put you over the cap.'); this.signTo(p, t, p.ask.sal, yrs || p.ask.yrs, true); return null; }
+  resign(p, yrs) { if (moodOn() && p.wantsTrade) return p.last + ' has asked for a trade and refuses to re-sign.'; const t = this.teams[p.tid]; const cur = p.contract && p.contract.exp >= this.capSeason() ? p.contract.sal : 0; if (this.payroll(t) - cur + p.ask.sal > this.capLimit(t)) return 'Re-signing ' + p.last + (this.capLimit() > CAP ? ' would take you more than 10% over the cap, the offseason limit.' : ' would put you over the cap.'); this.signTo(p, t, p.ask.sal, yrs || p.ask.yrs, true); return null; }
   // offseason-aware contract start
   // every deal signed in this league, for the player's history: [season, club, years, cap hit, kind, clause, first season]
   // (kind: ELC, FA = signed as a free agent, RE = re-signed, EXT = extension)
@@ -6544,9 +6610,11 @@ class League {
     if (this.phase === 'resign' && !p.undr) return { ok: false, msg: 'Free agency opens on July 1. Until then clubs talk only to their own pending free agents.' };
     // (the 23-man roster and the cap hold in the season; in the summer only the 50 contracts do, and the cap with its 10%
     // offseason overage - get compliant by opening night)
-    if (!farm && inSeason && t.roster.length >= ROSTER_MAX) return { ok: false, msg: 'Your NHL roster is full (' + ROSTER_MAX + ' players). Assign him to the AHL or send someone down.' };
+    // (the 23 count the healthy: injured reserve aside, as callUp does - 2026-10, the opening trim keeps the injured on the
+    // roster, and by roster.length a club with ten on IR couldn't sign anyone, however many it sent down)
+    if (!farm && inSeason && this.activeLen(t) >= ROSTER_MAX) return { ok: false, msg: 'Your NHL roster is full (' + ROSTER_MAX + ' players, not counting injured reserve). Assign him to the AHL or send someone down.' };
     if (this.contracts(t) >= MAX_CONTRACTS) return { ok: false, msg: 'You are at the ' + MAX_CONTRACTS + '-contract limit.' };
-    if (this.payroll(t) + (farm ? Math.max(0, sal - BURY) : sal) > this.capLimit()) return { ok: false, msg: inSeason ? 'That offer would put you over the $' + CAP + 'M cap.' : 'That offer would take you more than 10% over the cap ($' + this.capLimit() + 'M), the most a club may carry in the offseason.' };
+    if (this.payroll(t) + (farm ? Math.max(0, sal - BURY) : sal) > this.capLimit(t)) return { ok: false, msg: inSeason ? 'That offer would put you over the $' + CAP + 'M cap' + (this.ltirRelief(t) > 0 ? ' (with ' + money(this.ltirRelief(t)) + ' of long-term IR relief).' : '.') : 'That offer would take you more than 10% over the cap ($' + this.capLimit() + 'M), the most a club may carry in the offseason.' };
     if (!p.ask) this.setAsk(p);
     const midSeason = this.phase === 'regular' || this.phase === 'playoffs';
     const need = p.ask.sal * (midSeason ? 0.8 : 1) * (1 + 0.04 * Math.abs(yrs - p.ask.yrs));
@@ -6651,13 +6719,13 @@ class League {
         // a full roster still upgrades: the best free agent it can afford who's clearly better than its weakest healthy
         // regular at his position (the extra man goes down)
         if (pass > 1) continue;
-        const room = CAP - this.payroll(t), worst = g => ros.filter(p => grpOf(p) === g && !p.inj).sort((a, b) => a.ovr - b.ovr)[0];
+        const room = CAP - this.payroll(t) + this.capRelief(t), worst = g => ros.filter(p => grpOf(p) === g && !p.inj).sort((a, b) => a.ovr - b.ovr)[0];   // (in the season, long-term IR relief is room, as for you)
         const up = fas.find(p => p.tid === -1 && p.pos !== 'G' && p.ask && p.ask.sal <= room - 0.25 && (w => w && p.ovr >= w.ovr + 3)(worst(grpOf(p))));
         if (up) { const a = up.ask; this.signTo(up, t, a.sal, a.yrs); if (up.ovr >= 70) this.addNews('The ' + t.name + ' signed ' + up.first + ' ' + up.last + ' ($' + a.sal.toFixed(2) + 'M × ' + a.yrs + ').', t.tid); this.aiFarmMoves(t); }
         continue;
       }
-      const room = CAP - this.payroll(t);
-      const pool2 = t.status === 'Rebuilding' ? fas.filter(p => p.age <= 27).concat(fas.filter(p => p.age > 27)) : fas;
+      const room = CAP - this.payroll(t) + this.capRelief(t);
+      const pool2 =t.status === 'Rebuilding' ? fas.filter(p => p.age <= 27).concat(fas.filter(p => p.age > 27)) : fas;
       const cand = pool2.find(p => p.tid === -1 && (need === 'any' ? p.pos !== 'G' : need === 'F' ? ['C', 'LW', 'RW'].includes(p.pos) : p.pos === need) && p.ask && p.ask.sal <= room - (23 - t.roster.length - 1) * CAP_MIN_SAL);
       if (cand) { const a = cand.ask; this.signTo(cand, t, a.sal, a.yrs); if (cand.ovr >= 70) this.addNews('The ' + t.name + ' signed ' + cand.first + ' ' + cand.last + ' ($' + a.sal.toFixed(2) + 'M × ' + a.yrs + ').', t.tid); }
       else { // fall back: the cheapest player who fits, at his own asking price. (This took the first match on a list
@@ -6762,7 +6830,7 @@ class League {
       }
       (this.faGen || (this.faGen = {}))[this.season + 1] = made; }
     this.season++;
-    for (const p of Object.values(this.players)) { const c = p.contract; if (c && c.ext && c.exp < this.season) { c.sal = c.ext.sal; c.exp = c.ext.exp; c.cl = c.ext.cl || null; c.p35 = c.ext.p35 || 0; c.tw = 0; c.bon = 0; delete c.ahl; delete c.ext; } p.strk = null; p.wk = null; p.mo = null; p.mood = 0; p.wantsTrade = false; p.glPrev = p.gl && p.gl.length ? 1 : 0; p.gl = []; }
+    for (const p of Object.values(this.players)) { const c = p.contract; if (c && c.ext && c.exp < this.season) { c.sal = c.ext.sal; c.exp = c.ext.exp; c.cl = c.ext.cl || null; c.p35 = c.ext.p35 || 0; c.tw = c.ext.tw ? 1 : 0; c.bon = 0; if (c.tw) c.ahl = c.ext.ahl || .3; else delete c.ahl; delete c.ext; } p.strk = null; p.wk = null; p.mo = null; p.mood = 0; p.wantsTrade = false; p.glPrev = p.gl && p.gl.length ? 1 : 0; p.gl = []; delete p.pto; }   // (pto: last camp's tryout is over - ensureFarm)
     this.phase = 'regular'; this.day = 0; this.playoffs = null; this.draft = null;
     this.news = this.news.filter(n => n.s >= this.season - 3 && (n.s >= this.season - 1 || ['award', 'trade', 'milestone', 'player', 'front'].includes(n.cat)));
     // (last season's points percentage is kept first: the waiver order uses it until a club has played 20 games - wvPrio)
@@ -6986,7 +7054,13 @@ class League {
         p.inj = 24; p.ltirHold = true; this.addNews('The ' + t.name + ' keep ' + p.first + ' ' + p.last + ' on long-term injured reserve: no cap room to activate him until the playoffs.', t.tid, 'txn', p.id); continue;
       }
       p.inj = 0; if (p.tid === this.userTid) this.backNews(p, lt0); else if (p.tid >= 0) this.autoLines(this.teams[p.tid]); } }
-    for (const t of this.teams) { if (t.roster.length <= ROSTER_MAX) continue; if (t.tid !== this.userTid) this.aiFarmMoves(t); else { const er = this.rosterOf(t).find(p => p.er && !p.inj); if (er && this.healthyOk(t, er)) { this.sendDown(t, er, { silent: true }); this.addNews(er.first + ' ' + er.last + ' was returned to ' + this.affName(t) + ' now that the roster is healthy.', t.tid, 'txn', er.id); } } }
+    // (over 23 as activeLen counts it - injured reserve aside: 2026-10 audit D2. Counting the injured, every club carrying
+    // one ran aiFarmMoves' rating swaps each day, and the first day of a season undid the real rosters - 94 moves, Jarry,
+    // Askarov and Silovs back down behind AHL goalies rated a point or two higher)
+    for (const t of this.teams) { if (this.activeLen(t) <= ROSTER_MAX) { if (t.tid === this.userTid) t.overNote = 0; continue; } if (t.tid !== this.userTid || this.isAuto('roster')) this.aiFarmMoves(t); else { const er = this.rosterOf(t).find(p => p.er && !p.inj); if (er && this.healthyOk(t, er)) { this.sendDown(t, er, { silent: true }); this.addNews(er.first + ' ' + er.last + ' was returned to ' + this.affName(t) + ' now that the roster is healthy.', t.tid, 'txn', er.id); } } }
+    // (your club still over - the injured back, say: one reminder until it's fixed. The opening trim keeps the injured on
+    // the roster, so their return can put you over, and nothing said so. With your roster on auto the staff does it above)
+    { const t = this.teams[this.userTid]; if (t && this.activeLen(t) > ROSTER_MAX && !t.overNote) { t.overNote = 1; this.addNews('Your NHL roster has ' + this.activeLen(t) + ' healthy players, over the ' + ROSTER_MAX + ' limit (injured reserve aside): send someone down from the Roster page.', t.tid, 'txn'); } }
     // (the week's stories by schedule day - a real week on the NHL calendar; the rest on the season clock, sclk, whose
     // rhythm they were tuned on: the draft board's monthly drift, AI extensions, coach firings, moods, the deadline rumors)
     if (d % 7 === 0) this.weeklyStories();
@@ -7795,13 +7869,16 @@ class League {
     const utPay = this.payroll(ut) - give.players.reduce((s, id) => s + hit(id) - rg(id), 0) + get.players.reduce((s, id) => s + Math.max(0, hit(id) - rt(id)), 0);
     const otPay = this.payroll(ot) + give.players.reduce((s, id) => s + Math.max(0, hit(id) - rg(id)), 0) - get.players.reduce((s, id) => s + hit(id) - rt(id), 0);
     const nRg = give.players.filter(id => rg(id) > 0), nRt = get.players.filter(id => rt(id) > 0);
+    // (each side's long-term IR relief in the season, net of the LTIR men changing hands: the same room aiCapComply counts)
+    const ltIds = ids => ids.filter(id => this.where(P[id]) === 'roster' && onLtir(P[id])).reduce((s, id) => s + this.capHit(P[id]), 0);
+    const inS = this.capLimit() === CAP, utLt = inS ? Math.max(0, this.ltirRelief(ut) - ltIds(give.players) + ltIds(get.players)) : 0, otLt = inS ? Math.max(0, this.ltirRelief(ot) - ltIds(get.players) + ltIds(give.players)) : 0;
     if (nRg.length > this.retSlots(ut)) msg = 'You can have at most three retained contracts on your books (you have room for ' + Math.max(0, this.retSlots(ut)) + ').';
     else if (nRt.length > this.retSlots(ot)) msg = 'The ' + ot.name + ' already carry the most retained contracts they can.';
     else if (nRg.concat(nRt).some(id => !this.retOk(P[id]))) msg = 'Salary can only be retained on a signed contract that has been retained on fewer than two times.';
     else if (!give.players.length && !give.picks.length) msg = 'Add something to offer.';
     else if (!get.players.length && !get.picks.length) msg = 'Pick something you want back.';
-    else if (utPay > this.capLimit() && salOut > salIn) msg = this.capLimit() > CAP ? 'This takes you more than 10% over the cap ($' + utPay.toFixed(1) + 'M), the offseason limit.' : 'This puts you over the cap ($' + utPay.toFixed(1) + 'M).';
-    else if (otPay > CAP && salIn > salOut) msg = 'The ' + ot.name + ' cannot fit that salary under the cap.';
+    else if (utPay - utLt > this.capLimit() && salOut > salIn) msg = this.capLimit() > CAP ? 'This takes you more than 10% over the cap ($' + utPay.toFixed(1) + 'M), the offseason limit.' : 'This puts you over the cap ($' + utPay.toFixed(1) + 'M).';
+    else if (otPay - otLt > CAP && salIn > salOut) msg ='The ' + ot.name + ' cannot fit that salary under the cap.';
     else if (utRos > ROSTER_MAX) msg = 'Your roster would exceed ' + ROSTER_MAX + ' players.';
     else if (otRos > ROSTER_MAX + 1) msg = 'Their roster would exceed ' + ROSTER_MAX + ' players.';   // (one over is fine: they send a man down - doTrade runs their farm moves)
     else if (otRos < ROSTER_MIN) msg = 'They would be left with too few players.';
@@ -8211,9 +8288,10 @@ Object.assign(League.prototype, {
       while (!this.real && t.prospects.length < 8) { const p = this.mkProspect(ri(18, 21)); p.ms = []; p.mcar = []; p.tid = t.tid; p.prospect = true; t.prospects.push(p.id); this.fakeDraft(p, t); this.setLeague(p, this.pickLeague(p)); }
       // signed youngsters already playing for the farm club, and unsigned prospects (a real-roster league brings its own)
       for (let k = 0; k < (this.hlm || this.real ? 0 : 5); k++) { const p = this.mkProspect(ri(19, 22)); p.ms = []; p.mcar = []; this.fakeDraft(p, t); const st = this.capSeason(); p.contract = { sal: p.draft.round === 1 ? .95 : .875, exp: st + ri(0, 2), tw: 1, ahl: .08 }; p.elc = 1; p.wx = st + 1; p.home = { lg: this.pickLeague(p), cl: null }; this.attach(t, p, 'farm'); }
-      // NHL rosters max out at 23 now
+      // NHL rosters max out at 23 now (healthy ones, as activeLen counts them: 2026-10 audit D2 - counting injured reserve,
+      // a real league's opening night sent down its healthy goalies, Jarry and Askarov, by rating behind a hurt backup)
       let guard = 0;
-      while (t.roster.length > ROSTER_MAX && guard++ < 10) { const ros = this.rosterOf(t); const gs = ros.filter(x => x.pos === 'G').length; const w = ros.filter(x => x.pos !== 'G' || gs > 2).sort((a, b) => a.ovr - b.ovr)[0]; this.attach(t, w, 'farm'); if (t.tid === this.userTid) this.addNews(w.first + ' ' + w.last + ' was assigned to your new AHL affiliate (' + this.affName(t) + ') — NHL rosters now max out at ' + ROSTER_MAX + '.', t.tid, 'txn', w.id); }
+      while (this.activeLen(t) > ROSTER_MAX && guard++ < 10) { const ros = this.rosterOf(t).filter(x => !x.inj); const gs = ros.filter(x => x.pos === 'G').length; const w = ros.filter(x => x.pos !== 'G' || gs > 2).sort((a, b) => a.ovr - b.ovr)[0]; if (!w) break; this.attach(t, w, 'farm'); if (t.tid === this.userTid) this.addNews(w.first + ' ' + w.last + ' was assigned to your new AHL affiliate (' + this.affName(t) + ') — NHL rosters now max out at ' + ROSTER_MAX + '.', t.tid, 'txn', w.id); }
       this.ensureFarm(t, true);
       if (t.lines) this.validateLines(t);
     }
@@ -8233,7 +8311,7 @@ Object.assign(League.prototype, {
       while (cnt(pos) < need[pos] && guard++ < 16) { const e = this.echlOf(t).filter(p => grpOf(p) === pos && !p.inj).sort((a, b) => b.ovr - a.ovr)[0]; if (!e) break; this.toAHL(t, e, { silent: true, force: true }); }
       guard = 0;
       while (cnt(pos) < need[pos] && guard++ < 16) {
-        if (!fas) fas = Object.values(this.players).filter(p => p.tid === -1 && p.ovr <= 57 && p.ovr >= 45 && p.age >= 20 && p.age <= 33);
+        if (!fas) fas = Object.values(this.players).filter(p => p.tid === -1 && !p.pto && p.ovr <= 57 && p.ovr >= 45 && p.age >= 20 && p.age <= 33);   // (not a man in another club's camp on a tryout, p.pto: Harrington, OTT's, was signed to your farm on opening night - 2026-10 verify, D7)
         const i = fas.reduce((b, p, k) => grpOf(p) === pos && (b < 0 || p.ovr > fas[b].ovr) ? k : b, -1);
         let p;
         if (i >= 0) { p = fas[i]; fas.splice(i, 1); }
@@ -8271,7 +8349,7 @@ Object.assign(League.prototype, {
     const L = pt.lines, P = this.players; const fw = [.32, .28, .24, .16], dw = [.4, .34, .26]; let off = 0, def = 0;
     L.F.forEach((l, i) => l.forEach(id => { const p = P[id]; if (!p) return; const r = p.r; off += fw[i] / 3 * .8 * (r.sht * .33 + r.pas * .25 + r.hnd * .2 + r.ska * .22); def += fw[i] / 3 * .4 * (r.def * .45 + r.chk * .2 + r.ska * .2 + r.pas * .15); }));
     L.D.forEach((l, i) => l.forEach(id => { const p = P[id]; if (!p) return; const r = p.r; off += dw[i] / 2 * .2 * (r.sht * .3 + r.pas * .35 + r.hnd * .15 + r.ska * .2); def += dw[i] / 2 * .6 * (r.def * .45 + r.chk * .2 + r.ska * .2 + r.pas * .15); }));
-    const g = P[L.G[0]]; return { off, def, g: (g ? g.r.ref * .5 + g.r.pos * .35 + g.r.reb * .15 : 45) + 16 }; // AHL scoring environment ≈ NHL
+    const g = P[L.G[0]]; return { off, def, g: (g ? g.r.ref * .5 + g.r.pos * .35 + g.r.reb * .15 : 45) + SIM_AHL }; // the AHL's scoring level (SIM_AHL: 16 with the old goalie weight)
   },
   ahlDay(games) {
     const P = this.players; let news = 0;
@@ -8300,7 +8378,7 @@ Object.assign(League.prototype, {
   calderCup() {
     const st = this.ahlStandings(); if (st.length < 16) return;
     const str = {}; st.slice(0, 16).forEach(t => { str[t.tid] = this.affStrength(this.affLineup(t)); });
-    const lam = (o, d, g) => 2.98 * Math.exp(0.023 * (o - d)) * Math.exp(-0.011 * (g - 70));
+    const lam = (o, d, g) => (SIM_LAM - .03) * Math.exp(SIM_SK * (o - d)) * Math.exp(-SIM_GK * (g - 70));   // (the NHL quick sim's, as fastSim)
     const game = (a, b) => { const A = str[a.tid], B = str[b.tid]; const la = lam(A.off, B.def, B.g), lb = lam(B.off, A.def, A.g); const x = poisson(la), y = poisson(lb); return x > y ? a : y > x ? b : Math.random() < la / (la + lb) ? a : b; };
     let alive = st.slice(0, 16); let rnd = 0, final = null;
     while (alive.length > 1) {
@@ -8356,9 +8434,9 @@ Object.assign(League.prototype, {
   wvClaim(p) {   // you claim him: straight to your NHL roster, his contract and all; returns an error or null
     if (!p || !p.wv) return 'He is no longer on waivers.';
     const t = this.teams[this.userTid], inSeason = this.phase === 'regular' || this.phase === 'playoffs';
-    if (inSeason && t.roster.length >= ROSTER_MAX) return 'Your roster is full (' + ROSTER_MAX + '). Send someone down first.';
+    if (inSeason && this.activeLen(t) >= ROSTER_MAX) return 'Your roster is full (' + ROSTER_MAX + ', not counting injured reserve). Send someone down first.';   // (healthy players, as callUp counts them)
     if (this.contracts(t) >= MAX_CONTRACTS) return 'You are at the ' + MAX_CONTRACTS + '-contract limit.';
-    if (this.payroll(t) + this.capHit(p) > this.capLimit()) return 'His ' + money(this.capHit(p)) + ' cap hit does not fit under your cap.';
+    if (this.payroll(t) + this.capHit(p) > this.capLimit(t)) return 'His ' + money(this.capHit(p)) + ' cap hit does not fit under your cap.';
     const from = this.teams[p.wv.from]; delete p.wv; this.wvq = (this.wvq || []).filter(id => id !== p.id);
     this.attach(t, p, 'roster'); p.er = 0; this.fixNumbers(); if (t.lines) this.validateLines(t);
     this.addNews('Waivers: you claimed ' + p.pos + ' ' + p.first + ' ' + p.last + ' from the ' + from.name + '.', t.tid, 'txn', p.id);
@@ -8369,7 +8447,7 @@ Object.assign(League.prototype, {
       if (!force && p.wv.day === this.day && p.wv.ph === this.phase) continue;
       const o = p.wv.ai != null ? this.teams[p.wv.ai] : null, from = this.teams[p.wv.from];
       delete p.wv;
-      if (o && o.roster.length <= ROSTER_MAX && CAP - this.payroll(o) >= this.capHit(p)) { this.attach(o, p, 'roster'); p.er = 0; this.fixNumbers(); this.autoLines(o); this.addNews('Waivers: the ' + o.city + ' ' + o.name + ' claimed ' + p.pos + ' ' + p.first + ' ' + p.last + ' from the ' + from.name + '.', o.tid, 'txn', p.id); }
+      if (o && this.activeLen(o) <= ROSTER_MAX && CAP - this.payroll(o) + this.capRelief(o) >= this.capHit(p)) { this.attach(o, p, 'roster'); p.er = 0; this.fixNumbers(); this.autoLines(o); this.addNews('Waivers: the ' + o.city + ' ' + o.name + ' claimed ' + p.pos + ' ' + p.first + ' ' + p.last + ' from the ' + from.name + '.', o.tid, 'txn', p.id); }
     }
     this.wvq = (this.wvq || []).filter(id => this.players[id] && this.players[id].wv);
   },
@@ -8380,8 +8458,8 @@ Object.assign(League.prototype, {
   // he costs - salary and the years left on it (a long deal on real money scares clubs off). Returns the claiming club.
   waiverClaim(t, p) {
     const c = p.contract, yl = c ? Math.max(1, c.exp - this.capSeason() + 1) : 1, sal = c ? c.sal : 0;
-    const cands = this.teams.filter(o => o.tid !== t.tid && o.tid !== this.userTid && o.roster.length < ROSTER_MAX).map(o => { const w = this.rosterOf(o).filter(x => grpOf(x) === grpOf(p)).sort((a, b) => a.ovr - b.ovr)[0]; return { o, gain: w ? p.ovr - w.ovr : 5 }; })
-      .filter(x => x.gain >= 1.5 && CAP - this.payroll(x.o) >= this.capHit(p)).sort((a, b) => this.wvPrio(a.o) - this.wvPrio(b.o));
+    const cands = this.teams.filter(o => o.tid !== t.tid && o.tid !== this.userTid && this.activeLen(o) < ROSTER_MAX).map(o => { const w = this.rosterOf(o).filter(x => grpOf(x) === grpOf(p)).sort((a, b) => a.ovr - b.ovr)[0]; return { o, gain: w ? p.ovr - w.ovr : 5 }; })
+      .filter(x => x.gain >= 1.5 && CAP - this.payroll(x.o) + this.capRelief(x.o) >= this.capHit(p)).sort((a, b) => this.wvPrio(a.o) - this.wvPrio(b.o));
     for (const x of cands) {
       const pr = cl(.32 + x.gain * .08 + (p.age <= 25 ? .1 : 0) - (p.age >= 32 ? .2 : 0) - (sal > 3 ? .15 : 0) - (sal > 2 ? .06 * (yl - 1) : 0), 0, .85);
       if (Math.random() < pr) return x.o;
@@ -8426,7 +8504,7 @@ Object.assign(League.prototype, {
     if (w !== 'farm' && !(w === 'prospects' && p.contract)) return 'He is not under contract in your system.';
     if (!force) {
       if (this.activeLen(t) >= ROSTER_MAX && (this.phase === 'regular' || this.phase === 'playoffs')) return 'Your NHL roster is full (' + ROSTER_MAX + ', not counting injured reserve). Send someone down first.';
-      if (this.phase !== 'playoffs' && this.payroll(t) - this.buried(p) + this.capHit(p) > this.capLimit()) return 'Not enough cap space to recall him.';   // (no cap in the playoffs)
+      if (this.phase !== 'playoffs' && this.payroll(t) - this.buried(p) + this.capHit(p) > this.capLimit(t)) return 'Not enough cap space to recall him.';   // (no cap in the playoffs)
     }
     this.attach(t, p, 'roster'); p.er = force ? 1 : 0;
     this.fixNumbers(); if (t.lines) this.validateLines(t);
@@ -8478,7 +8556,7 @@ Object.assign(League.prototype, {
     if (!opts.includes(dest)) dest = opts.includes('AHL') ? 'AHL' : 'LOAN';
     if (dest === 'EU' && !euLg) euLg = EU_LOAN.includes(EU_HOME[p.nat]) ? EU_HOME[p.nat] : 'SHL';
     if (dest === 'ECHL' && this.echlOf(t).length >= ECHL_MAX) return 'Your ECHL roster is full (' + ECHL_MAX + ').';
-    if (dest === 'NHL') { if (t.roster.length >= ROSTER_MAX && (this.phase === 'regular' || this.phase === 'playoffs')) return 'Your NHL roster is full (' + ROSTER_MAX + ').'; if (this.payroll(t) + sal > this.capLimit()) return 'Not enough cap space.'; }
+    if (dest === 'NHL') { if (this.activeLen(t) >= ROSTER_MAX && (this.phase === 'regular' || this.phase === 'playoffs')) return 'Your NHL roster is full (' + ROSTER_MAX + ', not counting injured reserve).'; if (this.payroll(t) + sal > this.capLimit(t)) return 'Not enough cap space.'; }
     const start = this.capSeason();
     p.contract = { sal, exp: start + yrs - 1, tw: 1, ahl: .08, bon: this.elcBonus(p) }; this.noteDeal(p, t.tid, 'ELC', sal, yrs, start, null); p.elc = 1; p.wx = start + (p.age <= 19 ? 4 : p.age <= 21 ? 3 : 2) - 1; p.ask = null;
     if (dest === 'NHL') this.attach(t, p, 'roster');
@@ -8566,7 +8644,7 @@ Object.assign(League.prototype, {
       let g2 = 0;
       while (this.activeLen(t) < ROSTER_MAX && g2++ < 3) {
         const fb = this.farmOf(t).filter(p => !p.inj && p.contract && p.pos !== 'G').sort((a, b) => b.ovr - a.ovr)[0];
-        if (!fb || (this.phase !== 'playoffs' && this.payroll(t) - this.buried(fb) + this.capHit(fb) > CAP)) break;
+        if (!fb || (this.phase !== 'playoffs' && this.payroll(t) - this.buried(fb) + this.capHit(fb) > this.capLimit(t))) break;   // (long-term IR relief counts, as for your own recalls)
         this.attach(t, fb, 'roster'); fb.er = 0;
       }
     }
@@ -8934,6 +9012,9 @@ function injLen(p, short) {
 // exactly 24 games the relief ended after one game and the AI dumped contracts). One held there for the cap (ltirHold)
 // counts by his games.
 function onIR(p) { return !!p && (p.inj >= 7 || (p.inj > 0 && !!p.injLive && !!p.injLive.ir)); }
+// a club's NHL roster count as the limit reads it: healthy players against the 23, injured reserve shown apart (2026-10:
+// the screens showed t.roster.length, injured included - '31/23' for a club the rules had at 21)
+function rosLbl(t) { const a = L.activeLen(t), n = t.roster.length; return a + '/' + ROSTER_MAX + (n > a ? ' (+' + (n - a) + ' IR)' : ''); }
 function onLtir(p) { return !!p && (p.injLive && !p.ltirHold ? p.inj > 0 && !!p.injLive.ltir : p.inj >= 24); }
 const ROLE_PROMISE = ['Top line / top pair', 'Top six / top four', 'Middle six / third pair', 'Depth / extra'];
 const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
@@ -8988,7 +9069,7 @@ Object.assign(League.prototype, {
     if (role > exp) { v -= 14 * (role - exp); why.push('would play a smaller role here (' + ROLE_PROMISE[role].toLowerCase() + ')'); }
     else if (role < exp) { v += 6; why.push('a bigger role here than he expects'); }
     const sui = !mid ? this.suitors(p) : 0; if (sui >= 3) { v -= 6; why.push(sui + ' other clubs are calling'); }
-    const room = this.capLimit() - this.payroll(t), need = p.ask.sal * (mid ? .8 : 1);
+    const room = this.capLimit(t) - this.payroll(t), need = p.ask.sal * (mid ? .8 : 1);
     if (need > room) why.push(mid ? "you can't fit his ask under the cap" : "his ask would take you more than 10% over the cap, the offseason limit");
     v = Math.round(cl(v, 5, 98));
     return { v, lab: need > room ? 'No room' : v >= 66 ? 'High' : v >= 42 ? 'Medium' : 'Low', cls: need > room ? 'muted' : v >= 66 ? 'int-hi' : v >= 42 ? 'int-med' : 'neg', why };   // (High blue, Medium green, Low red - the user's colours, 2026-10)
@@ -10438,7 +10519,7 @@ Object.assign(League.prototype, {
     const v = g => g.players.reduce((s, id) => s + (P[id] ? this.pValue(P[id], ut) : 0), 0) + g.picks.reduce((s, id) => { const k = this.picks.find(x => x.id === id); return s + (k ? this.kValue(k, ut) : 0); }, 0);
     const sal = g => g.players.reduce((s, id) => s + (P[id] && P[id].contract ? this.capHit(P[id]) : 0), 0);
     const desc = g => [...g.players.map(id => P[id] ? P[id].first + ' ' + P[id].last : '?'), ...g.picks.map(id => { const k = this.picks.find(x => x.id === id); return k ? this.pickLabel(k) : id; })].join(', ');
-    const capOk = this.payroll(ut) - sal(o.give) + sal(o.get) <= this.capLimit();
+    const capOk = this.payroll(ut) - sal(o.give) + sal(o.get) <= this.capLimit(ut);
     const gain = v(o.get), cost = v(o.give);
     if (capOk && gain >= cost * 1.05 && this.offerValid(o) && this.evalTrade(o.tid, o.give, o.get).accept) {
       this.doTrade(o.tid, o.give, o.get);
@@ -11900,7 +11981,7 @@ function repairNaN(lg) {
   }
   return n;
 }
-function loadFrom(s) { try { { L = new League(JSON.parse(s)); repairNaN(L); undoHughesTrade(L); if ((L.archV || 0) < 13) { for (const p of Object.values(L.players)) p.arch = archOf(p); L.archV = 13; } if (!L.capV) { L.teams.forEach(t => L.ensureCaptains(t, true)); L.capV = 1; }   /* captains and alternates for every club */ if (!L.bpV) { for (const p of Object.values(L.players)) if (p.hlm == null && !p.born && !p.bc) birthPlace(p); L.bpV = 1; } if (!L.herV) { for (const p of Object.values(L.players)) if (p.bn && p.bn !== p.nat && (p.nat === 'CAN' || p.nat === 'USA') && p.hlm == null && !p.nhl && !(p.fam && p.fam.length) && !(p.career || []).length && (p.tid === -2 || (p.prospect && !p.contract))) herName(p); L.herV = 1; } if (!L.shpV) { for (const p of Object.values(L.players)) { if (p.pos === 'G' || !(p.rx && p.rx.c0)) continue; const o0 = ovrOf(p), same = p.ovr === o0; shapePull(p, 1); for (let i = 0; i < 3; i++) { const d = o0 - ovrOf(p); if (Math.abs(d) < .3) break; for (const k of SHP_K) p.r[k] = Math.round(cl(p.r[k] + d, 20, 99)); } if (same) p.ovr = ovrOf(p); } L.shpV = 1; } if (!L.famFixV) { const RA = {}; for (const r of L.retired || []) RA[r.id] = r.age + (L.season - r.s); for (const p of Object.values(L.players)) for (const e of p.fam || []) { if (e.r !== 'son' && e.r !== 'nephew') continue; const q = e.id ? L.players[e.id] : null, qa = q ? q.age : e.id ? RA[e.id] : null; if (qa != null && qa > p.age + 12) e.r = e.r === 'son' ? 'father' : 'uncle'; } L.famFixV = 1; }   /* the bloodline prospects' links were the wrong way round (famDraft): a "son" or "nephew" a generation older is his father or uncle */ if (!L.famFakeV) { const y0 = (L.history || []).length ? Math.min(...L.history.map(h => h.season)) : L.season, RR = {}; for (const r of L.retired || []) RR[r.id] = r; for (const p of Object.values(L.players)) { if (p.hlm != null || !(p.fam || []).length) continue; const by = p.born ? p.born[0] : L.season + 1 - p.age; if (by >= y0 || LEGACY_KIDS.some(k => k.n === p.first + ' ' + p.last)) continue; const bad = p.fam.filter(e => { const q = e.id ? (L.players[e.id] || RR[e.id]) : null; return q && q.hlm != null && ['father', 'uncle', 'brother'].includes(e.r); }); if (!bad.length) continue; for (const e of bad) { const q = L.players[e.id]; if (q && q.fam) q.fam = q.fam.filter(x => x.id !== p.id); const r = RR[e.id]; if (r && r.kids) r.kids--; } p.fam = p.fam.filter(e => !bad.includes(e)); if (!p.fam.length) delete p.fam; p.last = natName(p.nat)[1]; } L.famFakeV = 1; }   /* made-up relatives of real players born before the league began came out (famDraft now waits for the future): the link goes both ways and he takes a name of his own */ if (!L.holeV2) L.holeV = 0; L.holeV2 = 1;   /* re-run once with the defence floor */ if (!L.holeV) { for (const p of Object.values(L.players)) { if (p.hlm != null || p.age > 21 || (p.career || []).length || dispR(p.pot) < 85) continue; if (prosHoles(p, p.pot)) p.arch = archOf(p); } L.holeV = 1; }   /* made-up high-ceiling prospects with no NHL games yet lose a glaring skill hole (prosHoles) */ if (!L.prosCV) { for (const p of Object.values(L.players)) { if (p.tid !== -2 || p.hlm != null || p.gen || dispR(p.pot) >= 94) continue; const o0 = p.ovr; prosClamp(p, prosLvl(p.pot, p.age)); if (p.ovr < o0) { potFix(p); p.arch = archOf(p); } } L.prosCV = 1; }   /* this class's made-up prospects drawn far over their tier's usual level come back within 5 of it (prosClamp: his ceiling read as his potential, the generous side; the potential itself stays) */ if (!L.chkV) { for (const p of Object.values(L.players)) { if (p.pos === 'G' || !p.r || p.r.chk == null) continue; const cap = chkCap(p); if (p.r.chk <= cap) continue; const same = p.ovr === ovrOf(p); p.r.chk = cap; if (same) p.ovr = ovrOf(p); p.arch = archOf(p); } L.chkV = 1; }   /* checking above what his frame allows comes down to it (chkCap), his style re-read */ if (!L.rxSV) { L.rxS = (L.history || []).length ? Math.min(...L.history.map(h => h.season)) : L.season; L.rxSV = 1; }   /* the league's first season (2026: the 2026/27 season; it read 2025 until rxSV) */   /* a real player's skills that wandered from his shape over the seasons come back to within 3 of it (shapePull), his overall kept; L.rxS: the season the real players' stats were read (rxOverrides) */ /* the family names of birthplace (herName) for made-up prospects not yet signed - nobody you already know is renamed */ if (!L.echlV && L.teams[0].farm) { for (const t of L.teams) { const mv = L.minorLimits(t); if (t.tid === L.userTid && mv.length) L.addNews('The ECHL is open, and the AHL now carries at most ' + AHL_MAX + ' players (' + AHL_GMAX + ' goalies): ' + mv.length + ' of your minor leaguers moved down to the ' + L.echlName(t) + ' (ECHL): ' + mv.slice(0, 6).map(p => p.pos + ' ' + p.first + ' ' + p.last).join(', ') + (mv.length > 6 ? '…' : '') + '. Move them on the Roster page (AHL tab).', t.tid, 'txn'); } L.echlV = 1; }   /* the ECHL and the minor-league limits for saves made before them */   /* birthplaces for the generated players already in the league (real ones get theirs from NHL.com: nhlBackfill) */ if (!L.dcFrV) { const fr = (L.draftClass || []).map(id => L.players[id]).filter(p => p && p.tid === -2 && !p.hlm && p.pot >= 84 && p.pot < 92).sort((a, b) => b.pot - a.pot); for (const p of fr.slice(1)) { p.pot = ri(81, 83); if (p.ovr > p.pot) p.ovr = p.pot; } L.dcFrV = 1; }   /* (the class's franchise ceilings beyond its best one come down to elite: generated classes had 1-4 a year) */ if (!L.elcFix) { for (const p of Object.values(L.players)) if (p.elc && p.contract && p.contract.sal > 1.0) p.elc = 0; L.elcFix = 1; }   /* (the ELC flag that never cleared: off for anyone on a real second deal) */   /* (styles re-read: a shooter prospect read as a grinder) */ if (L.askV !== 3) { for (const p of Object.values(L.players)) if (p.tid === -1 || p.ask) L.setAsk(p); L.askV = 3; }   /* (asks priced on the 2026 market's curve) */ if (!L.scoutV) L.migrateScouts(); SCREV++; if (!L.minFixV) { for (const p of Object.values(L.players)) { const c = p.contract; if (p.tid >= 0 && c && !p.elc && c.sal <= CAP_MIN_SAL + .02 && c.exp <= L.capSeason() + 1 && dispR(p.ovr) >= 84) { const v = Math.round(L.fairSal(p) * 100) / 100; L.addNews(p.first + ' ' + p.last + '\u2019s minimum deal with the ' + L.teams[p.tid].name + ' was corrected to $' + v.toFixed(2) + 'M (a free-agent signing bug paid stars the league minimum).', p.tid, 'txn', p.id); c.sal = v; } } L.minFixV = 1; } if (!L.dShapeV) { L.dShapeV = 1; const D = Object.values(L.players).filter(p => p.pos === 'D' && p.r); const rate = p => { const s = p.stats && p.stats.gp >= 20 ? [p.stats.gp, p.stats.g, p.stats.a] : (c => c && c[2] >= 20 ? [c[2], c[3], c[4]] : null)((p.career || []).slice(-1)[0]); return s ? (s[1] + s[2]) / s[0] : null; }; const v = D.map(rate).filter(x => x != null), m = v.reduce((a, b) => a + b, 0) / (v.length || 1), sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length || 1)) || 1; for (const p of D) { const x = rate(p); dShape(p, x == null ? 0 : cl((x - m) / sd * .9, -2.2, 2.2), true); p.arch = archOf(p); } } if (!L.slotV) { L.slotV = 1; let nUp = 0; for (const p of Object.values(L.players)) { if (!(p.hlm != null || p.born) || !p.draft || !p.draft.pick || p.age > 23 || p.age >= potAge(p)) continue; const sc = slotCeil(p.draft.pick), w = p.age <= 21 ? .45 : .35; if (sc <= p.pot) continue; const np = Math.min(89, Math.round(w * sc + (1 - w) * p.pot)); if (np > p.pot) { p.pot = np; nUp++; } } if (nUp) L.addNews('Ceilings now weigh draft position: ' + nUp + ' young players drafted higher than their production suggested had their potential raised toward their draft slot.', -1, 'prospect'); } if (!L.prosFixV) { L.prosFixV = 1; let nFix = 0; for (const p of Object.values(L.players)) { if (p.gv || p.born || p.hlm != null || p.age < 17 || p.age > 21 || L.where(p) === 'roster' || !(p.tid === -2 || p.prospect || p.elc)) continue; let o = 44 + (p.pot - 65) * (p.pot < 65 ? .8 : .55) - 2.5 + 3; for (let a = 17; a < p.age; a++) o += (a <= 20 ? 3 : 2.2) + Math.max(0, p.pot - o) * .12; const cap = Math.min(p.pot, o + 3); if (p.ovr <= cap) continue; const d = (p.ovr - cap) * .8; for (const k of Object.keys(p.r)) if (k !== 'end' && k !== 'dur') p.r[k] = Math.max(20, Math.round(p.r[k] - d)); p.ovr = ovrOf(p); nFix++; } if (nFix) L.addNews('Prospect ratings were corrected for ' + nFix + ' generated prospects from draft classes made before the generator fix (late picks had been rated like first-rounders).', -1, 'prospect'); } if (!L.draftClass && (L.phase === 'regular' || L.phase === 'playoffs')) L.makeDraftClass(); if (!L.staffV) L.initStaff(); if (!L.clauseV && L.migrateClauses) L.migrateClauses(); if (!L.certV) { for (const p of Object.values(L.players)) delete p.cert; L.certV = 1; } if (!L.xfV) { for (const p of Object.values(L.players)) { const o = p.ovr; spikeRatings(p); p.ovr = ovrOf(p); if (p.ovr < o) { p.ovr = o; } p.xf = xfOf(p); } L.xfV = 2; } for (const p of Object.values(L.players)) { if (!p.arch) p.arch = archOf(p); if (!p.xf) p.xf = xfOf(p); } if (!L.minors) L.initMinors(); if (!L.teams[0].status) L.updateStatuses(true); L.fixGenerational(); if ((L.dispV || 0) < 2) { for (const p of Object.values(L.players)) if (p.oh) p.oh = p.oh.map(([a, d]) => [a, showR(56 + (d + 0.5 - 75) / DISP_K)]); L.dispV = 2; /* the rating history was saved on the old display scale: now on the one shown (showR) */ } if ((L.adjV || 0) < RATING_ADJ_V) { for (const p of Object.values(L.players)) ratingAdj(p); L.adjV = RATING_ADJ_V; } if (!L.potV) { for (const p of Object.values(L.players)) if (p.tid !== -2) potFix(p); L.potV = 1; } if ((L.archV || 0) < 13) { for (const p of Object.values(L.players)) p.arch = archOf(p); L.archV = 13; } if (!L.potGV) { const room = { 24: 6, 25: 4.5, 26: 3, 27: 2, 28: 1 }; for (const p of Object.values(L.players)) if (p.pos === 'G' && room[p.age] && p.pot <= p.ovr + 1) p.pot = Math.min(89, p.ovr + room[p.age]); L.potGV = 1; } if (!L.potDV) { for (const p of Object.values(L.players)) if (p.pos === 'D' && p.age === 27 && p.pot <= p.ovr) p.pot = Math.min(89, p.ovr + 1); L.potDV = 1; } if (!L.potD27) { for (const p of Object.values(L.players)) if (p.pos === 'D' && p.age >= POT_AGE_D && !p.lateBloom) p.pot = p.ovr; L.potD27 = 1; }   /* (2026-10: D are done developing at 27 like forwards) */ if (!L.prdV) { prodRead(L, L.season - 1); L.prdV = 1; }   /* (each young player's production read for his likelihood, until the summer reads the next) */   /* goalies now develop until 29: those 24-28 left at their ceiling get room back */ if (!L.pos2V) { for (const p of Object.values(L.players)) if (!p.hlm && !p.pos2) genPos2(p); L.pos2V = 1; } if (L.real && !L.fakeFix && !(L.history && L.history.length)) { const gone = new Set(); for (const t of L.teams) for (const k of ['farm', 'prospects']) t[k] = (t[k] || []).filter(id => { const p = L.players[id], fake = p && !p.hlm && !p.born && p.draft && p.draft.season < L.season && !(p.career && p.career.length) && !(p.stats && p.stats.gp) && !(p.mcar && p.mcar.length); if (fake) gone.add(id); return !fake; }); gone.forEach(id => delete L.players[id]); L.teams.forEach(t => L.ensureFarm(t, true)); L.fakeFix = 1; }   // made-up prospects an early real-roster league was given   // archetype set: no Dangler, Defensive Defenseman   // one offensive defenseman type
+function loadFrom(s) { try { { L = new League(JSON.parse(s)); repairNaN(L); undoHughesTrade(L); if ((L.archV || 0) < 13) { for (const p of Object.values(L.players)) p.arch = archOf(p); L.archV = 13; } if (!L.capV) { L.teams.forEach(t => L.ensureCaptains(t, true)); L.capV = 1; }   /* captains and alternates for every club */ if (!L.bpV) { for (const p of Object.values(L.players)) if (p.hlm == null && !p.born && !p.bc) birthPlace(p); L.bpV = 1; } if (!L.herV) { for (const p of Object.values(L.players)) if (p.bn && p.bn !== p.nat && (p.nat === 'CAN' || p.nat === 'USA') && p.hlm == null && !p.nhl && !(p.fam && p.fam.length) && !(p.career || []).length && (p.tid === -2 || (p.prospect && !p.contract))) herName(p); L.herV = 1; } if (!L.shpV) { for (const p of Object.values(L.players)) { if (p.pos === 'G' || !(p.rx && p.rx.c0)) continue; const o0 = ovrOf(p), same = p.ovr === o0; shapePull(p, 1); for (let i = 0; i < 3; i++) { const d = o0 - ovrOf(p); if (Math.abs(d) < .3) break; for (const k of SHP_K) p.r[k] = Math.round(cl(p.r[k] + d, 20, 99)); } if (same) p.ovr = ovrOf(p); } L.shpV = 1; } if (!L.famFixV) { const RA = {}; for (const r of L.retired || []) RA[r.id] = r.age + (L.season - r.s); for (const p of Object.values(L.players)) for (const e of p.fam || []) { if (e.r !== 'son' && e.r !== 'nephew') continue; const q = e.id ? L.players[e.id] : null, qa = q ? q.age : e.id ? RA[e.id] : null; if (qa != null && qa > p.age + 12) e.r = e.r === 'son' ? 'father' : 'uncle'; } L.famFixV = 1; }   /* the bloodline prospects' links were the wrong way round (famDraft): a "son" or "nephew" a generation older is his father or uncle */ if (!L.famFakeV) { const y0 = (L.history || []).length ? Math.min(...L.history.map(h => h.season)) : L.season, RR = {}; for (const r of L.retired || []) RR[r.id] = r; for (const p of Object.values(L.players)) { if (p.hlm != null || !(p.fam || []).length) continue; const by = p.born ? p.born[0] : L.season + 1 - p.age; if (by >= y0 || LEGACY_KIDS.some(k => k.n === p.first + ' ' + p.last)) continue; const bad = p.fam.filter(e => { const q = e.id ? (L.players[e.id] || RR[e.id]) : null; return q && q.hlm != null && ['father', 'uncle', 'brother'].includes(e.r); }); if (!bad.length) continue; for (const e of bad) { const q = L.players[e.id]; if (q && q.fam) q.fam = q.fam.filter(x => x.id !== p.id); const r = RR[e.id]; if (r && r.kids) r.kids--; } p.fam = p.fam.filter(e => !bad.includes(e)); if (!p.fam.length) delete p.fam; p.last = natName(p.nat)[1]; } L.famFakeV = 1; }   /* made-up relatives of real players born before the league began came out (famDraft now waits for the future): the link goes both ways and he takes a name of his own */ if (!L.holeV2) L.holeV = 0; L.holeV2 = 1;   /* re-run once with the defence floor */ if (!L.holeV) { for (const p of Object.values(L.players)) { if (p.hlm != null || p.age > 21 || (p.career || []).length || dispR(p.pot) < 85) continue; if (prosHoles(p, p.pot)) p.arch = archOf(p); } L.holeV = 1; }   /* made-up high-ceiling prospects with no NHL games yet lose a glaring skill hole (prosHoles) */ if (!L.prosCV) { for (const p of Object.values(L.players)) { if (p.tid !== -2 || p.hlm != null || p.gen || dispR(p.pot) >= 94) continue; const o0 = p.ovr; prosClamp(p, prosLvl(p.pot, p.age)); if (p.ovr < o0) { potFix(p); p.arch = archOf(p); } } L.prosCV = 1; }   /* this class's made-up prospects drawn far over their tier's usual level come back within 5 of it (prosClamp: his ceiling read as his potential, the generous side; the potential itself stays) */ if (!L.chkV) { for (const p of Object.values(L.players)) { if (p.pos === 'G' || !p.r || p.r.chk == null) continue; const cap = chkCap(p); if (p.r.chk <= cap) continue; const same = p.ovr === ovrOf(p); p.r.chk = cap; if (same) p.ovr = ovrOf(p); p.arch = archOf(p); } L.chkV = 1; }   /* checking above what his frame allows comes down to it (chkCap), his style re-read */ if (!L.rxSV) { L.rxS = (L.history || []).length ? Math.min(...L.history.map(h => h.season)) : L.season; L.rxSV = 1; }   /* the league's first season (2026: the 2026/27 season; it read 2025 until rxSV) */   /* a real player's skills that wandered from his shape over the seasons come back to within 3 of it (shapePull), his overall kept; L.rxS: the season the real players' stats were read (rxOverrides) */ /* the family names of birthplace (herName) for made-up prospects not yet signed - nobody you already know is renamed */ if (!L.echlV && L.teams[0].farm) { for (const t of L.teams) { const mv = L.minorLimits(t); if (t.tid === L.userTid && mv.length) L.addNews('The ECHL is open, and the AHL now carries at most ' + AHL_MAX + ' players (' + AHL_GMAX + ' goalies): ' + mv.length + ' of your minor leaguers moved down to the ' + L.echlName(t) + ' (ECHL): ' + mv.slice(0, 6).map(p => p.pos + ' ' + p.first + ' ' + p.last).join(', ') + (mv.length > 6 ? '…' : '') + '. Move them on the Roster page (AHL tab).', t.tid, 'txn'); } L.echlV = 1; }   /* the ECHL and the minor-league limits for saves made before them */   /* birthplaces for the generated players already in the league (real ones get theirs from NHL.com: nhlBackfill) */ if (!L.dcFrV) { const fr = (L.draftClass || []).map(id => L.players[id]).filter(p => p && p.tid === -2 && !p.hlm && p.pot >= 84 && p.pot < 92).sort((a, b) => b.pot - a.pot); for (const p of fr.slice(1)) { p.pot = ri(81, 83); if (p.ovr > p.pot) p.ovr = p.pot; } L.dcFrV = 1; }   /* (the class's franchise ceilings beyond its best one come down to elite: generated classes had 1-4 a year) */ if (!L.elcFix) { for (const p of Object.values(L.players)) if (p.elc && p.contract && p.contract.sal > 1.0) p.elc = 0; L.elcFix = 1; }   /* (the ELC flag that never cleared: off for anyone on a real second deal) */   /* (styles re-read: a shooter prospect read as a grinder) */ if (L.askV !== 3) { for (const p of Object.values(L.players)) if (p.tid === -1 || p.ask) L.setAsk(p); L.askV = 3; }   /* (asks priced on the 2026 market's curve) */ if (!L.scoutV) L.migrateScouts(); SCREV++; if (!L.minFixV) { for (const p of Object.values(L.players)) { const c = p.contract; if (p.tid >= 0 && c && !p.elc && c.sal <= CAP_MIN_SAL + .02 && c.exp <= L.capSeason() + 1 && dispR(p.ovr) >= 84) { const v = Math.round(L.fairSal(p) * 100) / 100; L.addNews(p.first + ' ' + p.last + '\u2019s minimum deal with the ' + L.teams[p.tid].name + ' was corrected to $' + v.toFixed(2) + 'M (a free-agent signing bug paid stars the league minimum).', p.tid, 'txn', p.id); c.sal = v; } } L.minFixV = 1; } if (!L.dShapeV) { L.dShapeV = 1; const D = Object.values(L.players).filter(p => p.pos === 'D' && p.r); const rate = p => { const s = p.stats && p.stats.gp >= 20 ? [p.stats.gp, p.stats.g, p.stats.a] : (c => c && c[2] >= 20 ? [c[2], c[3], c[4]] : null)((p.career || []).slice(-1)[0]); return s ? (s[1] + s[2]) / s[0] : null; }; const v = D.map(rate).filter(x => x != null), m = v.reduce((a, b) => a + b, 0) / (v.length || 1), sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / (v.length || 1)) || 1; for (const p of D) { const x = rate(p); dShape(p, x == null ? 0 : cl((x - m) / sd * .9, -2.2, 2.2), true); p.arch = archOf(p); } } if (!L.slotV) { L.slotV = 1; let nUp = 0; for (const p of Object.values(L.players)) { if (!(p.hlm != null || p.born) || !p.draft || !p.draft.pick || p.age > 23 || p.age >= potAge(p)) continue; const sc = slotCeil(p.draft.pick), w = p.age <= 21 ? .45 : .35; if (sc <= p.pot) continue; const np = Math.min(89, Math.round(w * sc + (1 - w) * p.pot)); if (np > p.pot) { p.pot = np; nUp++; } } if (nUp) L.addNews('Ceilings now weigh draft position: ' + nUp + ' young players drafted higher than their production suggested had their potential raised toward their draft slot.', -1, 'prospect'); } if (!L.prosFixV) { L.prosFixV = 1; let nFix = 0; for (const p of Object.values(L.players)) { if (p.gv || p.born || p.hlm != null || p.age < 17 || p.age > 21 || L.where(p) === 'roster' || !(p.tid === -2 || p.prospect || p.elc)) continue; let o = 44 + (p.pot - 65) * (p.pot < 65 ? .8 : .55) - 2.5 + 3; for (let a = 17; a < p.age; a++) o += (a <= 20 ? 3 : 2.2) + Math.max(0, p.pot - o) * .12; const cap = Math.min(p.pot, o + 3); if (p.ovr <= cap) continue; const d = (p.ovr - cap) * .8; for (const k of Object.keys(p.r)) if (k !== 'end' && k !== 'dur') p.r[k] = Math.max(20, Math.round(p.r[k] - d)); p.ovr = ovrOf(p); nFix++; } if (nFix) L.addNews('Prospect ratings were corrected for ' + nFix + ' generated prospects from draft classes made before the generator fix (late picks had been rated like first-rounders).', -1, 'prospect'); } if (!L.draftClass && (L.phase === 'regular' || L.phase === 'playoffs')) L.makeDraftClass(); if (!L.staffV) L.initStaff(); if (!L.clauseV && L.migrateClauses) L.migrateClauses(); if (!L.certV) { for (const p of Object.values(L.players)) delete p.cert; L.certV = 1; } if (!L.xfV) { for (const p of Object.values(L.players)) { const o = p.ovr; spikeRatings(p); p.ovr = ovrOf(p); if (p.ovr < o) { p.ovr = o; } p.xf = xfOf(p); } L.xfV = 2; } for (const p of Object.values(L.players)) { if (!p.arch) p.arch = archOf(p); if (!p.xf) p.xf = xfOf(p); } if (!L.minors) L.initMinors(); if (!L.teams[0].status) L.updateStatuses(true); L.fixGenerational(); if ((L.dispV || 0) < 2) { for (const p of Object.values(L.players)) if (p.oh) p.oh = p.oh.map(([a, d]) => [a, showR(56 + (d + 0.5 - 75) / DISP_K)]); L.dispV = 2; /* the rating history was saved on the old display scale: now on the one shown (showR) */ } if ((L.adjV || 0) < RATING_ADJ_V) { for (const p of Object.values(L.players)) ratingAdj(p); L.adjV = RATING_ADJ_V; } if (!L.potV) { for (const p of Object.values(L.players)) if (p.tid !== -2) potFix(p); L.potV = 1; } if ((L.archV || 0) < 13) { for (const p of Object.values(L.players)) p.arch = archOf(p); L.archV = 13; } if (!L.potGV) { const room = { 24: 6, 25: 4.5, 26: 3, 27: 2, 28: 1 }; for (const p of Object.values(L.players)) if (p.pos === 'G' && room[p.age] && p.pot <= p.ovr + 1) p.pot = Math.min(89, p.ovr + room[p.age]); L.potGV = 1; } if (!L.potDV) { for (const p of Object.values(L.players)) if (p.pos === 'D' && p.age === 27 && p.pot <= p.ovr) p.pot = Math.min(89, p.ovr + 1); L.potDV = 1; } if (!L.potD27) { for (const p of Object.values(L.players)) if (p.pos === 'D' && p.age >= POT_AGE_D && !p.lateBloom) p.pot = p.ovr; L.potD27 = 1; }   /* (2026-10: D are done developing at 27 like forwards) */ if (!L.prdV) { prodRead(L, L.season - 1); L.prdV = 1; }   /* (each young player's production read for his likelihood, until the summer reads the next) */ if (L.prdV < 2) { prodRead(L, L.season - 1, true); L.prdV = 2; }   /* (2026-10 verify, S4: the goalies' stopping read, prd.gz, for a save made before it - read as average until the summer, a young goalie's likelihood shifted for the rest of that season) */   /* goalies now develop until 29: those 24-28 left at their ceiling get room back */ if (!L.pos2V) { for (const p of Object.values(L.players)) if (!p.hlm && !p.pos2) genPos2(p); L.pos2V = 1; } if (L.real && !L.fakeFix && !(L.history && L.history.length)) { const gone = new Set(); for (const t of L.teams) for (const k of ['farm', 'prospects']) t[k] = (t[k] || []).filter(id => { const p = L.players[id], fake = p && !p.hlm && !p.born && p.draft && p.draft.season < L.season && !(p.career && p.career.length) && !(p.stats && p.stats.gp) && !(p.mcar && p.mcar.length); if (fake) gone.add(id); return !fake; }); gone.forEach(id => delete L.players[id]); L.teams.forEach(t => L.ensureFarm(t, true)); L.fakeFix = 1; }   // made-up prospects an early real-roster league was given   // archetype set: no Dangler, Defensive Defenseman   // one offensive defenseman type
   if (!L.foV) { for (const p of Object.values(L.players)) { if ((p.pos === 'LW' || p.pos === 'RW') && !plays(p, 'C')) p.r.fo = Math.min(p.r.fo, 50); else if (p.pos === 'D') p.r.fo = Math.min(p.r.fo, 34); else continue; p.ovr = ovrOf(p); potFix(p); } L.foV = 1; }   // faceoffs belong to centers
   if ((L.linesV || 0) < 2) { L.teams.forEach(t => { if (t.tid !== L.userTid) L.autoLines(t); }); L.linesV = 2; }
   if (L.real && L.draftClass && (L.phase === 'regular' || L.phase === 'playoffs')) try { L.legacyKids(L.draftClass); } catch (e) { }   // (this year's class, made before the legacy sons existed: they join it now)
@@ -12291,6 +12372,14 @@ function nhlRate(list, season) {
       // (elsewhere: saves above his league's average, msx, and how far below the NHL that league's average goalie is, gap)
       let sa = 0, ga = 0, nsa = 0, nga = 0, gp = 0, ngp = 0, gsx = 0, msx = 0, gap = 0;
       for (const r of rows) { const w = W(r[0]); if (!r[3]) continue; if (r[1] === 'NHL') { nsa += w * r[3]; nga += w * r[4]; ngp += w * r[2]; gsx += w * (r[3] - r[4] - (lgBy[r[0]] ?? .9) * r[3]); } else { sa += w * r[3]; ga += w * r[4]; msx += w * (r[3] - r[4] - lgSvOf(r[1], r[0]) * r[3]); gap += w * r[3] * Math.max(.003, .014 - .012 * nhle(r[1])); } gp += w * r[2]; }
+      // (2026-10 audit S6) a quarter of each NHL season's goals saved comes from the shots' quality: MoneyPuck's expected
+      // goals against less the goals he let in (x.gmp: [season, club, GP, minutes, shots, GA, xGA], one row a season). On
+      // save % above average alone, a goalie behind a team that gives up the dangerous chances read low (Montembeault,
+      // Skinner, Andersen) and one behind a tight system high (Saros). A quarter is the most that doesn't cost agreement
+      // with the RSB roster (half: .826 -> .809). No MoneyPuck row for a season: that season as it was. (Its expected goals
+      // run 1-4% above the league's goals; scaled to them, the agreement with the RSB roster fell .839 -> .831, so as is)
+      { const sy = {}; for (const r of rows) if (r[1] === 'NHL' && r[3]) sy[r[0]] = (sy[r[0]] || 0) + r[3] - r[4] - (lgBy[r[0]] ?? .9) * r[3];
+        for (const m of nhlRows(P.gmp)) if (sy[m[0]] != null && m[5] != null && m[6] != null) gsx += W(m[0]) * GX_W * ((m[6] - m[5]) - sy[m[0]]); }
       // the advanced reports (x.gadv): even-strength and penalty-kill shots and goals against (ks / kg; the ps / pg read
       // before were the shots he faces while his own team has the extra man, saved at .91), quality starts, starts
       let es = 0, eg = 0, ks = 0, kg = 0, qs = 0, gs = 0; for (const r of P.gadv || []) { if (!r) continue; const w = W(r.y); es += w * (r.es || 0); eg += w * (r.eg || 0); ks += w * (r.ks || 0); kg += w * (r.kg || 0); qs += w * (r.qs || 0); gs += w * (r.gs || 0); }
@@ -12314,7 +12403,12 @@ function nhlRate(list, season) {
       // trust, but a flat five-season read took years to notice a role change)
       let rmin = 0, hit = 0, blk = 0, tk = 0, gv = 0, shm = 0, shg = 0; for (const r of nhlRows(P.rt)) { const w = W(r[0]), m = w * r[1] * (r[2] || 0) / 60; rmin += m; hit += w * r[3]; blk += w * r[4]; tk += w * r[5]; gv += w * r[6]; if (r[7] != null) { const ws = r[0] >= season - 1 ? 1 : r[0] === season - 2 ? .7 : r[0] === season - 3 ? .45 : .2; shm += ws * r[1] * r[7] / 60; shg += ws * r[1]; } }
       const rt = rmin >= 200 ? { hit: hit / rmin * 60, blk: blk / rmin * 60, tk: tk / rmin * 60, gv: gv / rmin * 60, sh: shg >= 20 ? shm / shg : null, min: rmin } : null, e = Array.isArray(P.edge) ? P.edge : null;
-      sk.push({ P, age, D: pos === 'D', gp, g, a, ngp, toi: ngp ? toi / ngp / 60 : 0, sh, ng, na, fg, fs, ppp, pim, pm, fo: fon ? (fo + .5 * 250) / (fon + 250) : null, fon, rt, edge: e ? { spd: (e[1] + e[2]) / 2, shot: e[3], oz: e[4] } : null, adv: advOf(P, W, age <= 23 ? (y => y >= season - 1 ? 1 : y === season - 2 ? .5 : .3) : (y => y >= season - 1 ? 1 : y === season - 2 ? .7 : .5)) });
+      // (2026-10 audit S12) shot suppression: 5-on-5 expected goals against an hour with him on the ice less with him off
+      // (MoneyPuck, x.mp: [season, club, GP, toi, onXGF, onXGA, onGF, onGA, offXGF, offXGA, offToi]), seasons 1 / .7 / .5 by
+      // his minutes, pulled toward even by 500 minutes (it repeats year to year at only about .32). Negative = fewer chances
+      // against with him out there. Actual goals against, which defence read alone, add nothing to next season's results
+      let xd = 0, xm = 0; for (const r of nhlRows(P.mp)) { const w = r[0] >= season - 1 ? 1 : r[0] === season - 2 ? .7 : r[0] === season - 3 ? .5 : 0; if (!w || !(r[3] > 0) || !(r[10] > 0)) continue; xd += w * r[3] * (r[5] / r[3] * 60 - r[9] / r[10] * 60); xm += w * r[3]; }
+      sk.push({ P, age, D: pos === 'D', gp, g, a, ngp, toi: ngp ? toi / ngp / 60 : 0, sh, ng, na, fg, fs, ppp, pim, pm, fo: fon ? (fo + .5 * 250) / (fon + 250) : null, fon, rt, xgr: xm >= 150 ? xd / (xm + 500) : null, edge: e ? { spd: (e[1] + e[2]) / 2, shot: e[3], oz: e[4] } : null, adv: advOf(P, W, age <= 23 ? (y => y >= season - 1 ? 1 : y === season - 2 ? .5 : .3) : (y => y >= season - 1 ? 1 : y === season - 2 ? .7 : .5)) });
     }
   }
   // skaters: NHL-equivalent points per game (shrunk toward a replacement level over 15 games) and NHL minutes
@@ -12350,11 +12444,21 @@ function nhlRate(list, season) {
     // exactly 73 and producers in the AHL and Europe rated 4-6 below NHL players scoring at the same translated rate.
     // The ice-time stand-in is a little better for a pro league (AHL, KHL, SHL, ...) than for junior.
     const proLg = x => nhlRows(x.P.st).some(r => r[0] >= season - 1 && r[2] >= 10 && nhle(r[1]) >= .3);
+    // (2026-10 audit S12) a defenseman's shot suppression against the NHL D's (a small term, DEFX; it isn't adjusted for
+    // the competition he faces or his zone starts, which costs the top-pair D a little)
+    const zXg = z(nhl.filter(x => x.xgr != null).map(x => x.xgr));    // (2026-10 audit S8: the stand-in below for a player with under 8 weighted NHL games, NOGP_C, .25 -> .4. At .25 it was
+    // worth a 2nd-pair D or a 13.5-minute forward: the skaters with no NHL games sat a point above the RSB roster while
+    // the regulars sat a little under it, and minor-league scorers every club had passed over for three seasons - Leppanen,
+    // Tralmaks, Belzile - rated above everyday NHL depth. With S13's games dressed below, the forwards with no NHL games
+    // came out about 2.5 lower on average and 58 -> 16 of them at 78+; RSB agreement over every matched skater F .929 ->
+    // .949, D .905 -> .938, the regulars' unchanged)
     const wP = D ? .4 : .62, q = x => {   // quality: production and (for NHL players) how much the coach plays him
-      if (x.ngp < 8) return (D ? .7 : .85) * zP(ppg(x)) + (D ? .3 : .15) * (proLg(x) ? -.5 : -.8) - .25 + awardScore(x.P, season) * .15 + career(x);
+      if (x.ngp < 8) return (D ? .7 : .85) * zP(ppg(x)) + (D ? .3 : .15) * (proLg(x) ? -.5 : -.8) - NOGP_C + awardScore(x.P, season) * .15 + career(x);
       const t = zT(x.toi) * Math.min(1, x.ngp / 30) - (1 - Math.min(1, x.ngp / 30));
       // (the role bonus's penalty kill .18 -> .1: the PK was counted in his ice time, here, and again in his defence rating)
-      return wP * zP(ppg(x)) + (1 - wP) * t + (x.rt && (!D || ROLE.D) ? (D ? ROLE.D : 1) * cl(1 - zP(ppg(x)), 0, 1) * Math.min(ROLE.cap, Math.max(0, zHit(x.rt.hit)) * ROLE.hit + Math.max(0, zTk(x.rt.tk)) * ROLE.tk + (x.rt.sh != null ? Math.max(0, zSh(x.rt.sh)) * ROLE.sh : 0) + (D ? Math.max(0, zBlk(x.rt.blk)) * ROLE.blk : 0)) : 0) + (x.ozRel != null ? zOzR(x.ozRel) * (D ? .2 : .15) : x.edge ? (x.edge.oz - .5) * (D ? .3 : .2) : 0) +   /* a role forward's value beyond scoring: hits, takeaways, the penalty kill (a bonus only, capped, and it fades out for top scorers, whose overall is their offense). Uncapped at .15/.1/.3 it was worth up to .85, as much as the gap between a .45 and a 1.0 point-a-game forward: a 12-point grinder rated with 50-point wingers (his PK minutes are in his ice time already) */ - .45 * (1 - Math.min(1, x.ngp / 40)) + awardScore(x.P, season) * .15 + career(x);   // scoring elsewhere counts for less until it's done in the NHL   // + territory: how much of his ice time is spent in the other team's end
+      return wP * zP(ppg(x)) + (1 - wP) * t + (x.rt && (!D || ROLE.D) ? (D ? ROLE.D : 1) * cl(1 - zP(ppg(x)), 0, 1) * Math.min(ROLE.cap, Math.max(0, zHit(x.rt.hit)) * ROLE.hit + Math.max(0, zTk(x.rt.tk)) * ROLE.tk + (x.rt.sh != null ? Math.max(0, zSh(x.rt.sh)) * ROLE.sh : 0) + (D ? Math.max(0, zBlk(x.rt.blk)) * ROLE.blk : 0)) : 0) + (x.ozRel != null ? zOzR(x.ozRel) * (D ? .2 : .15) : x.edge ? (x.edge.oz - .5) * (D ? .3 : .2) : 0) +   /* a role forward's value beyond scoring: hits, takeaways, the penalty kill (a bonus only, capped, and it fades out for top scorers, whose overall is their offense). Uncapped at .15/.1/.3 it was worth up to .85, as much as the gap between a .45 and a 1.0 point-a-game forward: a 12-point grinder rated with 50-point wingers (his PK minutes are in his ice time already) */ - .45 * (1 - Math.min(1, x.ngp / 40)) + awardScore(x.P, season) * .15 + career(x)   /* scoring elsewhere counts for less until it's done in the NHL; + territory: how much of his ice time is spent in the other team's end */
+        + USE_K * cl((x.ngp - 40) / 60, 0, 1)   /* (2026-10 audit S13) games dressed - a coach's judgment - up to USE_K at 100 weighted NHL games: 17 everyday 4th-liners (60+ NHL games) showed the AHL chip, 3 still do (Frederic, Goodrow, R. Johnston at 76). It also lifts them past the minor-league scorers they were rated under (S8's point); centred on the regulars instead, it undid S8 (all-rows RSB agreement F .949 -> .932, D .938 -> .919) */
+        + (D && x.xgr != null ? DEFX * cl(-zXg(x.xgr), -2.5, 2.5) : 0);   // (S12: a D's shot suppression)
     };
     for (const x of grp) x.q = q(x);
     const qs = grp.map(x => x.q).sort((a, b) => b - a), clear = qs.length > 1 ? qs[0] - qs[1] : 0;   // how far #1 stands clear of #2
@@ -12456,6 +12560,12 @@ function nhlRate(list, season) {
     // and Draisaitl above Selke finalists - the line is straight and the top scorers sit under it.)
     const gaFit = {}; for (const g of ['F', 'D']) { const ps = reg.filter(x => grp(x) === g && m.rga(x) != null), xs = ps.map(m.p60), ys = ps.map(m.rga), mx = avg(xs), my = avg(ys); let sxy = 0, sxx = 0; xs.forEach((v, i) => { sxy += (v - mx) * (ys[i] - my); sxx += (v - mx) ** 2; }); gaFit[g] = { b: sxx ? sxy / sxx : 0, mx, my }; }
     m.rgaR = x => { const v = m.rga(x); if (v == null) return null; const f = gaFit[grp(x)]; return v - .5 * f.b * (m.p60(x) - f.mx); };
+    // (2026-10 audit S7b) his own-zone time against his teammates' less what his scoring rate predicts of it (a fit within
+    // forwards / D): it's mostly possession - the scorers carry the puck out (r -.40 with points an hour) - so McDavid drew
+    // three quarters of his defence from it and read the league's best defensive forward
+    const dzFit = {}; for (const g of ['F', 'D']) { const ps = reg.filter(x => grp(x) === g && m.dzR(x) != null), xs = ps.map(m.p60), ys = ps.map(m.dzR), mx = avg(xs), my = avg(ys); let sxy = 0, sxx = 0; xs.forEach((v, i) => { sxy += (v - mx) * (ys[i] - my); sxx += (v - mx) ** 2; }); dzFit[g] = { b: sxx ? sxy / sxx : 0, mx, my }; }
+    m.dzRR = x => { const v = m.dzR(x); if (v == null) return null; const f = dzFit[grp(x)]; return v - (f.my + f.b * (m.p60(x) - f.mx)); };
+    m.xga = x => x.xgr;   // (S12: his 5-on-5 shot suppression, MoneyPuck)
     const Z = {}, ZG = { F: {}, D: {} };   // z-scores against the regulars: pooled, or within forwards / D
     for (const k in m) { const v = reg.map(x => m[k](x)).filter(v => v != null); Z[k] = z(v); for (const g of ['F', 'D']) { const vg = reg.filter(x => (x.D ? 'D' : 'F') === g).map(x => m[k](x)).filter(v => v != null); ZG[g][k] = z(vg.length ? vg : v); } }
     const zz = (k, x, grp) => { const v = m[k](x); return v == null ? null : (grp ? ZG[x.D ? 'D' : 'F'][k] : Z[k])(v); }, neg = v => v == null ? null : -v;
@@ -12482,12 +12592,17 @@ function nhlRate(list, season) {
       // minutes rating: penalty-killing depth centers above Selke finalists, and possession, not defending, lifted Bouchard.
       // Shot share .05: it's his attempts for as much as against, and at .1-.15 the play-drivers - McDavid, Bouchard,
       // Quinn Hughes, 2-3 standard deviations up - rated as shutdown players)
-      def: x.D ? blend([[neg(zz('rgaR', x, 1)), .25], [zz('sr', x, 1), .05], [neg(r2 ? zz('dzR', x, 1) : null), .12], [zz('pk', x, 1), .15], [zz('blk', x, 1), .1], [zz('tk', x, 1), .08], [neg(zz('gvr', x, 1)), .07], [zz('toi', x, 1), .08], [neg(zz('ozs', x, 1)), .05], [r2 ? null : e.dz, .05]])
-        : blend([[neg(zz('rgaR', x, 1)), .18], [zz('sr', x, 1), .05], [neg(r2 ? zz('dzR', x, 1) : null), .22], [zz('pk', x, 1), .15],   /* (forwards: goals against .25 -> .18, own-zone time .15 -> .22. Goals are few and partly the goalie's: a whole top line - Scheifele, Connor, Vilardi, own-zone time better than their teammates' - rated bottom 5% on Winnipeg's goals against. At .12/.28 McDavid was a top-5 defender) */ [zz('tk', x, 1), .1], [neg(zz('gvr', x, 1)), .07], [neg(zz('ozs', x, 1)), .05], [zz('blk', x, 1), .03], [r2 ? null : e.dz, .05]]),
+      // (2026-10 audit: S7b own-zone time net of what his scoring predicts, dzRR; S12 a D's goals against .25 -> .1, with .15
+      // on his shot suppression, xga, where MoneyPuck has him - else his goals against as before. .2 / .05 cost the RSB
+      // agreement a little, .15 / .1 none: D .899 either side)
+      def: x.D ? blend([...(x.xgr != null ? [[neg(zz('xga', x, 1)), .15], [neg(zz('rgaR', x, 1)), .1]] : [[neg(zz('rgaR', x, 1)), .25]]), [zz('sr', x, 1), .05], [neg(r2 ? zz('dzRR', x, 1) : null), .12], [zz('pk', x, 1), .15], [zz('blk', x, 1), .1], [zz('tk', x, 1), .08], [neg(zz('gvr', x, 1)), .07], [zz('toi', x, 1), .08], [neg(zz('ozs', x, 1)), .05], [r2 ? null : e.dz, .05]])
+        : blend([[neg(zz('rgaR', x, 1)), .18], [zz('sr', x, 1), .05], [neg(r2 ? zz('dzRR', x, 1) : null), .22], [zz('pk', x, 1), .15],   /* (forwards: goals against .25 -> .18, own-zone time .15 -> .22. Goals are few and partly the goalie's: a whole top line - Scheifele, Connor, Vilardi, own-zone time better than their teammates' - rated bottom 5% on Winnipeg's goals against. At .12/.28 McDavid was a top-5 defender) */ [zz('tk', x, 1), .1], [neg(zz('gvr', x, 1)), .07], [neg(zz('ozs', x, 1)), .05], [zz('blk', x, 1), .03], [r2 ? null : e.dz, .05]]),
       // discipline: minor penalties an hour, a little for fights and misconducts (old data: all penalties)
       dis: zz('mi60', x) != null ? blend([[neg(zz('mi60', x)), .8], [neg(zz('mj60', x)), .2]]) : blend([[neg(zz('pt', x)), .8], [neg(zz('pim', x)), .2]]),
-      // endurance: his minutes, his motor (miles an hour on the ice), and staying in the lineup
-      end: blend([[zz('toi', x, 1), .35], [r2 ? zz('mi60e', x, 1) : null, .35], [Math.min(1.5, (x.ngp - 50) / 25), .3]]),
+      // endurance: his minutes, his motor (miles an hour on the ice), and staying in the lineup. (2026-10 audit S16: .35 /
+      // .35 / .3 -> .5 / .15 / .35. Miles an hour is skating style as much as stamina: heavy-minute net-front forwards read
+      // low - Hyman 79 at 19.4 minutes, Hagel 81 at 20.3 - and some young puck-moving D high, Zellweger 91 at 17.9)
+      end: blend([[zz('toi', x, 1), .5], [r2 ? zz('mi60e', x, 1) : null, .15], [Math.min(1.5, (x.ngp - 50) / 25), .35]]),
     }; };
     const keys = ['ska', 'sht', 'pas', 'hnd', 'def', 'dis', 'end'], grpK = { pas: 1, def: 1, end: 1 }, SPREAD = { ska: 8, sht: 9, pas: 8, hnd: 8, def: 8, dis: 7, end: 6 };
     const C = new Map(); for (const x of reg) C.set(x, comp(x));
@@ -12502,8 +12617,12 @@ function nhlRate(list, season) {
     // finishing by shot type for the detail ratings: wrist and snap together, slap apart, each pulled toward his position's
     // rate for that shot and measured within his position (D score on 5% of wrist shots, forwards on 11%)
     const finPos = {}; for (const g of ['F', 'D']) for (const t of ['ws', 's']) { const r = reg.filter(x => grp(x) === g && x.adv); const G = r.reduce((s, x) => s + (t === 'ws' ? x.adv.G.w + x.adv.G.n : x.adv.G.s), 0), S = r.reduce((s, x) => s + (t === 'ws' ? x.adv.S.w + x.adv.S.n : x.adv.S.s), 0); finPos[g + t] = S ? G / S : .08; }
-    const fin = (x, t, n) => { if (!x.adv) return null; const G = t === 'ws' ? x.adv.G.w + x.adv.G.n : x.adv.G.s, S = t === 'ws' ? x.adv.S.w + x.adv.S.n : x.adv.S.s; return S >= 5 ? (G + finPos[grp(x) + t] * n) / (S + n) : null; };
-    const zFin = {}; for (const g of ['F', 'D']) for (const t of ['ws', 's']) zFin[g + t] = z(reg.filter(x => grp(x) === g).map(x => fin(x, t, t === 'ws' ? 120 : 60)).filter(v => v != null));
+    // (2026-10 audit S17: a wrist / snap shot's finishing pulled by 200 shots, not 120, and toward his own career rate
+    // first - the position's rate scaled by his career shooting % against the position's, as shp - not straight to the
+    // position's: one hot season made a sniper, Wennberg 19.4% after 11-12% and Stephenson both 88 accuracy)
+    const finPri = (x, t) => { if (t !== 'ws') return finPos[grp(x) + t]; const ps = posSh[grp(x)], c = x.P.car && x.P.car.sh >= 50 ? (x.P.car.g + ps * 100) / (x.P.car.sh + 100) : ps; return finPos[grp(x) + t] * (ps ? c / ps : 1); };
+    const fin = (x, t, n) => { if (!x.adv) return null; const G = t === 'ws' ? x.adv.G.w + x.adv.G.n : x.adv.G.s, S = t === 'ws' ? x.adv.S.w + x.adv.S.n : x.adv.S.s; return S >= 5 ? (G + finPri(x, t) * n) / (S + n) : null; };
+    const zFin = {}; for (const g of ['F', 'D']) for (const t of ['ws', 's']) zFin[g + t] = z(reg.filter(x => grp(x) === g).map(x => fin(x, t, t === 'ws' ? FIN_N : 60)).filter(v => v != null));
     for (const x of reg) {
       const R = out.get(x.P), c = C.get(x), A = {};
       for (const k of keys) { if (c[k] == null) continue; const g = gOf(k, x), [mu, sd] = norm[k + g]; A[k] = base[g] + (grpK[k] ? PROF[x.P.pos][k] : 0) + cl((c[k] - mu) / sd, -2.8, 3.2) * SPREAD[k]; }
@@ -12513,7 +12632,10 @@ function nhlRate(list, season) {
       { const adj = nhlAgeAdj(x, season, rowsOf(x.P)); if (adj) for (const k in A) A[k] += adj; }
       if (Object.keys(A).length) R.attr = A;
       // the detail ratings' own numbers (subRatings / rxOverrides): z-scores against the regulars, b = their average level
-      const e = E(x), r2 = raw2(x), fw = fin(x, 'ws', 120), fs = fin(x, 's', 60), rx = R.tilt.rx = R.tilt.rx || {}, f2 = v => v == null || !isFinite(v) ? null : +cl(v, -3, 3).toFixed(2);
+      const e = E(x), r2 = raw2(x), fw = fin(x, 'ws', FIN_N), fs = fin(x, 's', 60), rx = R.tilt.rx = R.tilt.rx || {}, f2 = v => v == null || !isFinite(v) ? null : +cl(v, -3, 3).toFixed(2);
+      // (2026-10 audit S7: dmd / dmi, his defence and discipline as measured, before nhlBuild spreads what his overall still
+      // needs over every rating - the profile shows Defensive IQ and Discipline mostly from these, rxOverrides)
+      if (A.def != null) rx.dmd = +A.def.toFixed(1); if (A.dis != null) rx.dmi = +A.dis.toFixed(1);
       Object.assign(rx, { b: +base.all.toFixed(1), wsh: f2(fw != null ? zFin[grp(x) + 'ws'](fw) : null), ssh: f2(fs != null ? zFin[grp(x) + 's'](fs) : null), pd: f2(zz('pd', x)), gv: f2(zz('gvr', x, 1)), a1: f2(zz('a160', x, 1)), sr: f2(zz('sr', x, 1)), p60: f2(zz('p60', x)),
         oz: f2(r2 ? zz('ozR', x, 1) : e.oz != null ? e.oz * .5 : null), hdg: f2(e.hdg), slv: f2(zz('slv', x)), acc: f2(zz('acc', x, 1)),
         // fights and misconducts an hour (archOf: an enforcer is the man who drops the gloves, not just a big hitter)
@@ -12563,11 +12685,30 @@ function nhlRate(list, season) {
     // starter's seasons), in proportion below. The save rate's own pull toward the prior shrinks everyone alike and the
     // ranking didn't move: one strong season - Greaves, 55 games; Wedgewood, a career backup's best year - ranked 5th-6th, 89,
     // with Shesterkin and Sorokin, who'd done it for years
-    const q = x => (zS(sv(x)) * .65 + zA(gsaa(x)) * .2) * Math.min(1, x.nsa / 4000) + zG(x.ngp) * .1 + awardScore(x.P, season) * .15;
+    // (2026-10 audit S3) a goalie with next to no NHL work (under 300 weighted NHL shots) and a real record elsewhere
+    // (300+ shots): that record - his saves above his league's average, less his league's distance below the NHL (prior) -
+    // breaks the tie among them, against the other young goalies' records, at a small weight (G_MW .08). His skill part
+    // above counts nothing at 0 NHL shots, so the record was read and thrown away: 176 of 256 organisation goalies showed
+    // exactly 79, an AHL .937 (Postava) the same as an AHL .891 (Posch). (At .25+ the KHL and Czech goalies topped them all
+    // at 85-87: the over-rating an earlier fix removed)
+    const zPr = z(gk.filter(x => x.nsa < 1200 && x.sa >= 300).map(prior));
+    const qRec = x => x.sa >= 300 && x.nsa < 300 ? cl(zPr(prior(x)), -2, 2) * G_MW : 0, q0 = x => (zS(sv(x)) * .65 + zA(gsaa(x)) * .2) * Math.min(1, x.nsa / 4000) + zG(x.ngp) * .1 + awardScore(x.P, season) * .15, q = x => q0(x) + qRec(x);
     const pool = nhl.map(x => ({ x, q: q(x) })).sort((a, b) => a.q - b.q), ref = hlmRefDist('G', pool.length);
     const curve = v => { if (!pool.length) return 60; if (v <= pool[0].q) return ref[0] - (pool[0].q - v) * 4; if (v >= pool[pool.length - 1].q) return ref[ref.length - 1] + (v - pool[pool.length - 1].q) * 2;
       let lo = 0; while (lo < pool.length - 1 && pool[lo + 1].q < v) lo++; const a = pool[lo], b = pool[lo + 1] || a; const t = b.q === a.q ? 0 : (v - a.q) / (b.q - a.q); return ref[lo] + ((ref[lo + 1] ?? ref[lo]) - ref[lo]) * t; };
-    for (const x of gk) { const s = zS(sv(x)); out.set(x.P, { ovr: curve(q(x)) + nhlAgeAdj({ age: x.age, ngp: 0, G: true }, season, rowsOf(x.P)), tilt: { ref: s * 2, pos: s * 1.5, reb: s, end: x.ngp ? Math.min(3, (x.ngp - 30) / 15) : 0 }, pos: 'G' }); }
+    // (2026-10 audit S5) everything below an unknown goalie's level (no NHL games: u0) keeps 60% of its distance under
+    // it. 21 goalies with NHL experience ranked below every untested 18-year-old (Ersson 71, Soderblom 73), so the AI
+    // started any prospect over them; their order stays (the RSB roster has them at 79-81)
+    const u0 = curve(zG(0) * .1), tail = v => v < u0 ? u0 + (v - u0) * .6 : v;
+    // (S3: shown 81 at most - internal 65 - until he has 300 weighted NHL shots: a minor-league record alone doesn't make a starter)
+    const gCap = Math.floor(invShowR(G_CAP + 1) - 1e-6);
+    // (2026-10 verify: the squeeze is for the NHL goalies below the unknowns' level, not for the unknowns' own records - S3's
+    // record term (qRec) goes on after it, in full. Squeezed with the rest, the weakest records (Knowling, Day, Radkov) sat
+    // at 77, the backup line, so every drafted goalie counted as an NHL goalie already; the audit's S3 + S5 spread them 74-83)
+    // (2026-10, the user's call: then a goalie with no NHL games at all drops G_NEW below that, after the cap so their order
+    // holds - at 76-81 shown, just over the 77 backup line, 83-100% of drafted goalies read as future NHL goalies; about a
+    // quarter make it. One with any NHL games doesn't move)
+    for (const x of gk) { const s = zS(sv(x)); let o = tail(curve(q0(x))) + curve(q(x)) - curve(q0(x)) + nhlAgeAdj({ age: x.age, ngp: 0, G: true }, season, rowsOf(x.P)); if (x.nsa < 300) o = Math.min(o, gCap); if (!x.ngp) o -= G_NEW; out.set(x.P, { ovr: o, gNew: x.ngp ? 0 : G_NEW, tilt: { ref: s * 2, pos: s * 1.5, reb: s, end: x.ngp ? Math.min(3, (x.ngp - 30) / 15) : 0 }, pos: 'G' }); }
     nhlRate.dbgG = () => ({ lgSv, pool: pool.length, ref: [ref[0], ref[Math.floor(ref.length / 4)], ref[Math.floor(ref.length / 2)], ref[Math.floor(ref.length * 3 / 4)], ref[ref.length - 1]], gk: gk.map(x => ({ n: x.P.last, age: x.age, ngp: +x.ngp.toFixed(1), nsa: Math.round(x.nsa), sa: Math.round(x.sa), prior: +prior(x).toFixed(4), dsv: +dsv(x).toFixed(4), q: +q(x).toFixed(2), ovr: +out.get(x.P).ovr.toFixed(1) })) });   // (for the test harness)
     // a regular's ratings from the stats (2026-10): reflexes from his save percentage on high-danger shots (NHL EDGE),
     // positioning from the mid- and long-range ones, rebound control from how he holds up on the penalty kill and at even
@@ -12670,10 +12811,21 @@ function nhlTraits(pairs, fair) {
 // Kucherov's 130 points rated 92 and Kaprizov 90, below where the user knows them, and depth players lost 2-4 - so the
 // overall is now half production, half what his measured ratings add up to)
 let ATTR_PULL = .5, GOAL_CAP = 3;   // (let: the test harness tries other values)
+// (2026-10 audit, nhlRate) NOGP_C: the stand-in taken off a skater with under 8 weighted NHL games (S8); USE_K: the most
+// that games dressed add to a regular's quality (S13); DEFX: a D's 5-on-5 shot suppression in his quality (S12); FIN_N:
+// the shots a wrist-shot finishing rate is pulled by (S17). (DEFX 0: a D's shot suppression counts through his measured
+// defence, which is half his overall's ratings side - nhlRate's def blend. Added to his quality as well, any weight
+// lowered the D's agreement with the RSB roster - .01: .899 -> .895, .04: .894; the user's rule was that it mustn't drop)
+let NOGP_C = .4, USE_K = .35, DEFX = 0, FIN_N = 200;
 // goalies (nhlRate): his save rate above the league's is pulled toward his prior by G_K shots, and the prior moves from his
 // minor-league record to the NHL veteran's over his first G_V NHL shots. (3,000 / 2,000 held a young starter's strong NHL
 // season down to his AHL years: Wallstedt's .915 in 35 games rated 82, an 87 ceiling)
 let G_K = 2500, G_V = 1200;
+// (2026-10 audit) GX_W: the share of each NHL season's goals saved read from MoneyPuck's expected goals (S6); G_MW: the
+// weight of a minor-league record among goalies with under 300 NHL shots, and G_CAP their shown ceiling until then (S3)
+let GX_W = .25, G_MW = .08, G_CAP = 81;
+// (2026-10) G_NEW: how far (internal) a goalie with no NHL games sits below the level above, into the AHL band (MODEL_V 41)
+let G_NEW = 7.5;
 // a goalie's seasons by age: last, the one before, two before, older. (MODEL_V 29, checked against the RSB community
 // roster: at 1 / .75 / .5 / .15 a goalie's track record counted a little less than theirs; 1 / .85 / .7 / .3 agrees best)
 let GW = [1, .85, .7, .3];
@@ -12722,9 +12874,15 @@ function nhlProdZ(list, S) {
     // (NHL games in the last two seasons for goalies too: they all got a prospect's three quarters of the growing room)
     x.pz = 0; x.rngp = nhlRows(x.st).filter(r => (r[0] === S - 1 || r[0] === S - 2) && r[1] === 'NHL').reduce((s, r) => s + r[2], 0); if (x.pos === 'G' || x.age > 23) continue;
     let pts = 0, gp = 0; x.rngp = 0; for (const r of nhlRows(x.st)) { if ((r[0] !== S - 1 && r[0] !== S - 2) || r[2] < 10 || TOURN.test(r[1])) continue; const w = r[0] === S - 1 ? 1 : .5; pts += w * (r[3] + r[4]) * nhle(r[1]); gp += w * r[2]; if (r[1] === 'NHL') x.rngp += r[2]; }
+    // (2026-10 audit S14) whether last season's main league (most games) was a pro league - not junior or college - for
+    // nhlPot's first-round floor
+    { let lg = null, lgp = 0; for (const r of nhlRows(x.st)) if (r[0] === S - 1 && !TOURN.test(r[1]) && r[2] > lgp) { lgp = r[2]; lg = r[1]; } x.pro = !!lg && lg !== 'NCAA' && nhle(lg) >= .18; }
     if (gp < 15) continue;
     const k = Math.max(17, x.age) + (x.pos === 'D' ? 'D' : 'F'); (grp[k] = grp[k] || []).push([x, pts / gp]);
   }
+  // (S4) young goalies' stopping against goalies their age, every league (gProdZ) → x.gz
+  { const gz = gProdZ(list.filter(x => x.pos === 'G').map(x => [x, x.age, nhlRows(x.st).filter(r => (r[0] === S - 1 || r[0] === S - 2) && !TOURN.test(r[1])).map(r => [r[1], r[0], r[3], r[4], r[0] === S - 1 ? 1 : .5])]));
+    for (const x of list) if (x.pos === 'G') { const v = gz.get(x); if (v != null) x.gz = v; else delete x.gz; } }
   for (const k in grp) { const a = grp[k]; if (a.length < 8) continue; const m = a.reduce((s, q) => s + q[1], 0) / a.length, sd = Math.sqrt(a.reduce((s, q) => s + (q[1] - m) ** 2, 0) / a.length) || 1; for (const [x, v] of a) x.pz = cl((v - m) / sd, -2.5, 6)   /* (2026-10: capped at 2.5, a generational junior read like any very good one - McKenna, 129 points in 56 WHL games at 17, was 2.5 like a 1.5-a-game junior and topped out Elite on his #1 slot) */; }
   // and his trend: last season against the one before, each measured against players his age that season (x.ptr: how
   // many standard deviations he climbed), for nhlPot (a 19-year-old who jumped from ordinary to dominant is still rising)
@@ -12762,16 +12920,43 @@ function gNpz(rows) {
   if (sa < 300) return null;
   return cl(d / sa / .010 * sa / (sa + 800), -2.5, 2.5);
 }
+// (2026-10 audit S4) a young goalie's stopping against goalies his age, for his likelihood: his saves above his league's
+// average per shot, less how far that league's average goalie is below the NHL's (as the goalie ratings read a
+// minor-league record), the last two seasons (the one before at half weight), pulled toward even by 1,000 shots, as a
+// z-score among goalies within a year of his age, capped at 1.5 either way. Every goalie's rows set the leagues'
+// averages; only those under POT_AGE_G with 300+ shots get a reading. items: [goalie, age, [[league, season, shots,
+// goals against, weight]]] → Map goalie → z
+function gProdZ(items) {
+  const t = {}, a = {}; for (const [, , rows] of items) for (const [lg, y, sa, ga] of rows) if (sa > 0) for (const [k, o] of [[lg + '|' + y, t], [lg, a]]) { const q = o[k] || (o[k] = { s: 0, g: 0 }); q.s += sa; q.g += ga; }
+  const lgSv = (lg, y) => { const s = t[lg + '|' + y], b = a[lg]; return s && s.s >= 1500 ? 1 - s.g / s.s : b && b.s >= 1500 ? 1 - b.g / b.s : .905; };
+  const v = []; for (const [x, age, rows] of items) { if (age >= POT_AGE_G) continue; let s = 0, d = 0; for (const [lg, y, sa, ga, w] of rows) { if (!(sa > 0)) continue; s += w * sa; d += w * ((sa - ga) - lgSv(lg, y) * sa - (lg === 'NHL' ? 0 : Math.max(.003, .014 - .012 * nhle(SIM_LG_NHLE[lg] || lg))) * sa); } if (s >= 300) v.push([x, age, d / (s + 1000)]); }
+  const out = new Map();
+  for (const [x, age, r] of v) { const pe = v.filter(q => Math.abs(q[1] - age) <= 1).map(q => q[2]); if (pe.length < 6) continue; const m = pe.reduce((s, q) => s + q, 0) / pe.length, sd = Math.sqrt(pe.reduce((s, q) => s + (q - m) ** 2, 0) / pe.length) || 1; out.set(x, cl((r - m) / sd, -1.5, 1.5)); }
+  return out;
+}
 // a real player's production read at the start (nhlProdZ), kept for his likelihood (potLike) until the summer's prodRead
-const prdOf = (x, S) => ({ s: S - 1, pz: +(x.pz || 0).toFixed(2), npz: x.npz != null ? +x.npz.toFixed(2) : null, ngp: x.rngp || 0 });
+// (gz: a young goalie's stopping, S4)
+const prdOf = (x, S) => Object.assign({ s: S - 1, pz: +(x.pz || 0).toFixed(2), npz: x.npz != null ? +x.npz.toFixed(2) : null, ngp: x.rngp || 0 }, x.gz != null ? { gz: +x.gz.toFixed(2) } : null);
 // each summer (progression), what a young player's last two seasons say, for his likelihood - the same reads as a real
 // player's at the start: his scoring against everyone his age in every league, league-adjusted (pz), and in the NHL
 // against NHL players his age and position (npz), the season just played at full weight and the one before at half
 const SIM_LG_NHLE = { Czech: 'Czechia', Slovak: 'Slovakia', Allsv: 'HockeyAllsvenskan', J20: 'J20 Nationell', U20: 'U20 SM-sarja' };
-function prodRead(lg, S) {
-  const grp = {}, yng = [];
+function prodRead(lg, S, gOnly) {
+  const grp = {}, yng = [], gi = [];
   for (const p of Object.values(lg.players)) {
-    if (p.pos === 'G' || (p.age >= potAge(p) && !p.lateBloom)) continue;
+    // (2026-10 audit S4) goalies: every one's NHL and minor-league rows of the two seasons (career: [season, club, GP, W,
+    // L, OTL, shots, GA..], hist the same, his real seasons the first summer; mcar: [season, league, club, GP, W, L, shots,
+    // GA, SO]) for gProdZ, and a young one's NHL games. (Goalies were skipped: a real goalie's read from the data stayed
+    // for good, a made-up one never had one)
+    if (p.pos === 'G') {
+      const rows = [], seen = new Set(); let n = 0;
+      for (const r of p.career || []) if (r[0] === S || r[0] === S - 1) { seen.add(r[0]); rows.push(['NHL', r[0], r[6], r[7], r[0] === S ? 1 : .5]); n += r[2]; }
+      for (const r of p.hist || []) if ((r[0] === S || r[0] === S - 1) && !seen.has(r[0]) && !r[9]) { rows.push(['NHL', r[0], r[6], r[7], r[0] === S ? 1 : .5]); n += r[2]; }
+      for (const r of p.mcar || []) if (r[0] === S || r[0] === S - 1) rows.push([r[1], r[0], r[6], r[7], r[0] === S ? 1 : .5]);
+      gi.push([p, p.age, rows]); if ((p.age < potAge(p) || p.lateBloom) && !gOnly) p.prd = { s: S, pz: 0, npz: null, ngp: n };
+      continue;
+    }
+    if (gOnly || (p.age >= potAge(p) && !p.lateBloom)) continue;   // (gOnly: the load migration - only a missing gz filled in, nothing else read again)
     let pts = 0, gp = 0, np = 0, ng = 0, n = 0; const seen = new Set();
     const nhlRow = (y, g, a, gpp) => { const w = y === S ? 1 : .5; pts += w * (g + a); gp += w * gpp; np += w * (g + a); ng += w * gpp; n += gpp; };
     for (const r of p.career || []) if (r[0] === S || r[0] === S - 1) { seen.add(r[0]); nhlRow(r[0], r[3], r[4], r[2]); }
@@ -12788,18 +12973,28 @@ function prodRead(lg, S) {
     const m = peers.reduce((s, q) => s + q, 0) / peers.length, sd = Math.sqrt(peers.reduce((s, q) => s + (q - m) ** 2, 0) / peers.length) || 1;
     p.prd.npz = +cl((v - m) / sd, -2.5, 2.5).toFixed(2);
   }
+  { const gz = gProdZ(gi); for (const [p] of gi) { const v = gz.get(p); if (p.prd && v != null && (gOnly ? p.prd.gz == null : p.prd.s === S)) p.prd.gz = +v.toFixed(2); } }   // (S4)
 }
 // the draft slot's view of a ceiling (display), smooth in the pick: #1 93, #3 91, #10 88, #32 83, #64 79, #128 76, #224 75,
 // straight between those in log(pick). (Steps at #10/#11 and #32/#33 made cliffs between neighbouring picks.)
 const SLOT_KN = [[1, 93], [3, 91], [10, 88], [32, 83], [64, 79], [128, 76], [224, 75]];
+let SLOT_DD = 3;   // (2026-10 audit S9, nhlPot: how much lower a D's draft slot reads, in full from pick 64. let: the test harness tunes it)
+let G_ROOM0 = .64;   // (nhlPot: the share of his growing room a goalie with no NHL games gets, all of it at 60 - 2026-10 verify, S4: .75 like the skaters gave 4.4 starters an age group, .64 gives 3.2. let: the harness tunes it)
 function slotDisp(pk) { if (!pk) return null; if (pk <= 1) return 93; for (let i = 1; i < SLOT_KN.length; i++) { const [a, va] = SLOT_KN[i - 1], [b, vb] = SLOT_KN[i]; if (pk <= b) return va + (vb - va) * (Math.log(pk) - Math.log(a)) / (Math.log(b) - Math.log(a)); } return 75; }
-function nhlPot(P, ovr, age, S) {
+function nhlPot(P, ovr, age, S, lift) {
   if (age >= (P.pos === 'G' ? POT_AGE_G : P.pos === 'D' ? POT_AGE_D : POT_AGE)) return ovr;
+  // (lift: a goalie with no NHL games grows from where he stood before G_NEW took him down - his ceiling doesn't move, only
+  // where he starts: the odds of getting there are potLike's, and at the old level the S4 Starter ceilings fell from 3.4 an
+  // age group expected to 0.6)
+  ovr += lift || 0;
   // room left to grow by age; defensemen mature a year later than forwards and goalies later still (until about 28 and 29, as in the sim's own aging)
   // (a prospect who isn't an NHL regular yet gets three quarters of it, rising smoothly to all of it at 60 NHL games - a
   // cliff at 60 gave Kindel full room and Misa, with 45, three quarters: the table was drawn from players who made it)
-  const rngp = P.rngp || 0;
-  const room = ((P.pos === 'G' ? { 17: 18, 18: 17, 19: 16, 20: 15, 21: 14, 22: 12.5, 23: 11, 24: 9, 25: 7, 26: 5, 27: 3, 28: 1.5 } : P.pos === 'D' ? { 17: 15, 18: 14, 19: 13, 20: 11, 21: 9.5, 22: 8, 23: 6, 24: 4, 25: 2.5, 26: 1.2, 27: .5 } : { 17: 15, 18: 14, 19: 12, 20: 10, 21: 8, 22: 6, 23: 4, 24: 2.5, 25: 1.2, 26: .5 })[age] ?? (age < 17 ? 15 : 0)) * (.75 + .25 * Math.min(1, rngp / 60));
+  // (2026-10 verify, audit S4: a goalie not yet an NHL regular gets G_ROOM0 of it - the table was drawn from the goalies who
+  // made it, and far fewer do: at three quarters 12.6 goalies an age group aged 18-24 had Starter ceilings and 4.6 were
+  // expected to get there, against 3.1 an age among the established 27-33; at .64, 7.7 and 3.2)
+  const rngp = P.rngp || 0, r0 = P.pos === 'G' ? G_ROOM0 : .75;
+  const room = ((P.pos === 'G' ? { 17: 18, 18: 17, 19: 16, 20: 15, 21: 14, 22: 12.5, 23: 11, 24: 9, 25: 7, 26: 5, 27: 3, 28: 1.5 } : P.pos === 'D' ? { 17: 15, 18: 14, 19: 13, 20: 11, 21: 9.5, 22: 8, 23: 6, 24: 4, 25: 2.5, 26: 1.2, 27: .5 } : { 17: 15, 18: 14, 19: 12, 20: 10, 21: 8, 22: 6, 23: 4, 24: 2.5, 25: 1.2, 26: .5 })[age] ?? (age < 17 ? 15 : 0)) * (r0 + (1 - r0) * Math.min(1, rngp / 60));
   // (grown from his overall less the summer's growth nhlAgeAdj already gave a young NHL regular: counted twice, it made
   // Minten, Savoie and Kindel Elite or Franchise)
   const ovr0 = ovr; ovr -= rngp >= 25 ? youthBump(age) : 0;
@@ -12824,9 +13019,20 @@ function nhlPot(P, ovr, age, S) {
   // the slot's view blended in, not only a floor: for a late pick it pulls a ceiling down as well as a top pick's up (as a
   // floor it never bound below the first round, and 52 of 70 round 5-7 D showed Top 6 D ceilings). A first-round pick
   // 23 or under keeps most of his slot's ceiling until he shows otherwise - in the NHL, by scoring below players his age.
-  const sd = slotDisp(pk), slotInt = sd != null ? invDispR(sd) : null;
+  // (2026-10 audit S9) a D's slot reads SLOT_DD lower: the same slot read a tier higher for a D (his tiers' cut-offs sit
+  // 1-2 under the forwards': Top 4 D 83 to Top 6 F 85, and a D's growing room is larger) - 125 of 126 D taken in rounds
+  // 4-7 of 2024-26 had NHL-tier ceilings against 90 of 195 forwards, though D make the NHL no more often (Schuckers: D
+  // 21%, F 25% reach 200 games). With the forwards' 4th line at 77 (S13), 1.5 still left 25% of those D with AHL
+  // ceilings against the forwards' 65%; 3 gives 52%. In full from pick 64, none for a top-10 pick (straight between in
+  // log(pick)), and less as his NHL games pile up (wn): across the board it took Schaefer 95 -> 93 and Hutson 94 -> 93,
+  // whose own numbers say otherwise
+  const sd0 = slotDisp(pk), sd = sd0 != null && P.pos === 'D' ? sd0 - SLOT_DD * cl((Math.log(pk) - Math.log(10)) / (Math.log(64) - Math.log(10)), 0, 1) * (1 - wn) : sd0, slotInt = sd != null ? invDispR(sd) : null;
   const prior = slotInt != null ? .5 * (slotInt + z * 1.5) + .5 * (grow + z * 1.5 + tr * .5 + e * .5) : grow - 1.5 + z * 1.5;
-  const floor = slotInt != null && pk <= 32 && age <= 23 && !(rngp >= 60 && zn < -.5) ? slotInt - 3 + z * 1.5 : 0, wp = wPrior * (1 - .5 * wn * (zn < 0 ? 1 : 0));
+  // (2026-10 audit S14) the first-round floor also lifts from 22 for one not yet an NHL regular who scores below his age
+  // group in a pro league (x.pro, nhlProdZ): Boucher (#10, AHL 26 points in 47 at 23) kept a Top 6 F ceiling and
+  // Jiricek (#6, 0 points in 25 NHL games, AHL 10 in 24) Top 4 D. (It lifted only after 60 NHL games)
+  const bust = age >= 22 && rngp < 60 && (P.pz || 0) < 0 && !!P.pro;
+  const floor = slotInt != null && pk <= 32 && age <= 23 && !(rngp >= 60 && zn < -.5) && !bust ? slotInt - 3 + z * 1.5 : 0, wp = wPrior * (1 - .5 * wn * (zn < 0 ? 1 : 0));
   return Math.max(ovr0, Math.round(Math.min(89, Math.max(floor, wp * prior + (1 - wp) * evid))));
 }
 // an SVG logo (NHL.com's) as a small PNG data URL for the save
@@ -12864,11 +13070,24 @@ async function nhlRead(note) {
   D.teams.sort((a, b) => a.conf.localeCompare(b.conf) || (a.div || '').localeCompare(b.div || '') || a.city.localeCompare(b.city));
   D.kind = 'nhl'; D.real = { updated: D.updated }; return D;
 }
-// call up forwards or defensemen from the farm when injuries leave the lineup short of 12 healthy forwards / 6 defensemen
-function nhlCallUps(L, t) {
-  for (const [want, isPos] of [[12, q => q.pos !== 'D' && q.pos !== 'G'], [6, q => q.pos === 'D']]) {
-    while (L.rosterOf(t).filter(q => !q.inj && isPos(q)).length < want) { const up = (t.farm || []).map(id => L.players[id]).filter(q => !q.inj && q.contract && isPos(q)).sort((a, b) => b.ovr - a.ovr)[0]; if (!up) break; L.attach(t, up, 'roster'); }
+// call up forwards, defensemen or goalies from the farm when injuries leave the lineup short of 12 healthy forwards / 6
+// defensemen / 2 goalies. (2026-10 audit D2: pri ranks them first - League.fromNHL's "has played NHL games this season" -
+// then rating: by rating alone AHL veterans came up ahead of the men the clubs really use (Walsh, Tralmaks, Marjala); and
+// with no goalie call-up Edmonton, Pittsburgh, San Jose and Vancouver dressed a hurt backup)
+function nhlCallUps(L, t, pri) {
+  const k = pri || (() => 0);
+  for (const [want, isPos] of [[12, q => q.pos !== 'D' && q.pos !== 'G'], [6, q => q.pos === 'D'], [2, q => q.pos === 'G']]) {
+    while (L.rosterOf(t).filter(q => !q.inj && isPos(q)).length < want) { const up = (t.farm || []).map(id => L.players[id]).filter(q => !q.inj && q.contract && isPos(q)).sort((a, b) => k(b) - k(a) || b.ovr - a.ovr)[0]; if (!up) break; L.attach(t, up, 'roster'); }
   }
+}
+// (2026-10 audit D4) a shot (a goalie's catching hand) the data doesn't have - most reserve-list prospects - by his
+// position on the cap site, at the real league's split there (left D 2% right-handed, right D 88%, D unlisted 45%, left
+// wings 9%, right wings 66%, centers 31%, goalies 5% catch right; the data's own players with a known hand), fixed per
+// player by his id. Everyone was left-handed, so about 40% of these D played the wrong side
+const NHL_SH_R = { LD: .02, RD: .88, D: .45, LW: .09, L: .09, RW: .66, R: .66, C: .31, G: .05 };
+function nhlShGuess(x) {
+  const r = NHL_SH_R[String(x.cwpos || x.pos0 || x.pos || x.npos || '').split(',')[0].trim().toUpperCase()] ?? .38;   // (the cap site's own listing first, LD / RD: fromNHL's list has pos cut to C/LW/RW/D/G - the data's own is pos0 - so a listed left or right D read 45%. 2026-10 verify)
+  return hashStr(String(x.nhl || x.cw || (x.first + ' ' + x.last + ' ' + x.born)) + ':sh') % 1000 < r * 1000 ? 'R' : 'L';
 }
 // a real player's durability (DUR, 0-4) from the games he missed while an NHL regular (12+ minutes a game as a forward,
 // 15+ as a defenseman) over the last three seasons; games in the AHL that year aren't missed games (sent down, not
@@ -12918,7 +13137,7 @@ function nhlDur(x, S) {
 }
 // the rating model's version: a real-roster league built with an older model re-rates its players from the latest
 // data when it's opened, as long as it's still the season the data describes (nothing has developed yet)
-const MODEL_V = 39;   // 39: a young player's scoring against his age group counts past 2.5 standard deviations for his ceiling (McKenna, Stenberg Franchise); 38: potentials rebuilt - a ceiling from draft slot, age and scoring everywhere, and a likelihood of reaching it at fixed odds (potLike); D develop to 27; 37: a prospect's NHL games from 20 count toward how likely he is to reach his ceiling, and one still outside the NHL from 22 is less likely each year (Rosen, Korchinski); 36: young NHL regulars' ceilings graded High / Medium / Low on their scoring against NHL players their age; a goalie's rating trusts his numbers by how much NHL work they rest on; 35: a forward's defence leans on his own-zone time over goals against; 34: goalies' mid / long-range save % read from the right fields; 33: defensive D from defence and the scoring record; 32: a skilled forward with standout defence is two-way before power forward; 31: player types from the scoring record too (sniper / playmaker, offensive D); 30: fights an hour kept (p.rx.mj) for the player types (archOf); 29: D get the role credit (hits, takeaways, PK, blocks), goalies' older seasons count more (checked against the RSB roster); 28: no summer-growth bonus for young regulars (they're rated on their numbers; Hutson and Celebrini 93 -> 91); 27: the overall half production, half measured ratings (ATTR_PULL .75 -> .5: the stars were held down); goalies pulled toward their prior by 2,500 shots, the minor-league record giving way over 1,200 NHL shots; 26: goalies' minor-league save % against their own league's, a third goalie in the goalie scale; the blend's order placed on the production curve's spread (forwards no longer a point high); rust on the ratings too; defence reads goals against net of half the scoring rate, shot share .05; checking on log(hits + .25); durability counts every lost season; 25:the 2026-10 ratings audit (league factors, rates pulled toward position by minutes, EDGE raw over two seasons, defence from results, discipline from minors, faceoffs by draws, durability counting lost seasons, goalies rate-first, overall 75% from the ratings, potential without the double youth bonus, placement); 24: defence reads EDGE zone time the right way round, on-ice goals against vs teammates, giveaways net of puck time; shot power from shot speed and slap volume, accuracy from finishing and shots on net; 23: each regular's ratings from his own stats (advanced reports, EDGE: nhlRate's R.attr), fitted overall weights, overall 40% toward the ratings, potential without dice; 22: checking and a D's shooting set from the stats after the overall match (no make-up in his other ratings), D overall weights checking .08; 21: tournaments (Olympics, Worlds, 4 Nations) no longer counted as league games; 20: defensemen's offence/defence shape from their scoring (dShape); 17: role-forward bonus capped, young players' track record, goalies on goals saved, rust for a lost season, prospect ceilings by real draft outcomes; 18: durability from games missed; 19: durability over eight seasons
+const MODEL_V = 41;   // 41: goalies with no NHL games start below the backup line (G_NEW: about 74-76 shown, was 76-81); 40: the 2026-10-12 ratings audit - goalies' minor-league record breaks ties under 300 NHL shots (capped at 81 shown), the bottom squeezed toward the unknown level, a quarter of goals saved from MoneyPuck's expected goals (S3, S5, S6); skaters with no NHL games a step lower, games dressed counted, a D's shot suppression (MoneyPuck), own-zone time net of scoring, endurance on minutes, finishing toward his career rate (S8, S13, S12, S7b, S16, S17); Defensive IQ and Discipline shown as measured (S7); no rating overrides (the user's call); the likelihoods' prospect scoring on its own targets and the climb capped (S1), a miss before 60 NHL games anywhere down to where he stood (S2), goalies' likelihood from their stopping, late from 24 (S4), late D's slot ceilings 3 lower (S9), the first-round floor lifted at 22+ for a pro who scores below his age group (S14); after the verify pass, the goalies' record term outside the bottom squeeze and a goalie with no NHL games given .64 of his growing room (S3, S4); 39:a young player's scoring against his age group counts past 2.5 standard deviations for his ceiling (McKenna, Stenberg Franchise); 38: potentials rebuilt - a ceiling from draft slot, age and scoring everywhere, and a likelihood of reaching it at fixed odds (potLike); D develop to 27; 37: a prospect's NHL games from 20 count toward how likely he is to reach his ceiling, and one still outside the NHL from 22 is less likely each year (Rosen, Korchinski); 36: young NHL regulars' ceilings graded High / Medium / Low on their scoring against NHL players their age; a goalie's rating trusts his numbers by how much NHL work they rest on; 35: a forward's defence leans on his own-zone time over goals against; 34: goalies' mid / long-range save % read from the right fields; 33: defensive D from defence and the scoring record; 32: a skilled forward with standout defence is two-way before power forward; 31: player types from the scoring record too (sniper / playmaker, offensive D); 30: fights an hour kept (p.rx.mj) for the player types (archOf); 29: D get the role credit (hits, takeaways, PK, blocks), goalies' older seasons count more (checked against the RSB roster); 28: no summer-growth bonus for young regulars (they're rated on their numbers; Hutson and Celebrini 93 -> 91); 27: the overall half production, half measured ratings (ATTR_PULL .75 -> .5: the stars were held down); goalies pulled toward their prior by 2,500 shots, the minor-league record giving way over 1,200 NHL shots; 26: goalies' minor-league save % against their own league's, a third goalie in the goalie scale; the blend's order placed on the production curve's spread (forwards no longer a point high); rust on the ratings too; defence reads goals against net of half the scoring rate, shot share .05; checking on log(hits + .25); durability counts every lost season; 25:the 2026-10 ratings audit (league factors, rates pulled toward position by minutes, EDGE raw over two seasons, defence from results, discipline from minors, faceoffs by draws, durability counting lost seasons, goalies rate-first, overall 75% from the ratings, potential without the double youth bonus, placement); 24: defence reads EDGE zone time the right way round, on-ice goals against vs teammates, giveaways net of puck time; shot power from shot speed and slap volume, accuracy from finishing and shots on net; 23: each regular's ratings from his own stats (advanced reports, EDGE: nhlRate's R.attr), fitted overall weights, overall 40% toward the ratings, potential without dice; 22: checking and a D's shooting set from the stats after the overall match (no make-up in his other ratings), D overall weights checking .08; 21: tournaments (Olympics, Worlds, 4 Nations) no longer counted as league games; 20: defensemen's offence/defence shape from their scoring (dShape); 17: role-forward bonus capped, young players' track record, goalies on goals saved, rust for a lost season, prospect ceilings by real draft outcomes; 18: durability from games missed; 19: durability over eight seasons
 function nhlRateAll(D) {   // NHL id → { r, ovr, pot } from the current model
   const S = D.season, born = s => (String(s || '').match(/(\d{4})-(\d{2})-(\d{2})/) || []).slice(1).map(Number), list = [];
   for (const x of D.players) {
@@ -12927,8 +13146,17 @@ function nhlRateAll(D) {   // NHL id → { r, ovr, pot } from the current model
     list.push(Object.assign({}, x, { pos, age, b }));
   }
   nhlProdZ(list, S); const rated = nhlRate(list, S), out = {};
-  for (const x of list) { const R = rated.get(x); if (!R) continue; const ovr = Math.round(cl(R.ovr, 35, 95)), r = nhlBuild(x, R, ovr), p = { pos: x.pos, r }; const o = ovrOf(p); out[x.nhl] = { r, ovr: o, pot: nhlPot(x, o, x.age, S), prd: x.age < POT_AGE_G ? prdOf(x, S) : null, pos2: nhlPos2(x, x.pos), dur: nhlDur(x, S), rx: R.tilt.rx ? Object.assign({}, R.tilt.rx, { c0: rxC0(r) }) : null }; }
+  for (const x of list) { const R = rated.get(x); if (!R) continue; const ovr = Math.round(cl(R.ovr, 35, 95)), r = nhlBuild(x, R, ovr), p = { pos: x.pos, r }; const o = ovrOf(p); out[x.nhl] = { r, ovr: o, pot: nhlPot(x, o, x.age, S, R.gNew), prd: x.age < POT_AGE_G ? prdOf(x, S) : null, pos2: nhlPos2(x, x.pos), dur: nhlDur(x, S), rx: R.tilt.rx ? Object.assign({}, R.tilt.rx, { c0: rxC0(r) }) : null }; }
+  for (const x of list) if (out[x.nhl]) { const gm = nhlGMx(x, rated.get(x)); if (gm) out[x.nhl].gMx = gm; }   // (D10)
   return out;
+}
+// (2026-10 audit D10) a goalie's detail ratings that come from his own numbers (nhlRate's R.attr: reflexes from
+// high-danger saves, positioning from mid- and long-range saves, rebound control, endurance from his workload), so the
+// profile's detail list marks them measured as it does a skater's (rxOverrides). They never were: p.rx is skaters' only
+function nhlGMx(x, R) {
+  if (x.pos !== 'G' || !R || !R.attr) return null;
+  const m = ['ref', 'pos', 'reb', 'end'].filter(k => R.attr[k] != null && isFinite(R.attr[k]));
+  return m.length ? m : null;
 }
 function nhlRerate(D) {
   const M = nhlRateAll(D), X = {}; let n = 0; for (const x of D.players) if (x.nhl) X[x.nhl] = x;
@@ -12936,6 +13164,8 @@ function nhlRerate(D) {
     if (p.hlm != null && X[p.hlm]) { const md = realMedals(X[p.hlm], p.nat); if (md.length) p.rmed = md; }   // (real medals: added with the model that brought them)
     const m = p.hlm != null && M[p.hlm]; if (!m || m.r.ref != null && p.pos !== 'G' || m.r.ref == null && p.pos === 'G') continue;
     p.r = Object.assign({}, m.r); if (m.pos2) p.pos2 = m.pos2; else delete p.pos2; if (m.rx) p.rx = m.rx; else delete p.rx; p.ovr = ovrOf(p); p.pot = Math.max(p.ovr, m.pot); p.gen = dispR(p.ovr) >= 97; potFix(p); if (m.prd) p.prd = m.prd; else delete p.prd; delete p.certP; delete p.pcf; delete p.pcfT; p.arch = archOf(p); p.xf = xfOf(p); if (m.dur != null) { p.dur = m.dur; p.durK = 1; } n++;
+    if (m.gMx) p.gMx = m.gMx; else delete p.gMx;   // (D10: a goalie's measured detail ratings)
+    ratingAdj(p);   // (the user's own overrides go back on over the new model's numbers: re-rated without them, a model update erased every one)
   }
   L.modelV = MODEL_V; L.rxV = 2; L.advR = D.players.some(x => x.adv); L.teams.forEach(t => { if (t.tid !== L.userTid) L.autoLines(t); });
   if (n) { L.news = L.news.filter(x => !/^Player ratings updated to the latest rating model/.test(x.text)); L.addNews('Player ratings updated to the latest rating model (' + n + ' players).', -1, 'player'); }   // (one line, not one per update)
@@ -12952,7 +13182,7 @@ function realPickMoves(L, D) {
 League.fromNHL = function (D, userTid) {
   const S = D.season, born = s => (String(s || '').match(/(\d{4})-(\d{2})-(\d{2})/) || []).slice(1).map(Number);
   const teams = D.teams;   // already in picker order (nhlRead)
-  const L = new League({ version: 1, season: S, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, dyV: 1, potGV: 1, potDV: 1, potD27: 1, prdV: 1, cap: D.cap && D.cap.upper || capFor(S), real: { updated: D.updated, source: 'NHL.com and CapWages' } });
+  const L = new League({ version: 1, season: S, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, dyV: 1, potGV: 1, potDV: 1, potD27: 1, prdV: 2, cap: D.cap && D.cap.upper || capFor(S), real: { updated: D.updated, source: 'NHL.com and CapWages' } });
   const tidOf = {}, tidByName = {};
   teams.forEach((t, i) => {
     const nick = t.name;
@@ -12985,7 +13215,7 @@ League.fromNHL = function (D, userTid) {
     const key = x.nhl || x.cw || (x.first + x.last + x.born); if (seen.has(key)) continue; seen.add(key);
     // rights a club still lists to a veteran who hasn't played anywhere in three seasons (retired or long gone)
     if (x.list === 'reserve' && age >= 26 && !nhlRows(x.st).some(r => r[0] >= S - 3)) continue;
-    list.push(Object.assign({}, x, { pos, age, b }));
+    list.push(Object.assign({}, x, { pos, age, b, pos0: x.pos }));   // (pos0: the data's own position, LD / RD kept, for nhlShGuess)
   }
   // 2. ratings
   nhlProdZ(list, S); const rated = nhlRate(list, S);
@@ -12993,11 +13223,12 @@ League.fromNHL = function (D, userTid) {
   for (const x of list) {
     const R = rated.get(x); if (!R) continue;
     const ovr = Math.round(cl(R.ovr, 35, 95)), r = nhlBuild(x, R, ovr);
-    const p = { id: 'p' + (L.nextPid++), first: x.first, last: x.last, pos: x.pos, age: x.age, r, nat: NHL_NAT[x.nat] || x.nat || 'CAN', sh: x.sh === 'R' ? 'R' : 'L', tid: -1, num: +x.num || 0, contract: null, stats: null, pstats: null, career: [], draft: null, inj: 0, ms: [], mcar: [], ht: x.ht || null, wt: x.wt || null, hlm: x.nhl || null, born: x.b[0] ? x.b : null };
+    const p = { id: 'p' + (L.nextPid++), first: x.first, last: x.last, pos: x.pos, age: x.age, r, nat: NHL_NAT[x.nat] || x.nat || 'CAN', sh: x.sh === 'R' || x.sh === 'L' ? x.sh : nhlShGuess(x), tid: -1, num: +x.num || 0, contract: null, stats: null, pstats: null, career: [], draft: null, inj: 0, ms: [], mcar: [], ht: x.ht || null, wt: x.wt || null, hlm: x.nhl || null, born: x.b[0] ? x.b : null };
     if (x.bc) { p.bc = String(x.bc); if (x.bs) p.bs = stAbbr(x.bs); }
     const p2 = nhlPos2(x, x.pos); if (p2) p.pos2 = p2;
     if (R.tilt.rx) p.rx = Object.assign({}, R.tilt.rx, { c0: rxC0(r) });
-    p.ovr = ovrOf(p); p.pot = nhlPot(x, p.ovr, x.age, S); if (x.age < POT_AGE_G) p.prd = prdOf(x, S);
+    { const gm = nhlGMx(x, R); if (gm) p.gMx = gm; }   // (a goalie's detail ratings read from his numbers - D10)
+    p.ovr = ovrOf(p); p.pot = nhlPot(x, p.ovr, x.age, S, R.gNew); if (x.age < POT_AGE_G) p.prd = prdOf(x, S);
     { const dd = nhlDur(x, S); if (dd != null) { p.dur = dd; p.durK = 1; } }   // (a real record: known - durKnown)
     if (x.aw) p.aw = nhlRows(x.aw);
     { const md = realMedals(x, p.nat); if (md.length) p.rmed = md; }
@@ -13014,11 +13245,15 @@ League.fromNHL = function (D, userTid) {
   const clauseOf = (p, s) => !s ? null : /M-?NTC|Modified/i.test(s) ? L.makeClause(p, 'MNTC', 10) : /NMC/.test(s) ? L.makeClause(p, 'NMC') : /NTC/.test(s) ? L.makeClause(p, 'NTC') : null;
   for (const x of list) {
     const p = x.p; if (!p) continue;
-    if (x.list === 'fa') { p.tid = -1; L.setAsk(p); continue; }   // unsigned: on the market
+    if (x.list === 'fa') { p.tid = -1; if (x.pto) p.pto = x.pto; L.setAsk(p); continue; }   // unsigned: on the market (pto: in a club's camp on a tryout - ensureFarm leaves him be)
     const t = L.teams[tidOf[x.team]]; if (!t) continue;
-    const cons = (x.con || []).map(c => ({ type: c.type || '', rows: nhlRows(c.rows).sort((a, b) => a[0] - b[0]) })).filter(c => c.rows.length);
+    // (tw / ml: one-way or two-way and the minor-league salary, from CapWages' contract type - update-nhl.ps1, audit D6)
+    const cons = (x.con || []).map(c => ({ type: c.type || '', tw: c.tw, ml: c.ml, rows: nhlRows(c.rows).sort((a, b) => a[0] - b[0]) })).filter(c => c.rows.length);
     const cur = cons.find(c => c.rows.some(r => r[0] === S)) || cons.find(c => c.rows[0][0] <= S && c.rows[c.rows.length - 1][0] >= S);
     const ext = cons.filter(c => c !== cur && c.rows[0][0] > S).sort((a, b) => a.rows[0][0] - b.rows[0][0])[0];
+    // (2026-10 audit D7: a man in camp on a professional tryout has no contract - he's unsigned, on the market. On the
+    // club's roster list with no deal for this season he was given an invented one: Forbort, $2.77M one-way with Calgary)
+    if (!cur && (x.pto || /^(PTO|tryout)/i.test(String(x.status || '')))) { p.tid = -1; p.pto = x.pto || x.team || 'PTO'; L.setAsk(p); continue; }
     // (a signed player not on the NHL roster plays where his record says he is now: a junior 19 or under has to go back to
     // his junior club (the CHL agreement), a European stays with his club on loan; only the rest join the farm. Everyone
     // with a contract used to go to the AHL: Kettles, Czata, Psenicka, Stockselius, Genborg...)
@@ -13029,13 +13264,28 @@ League.fromNHL = function (D, userTid) {
     if (cur) {
       const row = cur.rows.find(r => r[0] === S) || cur.rows[0], yrs = cur.rows[cur.rows.length - 1][0] - S + 1;
       p.contract = { sal: Math.max(CAP_MIN_SAL, row[1]), exp: cur.rows[cur.rows.length - 1][0] };
-      L.finishContract(p, t, yrs, { cl: clauseOf(p, row[2] || x.terms) });
+      // (2026-10 audit D6: one-way / two-way as the real deal is - the data's tw, or for older data its type - and his real
+      // minor-league pay when listed. finishContract drew it at random: Jarry's $5.375M, Couture's $8M and Binnington's $6M
+      // one-way deals read two-way, 79 entry-level deals one-way)
+      const twOf = c => c.tw === 0 || c.tw === 1 ? c.tw : c.type ? (/two-way|entry/i.test(c.type) ? 1 : 0) : undefined;
+      L.finishContract(p, t, yrs, { cl: clauseOf(p, row[2] || x.terms), tw: twOf(cur) });
+      if (p.contract.tw && cur.ml > 0) p.contract.ahl = cur.ml;
       if (/entry/i.test(cur.type)) { p.elc = 1; p.wx = S + (p.age <= 21 ? 2 : 1); }
-      if (ext) { const e0 = ext.rows[0]; p.contract.ext = { sal: e0[1], exp: ext.rows[ext.rows.length - 1][0], cl: clauseOf(p, e0[2]), p35: p.age + yrs >= 35 && ext.rows.length >= 2 ? 1 : 0 }; }
+      if (ext) { const e0 = ext.rows[0], etw = twOf(ext); p.contract.ext = { sal: e0[1], exp: ext.rows[ext.rows.length - 1][0], cl: clauseOf(p, e0[2]), p35: p.age + yrs >= 35 && ext.rows.length >= 2 ? 1 : 0 }; if (etw) { p.contract.ext.tw = 1; if (ext.ml > 0) p.contract.ext.ahl = ext.ml; } }
     } else if (list2 === 'roster') { L.setAsk(p); p.contract = { sal: p.ask.sal, exp: S + p.ask.yrs - 1 }; delete p.ask; L.finishContract(p, t, 1, {}); }
     else { if (!p.draft) L.fakeDraft(p, t); L.setLeague(p, nhlDataLeague(x) || L.pickLeague(p)); }   // an unsigned pick plays where his last season was (Michael Hage, NCAA, was dealt into the WHL at random: two years of rights instead of four)
     // LTIR = out long-term, SEIR = season-ending (both give cap relief, e.g. Pietrangelo), SOIR / IR = weeks
-    if (/IR/.test(x.status || '')) { p.inj = /SEIR/.test(x.status) ? 100 : /LTIR/.test(x.status) ? ri(40, 90) : ri(7, 30); p.injType = 'undisclosed'; }
+    // (a career-end entry in RATING_ADJ - ratingAdj: Pietrangelo - keeps its out-for-good injury; this read him as 100 games)
+    if (/IR/.test(x.status || '') && !p.cEnd) { p.inj = /SEIR/.test(x.status) ? 100 : /LTIR/.test(x.status) ? ri(40, 90) : ri(7, 30); p.injType = 'undisclosed'; }
+    // (2026-10 audit D5: a veteran on injured reserve who hasn't played a game anywhere in either of the last two seasons
+    // is done, his contract running out on long-term IR - as Pietrangelo is: Couture, Ellis and Krug came off short IR
+    // stints playable, and San Jose carried $11.5M buried instead of the relief)
+    if (/IR/.test(x.status || '') && !p.cEnd && x.car && x.car.gp >= 100 && ![S - 1, S - 2].some(y => nhlRows(x.st).some(r => r[0] === y && r[2] > 0 && !TOURN.test(String(r[1]))))) { p.inj = 999; p.cEnd = S; }
+    // (2026-10 audit D1: a suspended player - the data's status - is out like an injured one, the lines skip him, as the
+    // live start's injury report has it: not on injured reserve, no cap relief, out the 7-10 games of an unlisted return.
+    // Hellebuyck, suspended by Winnipeg, started their opener and made them the No. 2 team. realSuspSync reinstates him
+    // when a later download no longer lists him suspended)
+    else if (/susp/i.test(x.status || '')) { p.inj = ri(7, 10); p.injType = 'Suspended'; p.injLive = { k: 'data|Suspended', r: null, s: 'Suspended', lt: 0, ir: 0, non: 1 }; }
   }
   nhlTraits(list.filter(x => x.p).map(x => ({ x, p: x.p })), p => L.fairSal(p)); L.trR = 1;   // personalities from their records
   L.teams.forEach(t => L.ensureCaptains(t, true)); L.capV = 1;   // the real captains and alternates (their letters came with the records)
@@ -13046,15 +13296,22 @@ League.fromNHL = function (D, userTid) {
   // and a junior 19 or under who's sent down goes back to his junior club, not the AHL)
   const xOfP = new Map(list.filter(x => x.p).map(x => [x.p, x]));
   const nowGP = p => { const x = xOfP.get(p); return x ? nhlRows(x.st).filter(r => r[0] === S && r[1] === 'NHL').reduce((s, r) => s + r[2], 0) : 0; };
-  const keepVal = p => p.ovr + (nowGP(p) > 0 ? 6 : 0);
+  // (2026-10 audit D2: the trim counted the injured against the 23, and initMinors trimmed again by rating after it - 53
+  // men playing NHL games this season opened in the AHL: Jarry, Silovs, Askarov, Lankinen, Frederic, Schenn, Emberson,
+  // Howard - and Edmonton, Pittsburgh, San Jose and Vancouver dressed a hurt backup goalie. Now as the live start does:
+  // the call-ups first (goalies too), then only the healthy count against the 23 (activeLen: injured reserve doesn't);
+  // the data's NHL roster and this season's NHL games keep a place before rating does (keepTier), a no-move clause is
+  // never sent down, and a goalie only when two healthy ones stay)
+  const keepTier = p => { const x = xOfP.get(p); return (x && (x.list === 'roster' || x.list === 'inactive') ? 2 : 0) + (nowGP(p) > 0 ? 1 : 0); };
+  const nmc = p => { const c = L.clauseOf(p); return !!c && c.t === 'NMC'; };
   for (const t of L.teams) {
-    while (t.roster.length > ROSTER_MAX) {
-      const healthy = L.rosterOf(t).filter(q => !q.inj && q.pos !== 'G'), nF = healthy.filter(q => q.pos !== 'D').length, nD = healthy.length - nF;
-      const x = healthy.filter(q => q.pos === 'D' ? nD > 7 : nF > 13).sort((a, b) => keepVal(a) - keepVal(b))[0] || healthy.sort((a, b) => keepVal(a) - keepVal(b))[0]; if (!x) break;
+    nhlCallUps(L, t, keepTier);
+    for (let k = 0; k < 40 && L.activeLen(t) > ROSTER_MAX; k++) {
+      const healthy = L.rosterOf(t).filter(q => !q.inj), n = { F: 0, D: 0, G: 0 }; for (const q of healthy) n[grpOf(q)]++;
+      const x = healthy.filter(q => !nmc(q) && n[grpOf(q)] > (grpOf(q) === 'G' ? 2 : grpOf(q) === 'D' ? 7 : 13)).sort((a, b) => keepTier(a) - keepTier(b) || a.ovr - b.ovr)[0]; if (!x) break;
       const jx = xOfP.get(x), jl = jx && nhlDataLeague(jx);
       if (jl && CHL.includes(jl) && x.age <= 19) { L.attach(t, x, 'prospects'); x.loan = 1; L.setLeague(x, jl); } else L.attach(t, x, 'farm');
     }
-    nhlCallUps(L, t);
   }
   for (const p of Object.values(L.players)) if (p.tid !== -2) potFix(p);
   L.potV = 1; L.slotV = 1; L.rxV = 2; L.advR = D.players.some(x => x.adv); L.adjV = RATING_ADJ_V; L.statAlg = STAT_ALG; L.statV = D.updated; L.genFix = 5; L.dispV = 2; L.modelV = MODEL_V;   // ceilings here come from real draft slots and production: no HLM-era trimming
@@ -13072,11 +13329,15 @@ League.fromNHL = function (D, userTid) {
   // real head coaches by name (ratings come from the coaching model)
   for (const x of D.teams) { const t = L.teams[tidOf[x.abbr]], hc = t && L.hcOf(t); if (hc && x.coach) { const w = x.coach.trim().split(' '); hc.first = w[0]; hc.last = w.slice(1).join(' '); hc.hlm = 1; } }
   realStaff(L, D, tidOf);
-  L.teams.forEach(t => { t.preStatus = t.status; const hc = L.hcOf(t); t.coach = { name: L.coachName(hc), since: hc ? hc.since : L.season, day: 0 }; nhlCallUps(L, t); L.autoLines(t); });
+  L.teams.forEach(t => { t.preStatus = t.status; const hc = L.hcOf(t); t.coach = { name: L.coachName(hc), since: hc ? hc.since : L.season, day: 0 }; nhlCallUps(L, t, keepTier); L.autoLines(t); });
   // real clubs open the season cap-compliant: an overage left here is LTIR the data doesn't label, so the club's
-  // priciest injured players go on long-term IR (instead of a day-one fire sale of its depth)
-  for (const t of L.teams) for (const p of L.rosterOf(t).filter(q => q.inj && q.inj < 24).sort((a, b) => L.capHit(b) - L.capHit(a))) { if (L.payroll(t) - L.ltirRelief(t) - CAP <= 0) break; p.inj = ri(30, 60); }
+  // priciest injured players go on long-term IR (instead of a day-one fire sale of its depth). (Not a suspended man: no
+  // relief for him - D1)
+  for (const t of L.teams) for (const p of L.rosterOf(t).filter(q => q.inj && q.inj < 24 && !(q.injLive && q.injLive.non)).sort((a, b) => L.capHit(b) - L.capHit(a))) { if (L.payroll(t) - L.ltirRelief(t) - CAP <= 0) break; p.inj = ri(30, 60); }
   L.addNews('Welcome to the ' + S + '-' + (S + 1 - 2000) + ' season, with the real NHL rosters and contracts as of ' + new Date(D.updated).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + '. You are the GM of the ' + L.tname(userTid) + '.');
+  // (who you open without: the live start lists your injuries, this start didn't - a WPG GM wasn't told Hellebuyck is
+  // suspended, he was just missing from the lines. 2026-10 verify, D1)
+  { const mine = L.rosterOf(L.teams[userTid]).filter(p => p.inj > 0).sort((a, b) => b.ovr - a.ovr); if (mine.length) L.addNews('Out on opening night: ' + mine.map(p => p.first + ' ' + p.last + ' (' + p.injType + ', ' + injLen(p) + ')').join(', ') + '.', userTid, 'injury'); }
   return L;
 };
 // ---------- the live start ----------
@@ -13418,6 +13679,7 @@ League.prototype.liveInjNews = function (r, X, start) {
   const md = s => { const [y, mo, d] = String(s).slice(0, 10).split('-').map(Number); return new Date(y, mo - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); };
   const big = a => a.slice().sort((x, y) => (y.inj > 3) - (x.inj > 3) || y.ovr - x.ovr).slice(0, 5).map(p => nm(p) + ' - ' + p.injType + ', ' + injLen(p)).join('; ');
   if (start) {
+    this.news = this.news.filter(n => !/^Out on opening night: /.test(n.text));   // (fromNHL's list from the data: ESPN's report below replaces it)
     const out = Object.values(this.players).filter(p => p.injLive && p.inj > 0 && p.tid >= 0), mine = out.filter(p => p.tid === ut);
     this.addNews('Injury report' + (r.at ? ' (' + md(r.at) + ')' : '') + ': ' + out.length + ' players start out hurt, from ESPN\'s injury report' + (out.length ? '. The biggest names: ' + big(out) : '') + '.', -1, 'injury');
     if (mine.length) this.addNews('Your injuries: ' + mine.sort((x, y) => y.ovr - x.ovr).map(p => p.first + ' ' + p.last + ' (' + p.injType + ', ' + injLen(p) + ')').join(', ') + '.', ut, 'injury');
@@ -14192,7 +14454,7 @@ function mHome(t) {
   const nInj = L.rosterOf(t).filter(p => p.inj > 0).length, stk = streakOf(t);
   const box = (v, lab, cls, act) => `<${act ? 'button' : 'div'} class="mh-st"${act || ''}><b class="${cls || ''}">${v}</b><span>${lab}</span></${act ? 'button' : 'div'}>`;
   const stats = `<div class="mh-stats">${box(recStr(t), 'Record')}${box(ordn(dpl), esc(t.div), '', ' data-act="nav" data-v="standings"')}${box(stk, 'Streak', stk[0] === 'W' ? 'pos' : stk === '—' ? '' : 'neg')}
-    ${box((sp < 0 ? '-' : '') + money(Math.abs(sp)), 'Cap space', sp >= 0 ? 'pos' : 'neg', ' data-act="nav" data-v="contracts"')}${box(L.rosterOf(t).length + '/' + ROSTER_MAX, 'Roster', '', ' data-act="nav" data-v="roster"')}${box(nInj, 'Injured', nInj ? 'neg' : '')}</div>`;
+    ${box((sp < 0 ? '-' : '') + money(Math.abs(sp)), 'Cap space', sp >= 0 ? 'pos' : 'neg', ' data-act="nav" data-v="contracts"')}${box(rosLbl(t), 'Roster', '', ' data-act="nav" data-v="roster"')}${box(nInj, 'Injured', nInj ? 'neg' : '')}</div>`;
   const st = p => (po ? p.pstats : p.stats) || {};
   const sk = L.rosterOf(t).filter(p => p.pos !== 'G' && st(p).gp), gkk = L.rosterOf(t).filter(p => p.pos === 'G' && st(p).gp && st(p).sa);
   const top = (ps, f) => ps.slice().sort((a, b) => f(st(b)) - f(st(a)))[0];
@@ -14552,7 +14814,7 @@ function offseasonCard() {
       <p class="muted small">Cap space for next season: <b>${money(CAP - L.payroll(UT()))}</b> (you may go up to 10% over, ${money(L.capLimit())}, until opening night).</p>
       <div class="btnrow"><button class="btn primary" data-act="nav" data-v="contracts">Open contracts</button><button class="btn" data-act="continue">Open free agency</button></div></div>`;
   }
-  if (L.phase === 'freeagency') return `<div class="card"><div class="eyebrow">Offseason · step 3 of 3</div><h2>Free agency</h2><p>Sign players to fill out your roster (${UT().roster.length}/${ROSTER_MAX}; you need at least 2 G, 7 D and 12 F). When you start the season, other teams finish their signings and empty spots are filled at the league minimum.</p><div class="btnrow"><button class="btn primary" data-act="nav" data-v="fa">Browse free agents</button><button class="btn" data-act="faWeek">Sim a week of free agency</button><button class="btn" data-act="continue">Open training camp</button></div></div>`;
+  if (L.phase === 'freeagency') return `<div class="card"><div class="eyebrow">Offseason · step 3 of 3</div><h2>Free agency</h2><p>Sign players to fill out your roster (${rosLbl(UT())}; you need at least 2 G, 7 D and 12 F). When you start the season, other teams finish their signings and empty spots are filled at the league minimum.</p><div class="btnrow"><button class="btn primary" data-act="nav" data-v="fa">Browse free agents</button><button class="btn" data-act="faWeek">Sim a week of free agency</button><button class="btn" data-act="continue">Open training camp</button></div></div>`;
   // training camp: its way back from Home (left for the roster or lines, there was none - on a phone the season couldn't
   // be started: the phone audit, 2026-10)
   if (L.phase === 'camp') return `<div class="card"><div class="eyebrow">Offseason · training camp</div><h2>${L.camp && L.camp.done ? 'Camp is done' : 'Training camp'}</h2><p class="muted">${L.camp && L.camp.done ? 'Set your opening-night roster and lines, then start the season.' : 'Battles for jobs and the preseason games decide who makes the team.'}</p><div class="btnrow"><button class="btn primary" data-act="${L.camp && L.camp.done ? 'continue' : 'nav'}" data-v="camp">${L.camp && L.camp.done ? 'Start ' + (L.season + 1) + ' season' : 'Go to training camp'}</button>${L.camp && L.camp.done ? '<button class="btn" data-act="nav" data-v="camp">Back to camp</button>' : ''}</div></div>`;
@@ -14693,7 +14955,7 @@ function vRoster() {
     : `<th>#</th><th class="l">Name</th>${th('pos', 'Pos')}${th('age', 'Age')}${th('ovr', 'OVR')}${th('pot', 'Potential')}<th class="l">Style</th><th title="Skating / Reflexes">SKA</th><th title="Shooting / Positioning">SHT</th><th title="Passing / Rebound control">PAS</th><th>HND</th><th>CHK</th><th>DEF</th><th>FO</th>${th('sal', 'Salary')}<th title="Seasons left on his contract">Yrs</th>${statHead}<th></th>`;
   const note = tab === 'farm' ? `<p class="muted small">Your AHL affiliate${ahl ? `: <b>${esc(L.affName(t))}</b> · ${ahl.w}-${ahl.l}-${ahl.otl} · ${ahlRank ? '#' + ahlRank + ' in the AHL' : ''}` : ''}. AHL players count only ${money(BURY)} less than their salary against the cap (most count $0). Call-ups need a roster spot (max ${ROSTER_MAX}) and cap room. Players without <span class="pill good">WX</span> must clear waivers to be sent back down, and another team may claim them. Stats shown are AHL stats.</p>`
     : tab === 'prospects' ? `<p class="muted small">Drafted players develop in junior, college or Europe and their stats are simulated every game day. Sign one to a 3-year entry-level contract (ELC) to bring him into the organization. CHL players can't play in the AHL until they turn 20, so they either make the NHL team or go back to junior - except one 19-year-old a season per club (the 2026 CBA)${L.chl19Of(t) ? ': this season, ' + esc(L.chl19Of(t).first + ' ' + L.chl19Of(t).last) : ''}. Rights to CHL/USHL draftees lapse 2 years after the draft; college and European players 4 years. A signed teenager who stays in junior or Europe has his ELC slide a year.</p>`
-      : mine ? `<p class="muted small">${t.roster.length}/${ROSTER_MAX} on the NHL roster · AHL ${L.ahlOf(t).length}/${AHL_MAX} (${L.ahlOf(t).filter(p => p.pos === 'G').length}/${AHL_GMAX} G) · ECHL ${L.echlOf(t).length}/${ECHL_MAX} · ${L.contracts(t)}/${MAX_CONTRACTS} contracts in the organization. Use ↓ AHL to assign a player to ${esc(L.affName(t))}, and ↓ ECHL from the AHL tab to the ${esc(L.echlName(t))}.</p>` : '';
+      : mine ? `<p class="muted small">${rosLbl(t)} on the NHL roster · AHL ${L.ahlOf(t).length}/${AHL_MAX} (${L.ahlOf(t).filter(p => p.pos === 'G').length}/${AHL_GMAX} G) · ECHL ${L.echlOf(t).length}/${ECHL_MAX} · ${L.contracts(t)}/${MAX_CONTRACTS} contracts in the organization. Use ↓ AHL to assign a player to ${esc(L.affName(t))}, and ↓ ECHL from the AHL tab to the ${esc(L.echlName(t))}.</p>` : '';
   return `<div class="card">
     <div class="cardhead"><div class="titlewrap">${teamBadge(t, true)}<div><h2>${esc(t.city)} ${esc(t.name)}</h2><span class="muted">${recStr(t)} · Payroll ${money(pay)} of ${money(CAP)} · ${t.roster.length} NHL · ${(t.farm || []).length} AHL · ${t.prospects.length} prospects · Team OVR ${R(L.teamOvr(t))}</span></div></div>
     <div class="ctrls"><select data-act="rosterTeam" id="roster-team">${L.teams.map(x => `<option value="${x.tid}" ${x.tid === tid ? 'selected' : ''}>${esc(x.city + ' ' + x.name)}</option>`).join('')}</select>${!mine ? `<button class="btn sm" data-act="tradeWith" data-tid="${tid}">Trade with ${esc(t.abbr)}</button>` : ''}</div></div>
@@ -14818,7 +15080,7 @@ function euPick(p) {
   const def = EU_LOAN.includes(EU_HOME[p.nat]) ? EU_HOME[p.nat] : 'SHL';
   return `<select id="eulg" aria-label="European league">${EU_LOAN.map(k => `<option value="${k}" ${k === def ? 'selected' : ''}>${esc(LEAGUES[k].n)} · ${esc(L.fitAt(p, LEAGUES[k].lv).l)}</option>`).join('')}</select>`;
 }
-function destDesc(p, k) { const t = UT(); const home = p.home || { lg: p.lg, cl: p.club }; return k === 'NHL' ? `Straight to the NHL. Needs a roster spot (${t.roster.length}/${ROSTER_MAX}) and his full cap hit.` : k === 'AHL' ? `Develops with ${esc(L.affName(t))}. Buried in the minors, he doesn't count against the cap.${L.chlAge(p) === 19 && CHL.includes(home.lg) && !L.chl19Of(t) ? ' Uses your one 19-year-old CHL spot this season.' : ''}` : k === 'ECHL' ? `Big minutes with the ${esc(L.echlName(t))}, a level below the AHL. You can recall him any time.` : k === 'EU' ? `Loaned to a European pro club for the season, playing men in a top league. ${euPick(p)}` : `Stays with ${esc(home.cl || 'his club')} (${esc(lgName(home.lg))})${p.age <= 19 ? '. His ELC slides a year if he spends the season there' : ''}.`; }
+function destDesc(p, k) { const t = UT(); const home = p.home || { lg: p.lg, cl: p.club }; return k === 'NHL' ? `Straight to the NHL. Needs a roster spot (${rosLbl(t)}) and his full cap hit.` : k === 'AHL' ? `Develops with ${esc(L.affName(t))}. Buried in the minors, he doesn't count against the cap.${L.chlAge(p) === 19 && CHL.includes(home.lg) && !L.chl19Of(t) ? ' Uses your one 19-year-old CHL spot this season.' : ''}` : k === 'ECHL' ? `Big minutes with the ${esc(L.echlName(t))}, a level below the AHL. You can recall him any time.` : k === 'EU' ? `Loaned to a European pro club for the season, playing men in a top league. ${euPick(p)}` : `Stays with ${esc(home.cl || 'his club')} (${esc(lgName(home.lg))})${p.age <= 19 ? '. His ELC slides a year if he spends the season there' : ''}.`; }
 const destVal = () => { const v = (document.querySelector('input[name=dest]:checked') || {}).value; return v === 'EU' ? 'EU:' + (($('#eulg') || {}).value || 'SHL') : v; };
 function signModal(pid) {
   const p = L.players[pid]; const t = UT(); const T = L.elcTerms(p); const opts = L.destOptions(Object.assign({}, p, { home: p.home || { lg: p.lg, cl: p.club } }));
@@ -14866,7 +15128,7 @@ function renderNeg() {
       <label>Role promise<select id="ng-role">${ROLE_PROMISE.map((r, i) => `<option value="${i}" ${i === S.role ? 'selected' : ''}>${r}</option>`).join('')}</select></label>
       ${L.clauseEligible(p, p.age + (S.kind === 'fa' && (L.phase === 'regular' || L.phase === 'playoffs') ? 0 : 1)) ? `<label>Trade protection<select id="ng-cl"><option value="">None</option><option value="MNTC" ${S.cla === 'MNTC' ? 'selected' : ''}>Modified NTC (10-team list)</option><option value="NTC" ${S.cla === 'NTC' ? 'selected' : ''}>Full no-trade clause</option><option value="NMC" ${S.cla === 'NMC' ? 'selected' : ''}>No-movement clause</option></select></label>` : ''}
       ${S.kind !== 'extend' && dispR(p.ovr) < 82 ? `<label>Contract type<select id="ng-tw"><option value="0">One-way</option><option value="1" ${S.tw ? 'selected' : ''}>Two-way</option></select></label>` : ''}
-      ${S.kind === 'fa' ? `<label>Assign to<select id="ng-dest"><option value="nhl" ${S.dest === 'nhl' ? 'selected' : ''}>NHL roster (${t.roster.length}/${ROSTER_MAX})</option><option value="farm" ${S.dest === 'farm' ? 'selected' : ''}>AHL · ${esc(L.affName(t))}</option></select></label>` : ''}
+      ${S.kind === 'fa' ? `<label>Assign to<select id="ng-dest"><option value="nhl" ${S.dest === 'nhl' ? 'selected' : ''}>NHL roster (${rosLbl(t)})</option><option value="farm" ${S.dest === 'farm' ? 'selected' : ''}>AHL · ${esc(L.affName(t))}</option></select></label>` : ''}
     </form>
     <p class="small muted">${S.kind === 'extend' ? "Next season's" : 'Current'} cap space: <b>${money(capNow)}</b>. His opening ask: ${money(S.open)} × ${p.ask.yrs}. Every offer below his number costs patience, and a lowball costs a lot.</p>
     <div class="btnrow"><button class="btn primary" data-act="negOffer">Make offer</button>${S.counter ? `<button class="btn" data-act="negAccept">Accept ${money(S.counter.sal)} × ${S.counter.yrs}</button>` : ''}${L.arbEligible(p, S.kind) ? `<button class="btn" data-act="negArb" title="An arbitrator sets his contract: one year at 25 and up, two years younger, at a salary between his ask and his market value. Under about ${money(Math.round(4.5 * CAP / 104 * 100) / 100)} the award is binding">Go to arbitration</button>` : ''}<button class="btn ghost" data-act="negWalk">Walk away</button></div>`}<div id="neg-msg"></div></div>`, 'wide negm');
@@ -14901,7 +15163,7 @@ function lineCallUp(t, pid, g, i, j) {
   const outId = g === 'G' ? t.lines.G[i] : t.lines[g][i][j], op = L.players[outId];
   const inSeason = L.phase === 'regular' || L.phase === 'playoffs';
   const full = inSeason && L.activeLen(t) >= ROSTER_MAX;
-  const capShort = L.phase !== 'playoffs' && L.payroll(t) - L.buried(p) + L.capHit(p) > L.capLimit();
+  const capShort = L.phase !== 'playoffs' && L.payroll(t) - L.buried(p) + L.capHit(p) > L.capLimit(t);
   if (full || capShort) {
     if (!op || L.where(op) !== 'roster') return toast(full ? 'Your NHL roster is full (' + ROSTER_MAX + '). Send someone down first.' : 'Not enough cap space to call him up.', 'bad');
     const ex = L.waiverExempt(op) || op.er, junior = L.chlJunior(op);
@@ -15351,7 +15613,7 @@ function vFA() {
   const th = (k, lab, cls, tip) => `<th${cls ? ` class="${cls}"` : ''}${tip ? ` title="${esc(tip)}"` : ''}><button class="sort ${key === k ? 'on' : ''}" data-act="fasort" data-k="${k}">${lab}${key === k ? (dir < 0 ? ' ▼' : ' ▲') : ''}</button></th>`;
   return `<div class="card"><div class="cardhead"><h2>Free agents</h2><div class="tabs inline">${gb('pro', 'NHL free agents (' + (allFA.length - nAm) + ')')}${gb('am', 'Undrafted free agents (' + nAm + ')')}</div><div class="tabs inline">${tb('', 'All')}${tb('F', 'Forwards')}${tb('D', 'Defense')}${tb('G', 'Goalies')}${tb('S', 'Signings')}</div></div>
   ${grp === 'am' ? '<p class="muted small">Players no club drafted, still playing junior, college or in Europe. Clubs sign the ones who emerge to two-way deals, usually at 19-24; unsigned at 25, they have moved on.</p>' : ''}
-  <p class="muted small">Cap space: <b>${money(CAP - L.payroll(t))}</b>${mid ? '' : ` (offseason: you may carry up to ${money(L.capLimit())}, 10% over, until opening night)`} · Cap floor ${money(L.capFloor())}${L.payroll(t) < L.capFloor() ? ` <span class="neg">(${money(L.capFloor() - L.payroll(t))} under)</span>` : ''} · Roster ${t.roster.length}/${ROSTER_MAX} · Contracts ${L.contracts(t)}/${MAX_CONTRACTS}${mid ? ' · During the season, free agents accept about 20% less than their ask.' : ''}</p>
+  <p class="muted small">Cap space: <b>${money(CAP - L.payroll(t))}</b>${mid ? '' : ` (offseason: you may carry up to ${money(L.capLimit())}, 10% over, until opening night)`} · Cap floor ${money(L.capFloor())}${L.payroll(t) < L.capFloor() ? ` <span class="neg">(${money(L.capFloor() - L.payroll(t))} under)</span>` : ''} · Roster ${rosLbl(t)} · Contracts ${L.contracts(t)}/${MAX_CONTRACTS}${mid ? ' · During the season, free agents accept about 20% less than their ask.' : ''}</p>
   ${(w => w.length ? `<p class="fa-window"><b>On waivers:</b> ${w.map(p => esc(nm(p)) + ' (' + p.pos + ', ' + R(p.ovr) + ')').join(', ')} - you have first claim. <button class="btn sm primary" data-act="wvOpen">See waivers</button></p>` : '')(L.wvPending().filter(p => !p.wv.passed))}
   ${L.phase === 'resign' ? `<p class="fa-window"><b>Free agency opens on July 1.</b> These players weren't re-signed by their clubs. Until it opens, every club talks only to its own pending free agents - re-sign yours on the Contracts page.</p>` : ''}
   ${L.phase === 'freeagency' ? `<div class="btnrow"><button class="btn" data-act="faDay">Next day of free agency</button><button class="btn" data-act="faWeek">Sim a week</button><span class="muted small">${L.faD ? 'Day ' + L.faD + '. ' : 'Day one: every free agent is still available. '}Each day other clubs sign players, the best ones first. Starting the season settles the rest of the market.</span></div>` : ''}
@@ -16468,7 +16730,7 @@ function farewellModal(ids) {
 }
 // notable players on waivers you have first claim on: claim him (to your NHL roster, contract and all) or pass
 // a full roster: pick who goes down to make room, and Claim does both (weakest first; one who'd need waivers is marked)
-function wvFull() { return UT().roster.length >= ROSTER_MAX && (L.phase === 'regular' || L.phase === 'playoffs'); }
+function wvFull() { return L.activeLen(UT()) >= ROSTER_MAX && (L.phase === 'regular' || L.phase === 'playoffs'); }
 function wvRoomSel(p) {
   if (!wvFull()) return '';
   const ut = UT(), ros = L.rosterOf(ut), gs = ros.filter(x => x.pos === 'G').length;
@@ -16478,7 +16740,7 @@ function wvRoomSel(p) {
 function waiverModal() {
   const ps = L.wvPending(); if (!ps.length) return closeModal();
   modal(`<h2>Players on waivers</h2><p class="muted small">You're ahead of the other clubs in the waiver order for these players. Claim one and he joins your NHL roster with his contract; pass and he goes to the next club in line tomorrow.</p>
-    ${(() => { const ut = UT(), full = ut.roster.length >= ROSTER_MAX && (L.phase === 'regular' || L.phase === 'playoffs'); return `<div class="wv-top"><span>Cap space <b>${money(L.capLimit() - L.payroll(ut))}</b></span><span>Roster <b class="${full ? 'neg' : ''}">${ut.roster.length}/${ROSTER_MAX}</b></span>${full ? '<span class="neg">Your roster is full - pick who goes down to make room, then claim.</span>' : ''}</div>`; })()}<div id="wv-msg"></div>
+    ${(() => { const ut = UT(), full = L.activeLen(ut) >= ROSTER_MAX && (L.phase === 'regular' || L.phase === 'playoffs'); return `<div class="wv-top"><span>Cap space <b>${money(L.capLimit(ut) - L.payroll(ut))}</b></span><span>Roster <b class="${full ? 'neg' : ''}">${rosLbl(ut)}</b></span>${full ? '<span class="neg">Your roster is full - pick who goes down to make room, then claim.</span>' : ''}</div>`; })()}<div id="wv-msg"></div>
     <div class="wv-list">${ps.map(p => { const t = L.teams[p.wv.from]; return `<div class="wv-row"><span class="wv-face">${faceSVG(p, t, 56)}</span><div class="wv-n"><b><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button></b><small>${p.pos} · ${p.age} · OVR ${R(p.ovr)} · ${tierChip(p, 'pot')} · ${p.contract ? money(L.capHit(p)) + ' × ' + Math.max(1, p.contract.exp - L.capSeason() + 1) : ''}</small><small class="muted">Waived by the ${esc(t.name)}${p.wv.passed ? ' · you passed' : ''}</small></div>
       <div class="btnrow">${p.wv.passed ? '' : `${wvRoomSel(p)}<button class="btn primary sm" data-act="wvClaim" data-pid="${p.id}">Claim</button><button class="btn ghost sm" data-act="wvPass" data-pid="${p.id}">Pass</button>`}</div></div>`; }).join('')}</div>
     `, 'wide');
@@ -16890,7 +17152,7 @@ function vCamp() {
   return `<div class="card cp-head"><div class="eyebrow">Training camp &amp; preseason · ${seasonLab(cs)}</div><h2>${C.done ? 'Camp is over: time for the cuts' : 'Training camp'}</h2>
     <p class="muted small">Six preseason games. Everyone signed in your organization gets a look: regulars, the farm, and your prospects back from junior and Europe. Grades are how each man looked against what's expected of a player rated like him; a young player with an A camp comes out of it a little better. Then set your roster: ${ROSTER_MAX} players, under the cap.</p>
     <div class="cp-games">${games}</div>
-    <div class="dd-meta"><span>Roster <b>${t.roster.length}/${ROSTER_MAX}</b></span><span>Cap space <b class="${CAP - L.payroll(t) + L.ltirRelief(t) >= 0 ? 'pos' : 'neg'}">${money(CAP - L.payroll(t) + L.ltirRelief(t))}</b></span>${stars.length ? `<span>Standouts <b>${stars.slice(0, 3).map(p => esc(p.last) + ' (' + L.campGrade(p) + ')').join(', ')}</b></span>` : ''}</div>
+    <div class="dd-meta"><span>Roster <b>${rosLbl(t)}</b></span><span>Cap space <b class="${CAP - L.payroll(t) + L.ltirRelief(t) >= 0 ? 'pos' : 'neg'}">${money(CAP - L.payroll(t) + L.ltirRelief(t))}</b></span>${stars.length ? `<span>Standouts <b>${stars.slice(0, 3).map(p => esc(p.last) + ' (' + L.campGrade(p) + ')').join(', ')}</b></span>` : ''}</div>
     ${iss.length && C.done ? `<p class="neg small">Before opening night: ${iss.map(esc).join(' and ')}.</p>` : ''}
     <div class="btnrow">${C.done ? `<button class="btn primary" data-act="continue">Start the ${seasonLab(cs)} season</button>` : `<button class="btn primary" data-act="campGame">Play preseason game ${C.g.length + 1}</button><button class="btn" data-act="campEnd">Sim the rest of camp</button>`}<button class="btn ghost" data-act="nav" data-v="roster">Roster</button><button class="btn ghost" data-act="nav" data-v="lines">Lines</button></div></div>
     <div class="cp-grid">${battle('F', 'Forward battles', 3, 3)}${battle('D', 'Defense battles', 2, 2)}${battle('G', 'Goalie battle', 1, 1)}</div>`;
@@ -16946,7 +17208,7 @@ function vDeadline() {
   const recap = D.done ? `<div class="card dd-recap"><h2>The buzzer has gone</h2><p>${D.deals} trade${D.deals === 1 ? '' : 's'} on Deadline Day.</p>${D.mine.length ? `<h4>Your moves</h4><ul>${D.mine.map(m => `<li>${newsLinks(m)}</li>`).join('')}</ul>` : '<p class="muted">You stood pat.</p>'}<div class="btnrow"><button class="btn primary" data-act="ddDone">Back to the season</button></div></div>` : '';
   return `${ddTicker(D)}<div class="card dd-head"><div class="dd-clock"><small>Deadline Day · ${esc(gameDate(Math.min(L.day, L.schedule.length - 1)).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }))}</small><b>${D.done ? '3:00 PM' : ddTime(D.tick)}</b><span>${D.done ? 'The deadline has passed' : left * 30 >= 60 ? Math.floor(left / 2) + 'h' + (left % 2 ? ' 30m' : '') + ' to the buzzer' : '30 minutes to the buzzer'}</span></div>
     <div class="dd-bar"><i style="width:${pct}%"></i></div>
-    <div class="dd-meta"><span>Cap space <b class="${CAP - L.payroll(ut) + L.ltirRelief(ut) >= 0 ? 'pos' : 'neg'}">${money(CAP - L.payroll(ut) + L.ltirRelief(ut))}</b></span><span>Roster <b>${ut.roster.length}/${ROSTER_MAX}</b></span><span>Status <b>${esc(ut.status || '')}</b></span><span>League trades today <b>${D.deals}</b></span></div>
+    <div class="dd-meta"><span>Cap space <b class="${CAP - L.payroll(ut) + L.ltirRelief(ut) >= 0 ? 'pos' : 'neg'}">${money(CAP - L.payroll(ut) + L.ltirRelief(ut))}</b></span><span>Roster <b>${rosLbl(ut)}</b></span><span>Status <b>${esc(ut.status || '')}</b></span><span>League trades today <b>${D.deals}</b></span></div>
     ${D.done ? '' : `<div class="btnrow"><button class="btn primary" data-act="ddWait">Wait 30 minutes</button><button class="btn" data-act="ddEnd">Sim to 3:00 PM</button><button class="btn ghost" data-act="nav" data-v="trade">Trade center</button></div><p class="small muted">Calls and shopping take half an hour, and the market moves while you're on the phone. Rumoured deals usually close within the hour, and the pace picks up near the buzzer. Players with several clubs interested cost more; sellers still holding one nobody's calling about in the last hour take less.</p>`}</div>
     ${recap}
     <div class="dd-grid"><section class="card"><h3>The board</h3><div class="owrap"><table class="tbl dd-board"><thead><tr><th class="l">Player</th><th>Pos</th><th>Age</th><th>OVR</th><th>Contract</th><th class="l">Teams interested</th><th class="l">Status</th><th></th></tr></thead><tbody>${board}</tbody></table></div></section>
@@ -17027,11 +17289,13 @@ const SUBR_G = [
 // takeaways, each blended with the core rating. (All were the core rating plus a wobble: Quinn Hughes, an 83rd-percentile
 // top speed and below-average blocks for a D, showed 99 speed and 95 shot blocking.)
 const pctZ = q => cl(Math.log(cl(q, .01, .99) / (1 - cl(q, .01, .99))) / 1.702, -2.4, 2.4);
-const rxC0 = r => ({ ska: r.ska, sht: r.sht, pas: r.pas, hnd: r.hnd, def: r.def });   // the core ratings the detail anchors were read against
+const rxC0 = r => ({ ska: r.ska, sht: r.sht, pas: r.pas, hnd: r.hnd, def: r.def, dis: r.dis });   // the core ratings the detail anchors were read against (dis: 2026-10 audit S7)
 // (each anchor moves with his core rating's change since it was read, x.c0: a 19-year-old's speed isn't pinned to last
 // season's tracking while he develops)
 function rxOverrides(p) {
-  const x = p.rx; if (!x || p.pos === 'G') return null; const o = {}, D = p.pos === 'D';
+  // (a goalie's measured ones, p.gMx - D10: the same values, his core ratings, now marked as read from his numbers)
+  if (p.pos === 'G') { if (!p.gMx) return null; const o = {}, lab = { ref: 'Reflexes', pos: 'Positioning', reb: 'Rebound Control', end: 'Endurance' }; for (const k of p.gMx) if (lab[k]) o[lab[k]] = r => r[k]; return o; }
+  const x = p.rx; if (!x) return null; const o = {}, D = p.pos === 'D';
   const dv = (r, k) => x.c0 && x.c0[k] != null ? r[k] - x.c0[k] : 0;
   // (2026-10 audit) every anchor sits on the regulars' own average level, x.b (a fixed 60-62 put the average player's
   // detail ratings 2-4 below his core ones), and reads z-scores of the raw numbers (x.spdZ etc. from nhlRate); older
@@ -17060,6 +17324,13 @@ function rxOverrides(p) {
   // hockey sense: scoring rate, shot share with him on the ice, his own time in their end, primary assists
   if (x.sr != null || x.oz != null || x.a1 != null || x.p60 != null) o['Offensive IQ'] = r => .4 * (r.sht + r.pas + r.hnd) / 3 + .6 * (b + ((x.p60 ?? 0) * .35 + (x.sr ?? 0) * .25 + (x.oz ?? 0) * .2 + (x.a1 ?? 0) * .2) * 8 + (dv(r, 'sht') + dv(r, 'pas') + dv(r, 'hnd')) / 3);
   if (x.gv != null) o['Poise'] = r => .5 * (r.hnd + r.pas + r.def) / 3 + .5 * (b + (-x.gv * .6 + (x.sr ?? 0) * .4) * 8 + (dv(r, 'hnd') + dv(r, 'pas') + dv(r, 'def')) / 3);
+  // (2026-10 audit S7) defensive IQ and discipline: 70% his defence and discipline as measured (x.dmd / x.dmi, nhlRate)
+  // plus his development since, 30% the core rating. The core ones carry an even share of what his overall needed beyond
+  // what his ratings measured, so the scorers showed elite defence and discipline - McDavid's 95 the league's best
+  // defensive forward, Quinn Hughes 92 discipline at 0.62 minors an hour - and depth players were dragged down on both
+  const Mz = (v, r, k) => r[k] + (v + dv(r, k) - r[k]) * fd;
+  if (x.dmd != null) o['Defensive IQ'] = r => .3 * r.def + .7 * Mz(x.dmd, r, 'def');
+  if (x.dmi != null) o['Discipline'] = r => .3 * r.dis + .7 * Mz(x.dmi, r, 'dis');
   return o;
 }
 // size and injury history for the bodily detail ratings, for anyone whose height and weight are known
@@ -17918,10 +18189,27 @@ function realPickFix(L, D) {
   L.addNews('Draft picks corrected: the picks real clubs have traded now sit in the right draft - they had been put on the year after' + (ex ? ' (' + L.pickLabel(ex) + ' belongs to the ' + L.teams[ex.owner].name + ')' : '') + '. ' + moved.size + ' picks changed hands' + (left ? '; ' + left + ' more stay where trades in this league have taken them' : '') + '.', -1, 'trade');
   return moved.size;
 }
+// (2026-10 audit D1) a suspension the data opened the league with (League.fromNHL: injLive k 'data|Suspended') ends when
+// a later download, in the same season, no longer lists him suspended: he's reinstated, as the live injury report
+// reinstates one at a live start's league (liveInj)
+function realSuspSync(L, D) {
+  if (!L || !L.real || !D || !D.players || +D.season !== L.season) return 0;
+  const X = {}; for (const x of D.players) if (x.nhl && !x.merged) X[x.nhl] = x;
+  let n = 0;
+  for (const p of Object.values(L.players)) {
+    if (!p.injLive || p.injLive.k !== 'data|Suspended' || !(p.inj > 0) || p.hlm == null) continue;
+    const x = X[p.hlm]; if (!x || /susp/i.test(String(x.status || ''))) continue;
+    p.inj = 0; delete p.injLive; n++;
+    if (p.tid === L.userTid) L.addNews(p.first + ' ' + p.last + ' is available again.', p.tid, 'injury', p.id);
+    if (p.tid >= 0 && (p.tid !== L.userTid || L.isAuto('lines'))) L.autoLines(L.teams[p.tid]);
+  }
+  return n;
+}
 async function nhlBackfill() {
   coachRecBackfill();
   let D = null; try { const r = await fetch('/api/nhl', { cache: 'no-store' }); if (r.ok) D = await r.json(); } catch (e) { }
   if (L && realPickFix(L, D)) save();
+  if (L && realSuspSync(L, D)) save();
   { const nJr = jrClass(D); if (nJr) { L.addNews('Draft: the ' + (L.season + 1) + ' class now has its real junior players - ' + nJr + ' from the OHL, WHL, QMJHL and USHL, rated on their production. The rest of the class is scouted from Europe and the NCAA.', L.userTid, 'draft'); save(); } }
   // real players' families (Wikidata, shipped with the program), once per league
   if (L && L.real) { famCoachLoad(); histXLoad(); }   // (relatives who coached, for the Family cards; past seasons' hits and faceoffs)
