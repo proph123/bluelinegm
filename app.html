@@ -8079,6 +8079,8 @@ Object.assign(League.prototype, {
   attach(t, p, list) {
     this.detach(p); p.tid = t.tid; (t[list] || (t[list] = [])).push(p.id); p.prospect = list === 'prospects'; delete p.echl;
     if (list === 'roster' && p.contract && p.contract.ao) delete p.contract.ao;   // called up: an AHL deal becomes an NHL one
+    // (a 19-year-old CHL player going to the farm takes his club's one 19-year-old spot for the season - chlJunior)
+    if (list === 'farm' && this.season >= 2026 && this.chlAge && this.chlAge(p) === 19) { const hl = p.home ? p.home.lg : p.lg; if (CHL.includes(hl) && !(t.chl19 && t.chl19.s === this.season)) t.chl19 = { s: this.season, pid: p.id }; }
     if (list !== 'prospects') { p.loan = 0; if (p.lg && p.lg !== 'AHL' && !p.home) p.home = { lg: p.lg, cl: p.club }; p.lg = list === 'farm' ? 'AHL' : null; p.club = null; }
   },
   lgOf(p) { const w = this.where(p); if (w === 'roster') return 'NHL'; if (w === 'farm') return p.echl ? 'ECHL' : 'AHL'; return p.lg || null; },
@@ -8319,10 +8321,11 @@ Object.assign(League.prototype, {
     if (!t.roster.includes(p.id)) return { err: 'He is not on the NHL roster.' };
     const cc = this.clauseOf(p); if (cc && cc.t === 'NMC' && !p.er) return { err: p.first + ' ' + p.last + ' has a no-movement clause and will not accept an assignment to the minors.' };
     const exempt = p.er || this.waiverExempt(p);
-    if (p.home && CHL.includes(p.home.lg) && p.age <= 19) { // CHL-NHL agreement: back to junior, not the AHL
+    if (this.chlJunior(p, t)) { // CHL-NHL agreement: back to junior, not the AHL
       this.attach(t, p, 'prospects'); p.loan = 1; this.setLeague(p, p.home.lg, p.home.cl || undefined); p.er = 0;
       if (t.lines) this.validateLines(t);
-      if (t.tid === this.userTid && !o.silent) this.addNews(p.first + ' ' + p.last + ' was returned to ' + p.club + ' (' + p.lg + '). Under the CHL agreement he cannot play in the AHL until he turns 20.', t.tid, 'txn', p.id);
+      const sp = this.chl19Of(t);
+      if (t.tid === this.userTid && !o.silent) this.addNews(p.first + ' ' + p.last + ' was returned to ' + p.club + ' (' + p.lg + '). Under the CHL agreement he cannot play in the AHL until he turns 20' + (this.chlAge(p) === 19 && sp ? ' - your one 19-year-old AHL spot this season is ' + sp.first + ' ' + sp.last + "'s" : '') + '.', t.tid, 'txn', p.id);
       return { ok: true, junior: true };
     }
     // (your own moves respect the AHL's limit: room first, by sending someone to the ECHL; the AI makes room itself)
@@ -8358,12 +8361,34 @@ Object.assign(League.prototype, {
     if (t.tid === this.userTid && !force) this.addNews((w === 'farm' ? 'Called up ' : 'Recalled ') + p.pos + ' ' + p.first + ' ' + p.last + (w === 'farm' ? ' from ' + this.affName(t) + '.' : ' from his loan.'), t.tid, 'txn', p.id);
     return null;
   },
+  // the CHL agreement: a CHL player can't play in the AHL (or ECHL, or Europe) until he's 20 - he goes back to junior.
+  // From 2026-27 (the new CBA, the user's ask) each NHL club may send ONE 19-year-old CHL player to the AHL a season;
+  // 18-year-olds never. t.chl19 = {s: season, pid} is the club's spot, taken when he's first assigned to the farm.
+  // (the agreement counts his age on December 31 of the season, not today's: a player turning 20 in the fall is free)
+  chlAge(p) { return p.born ? this.season - p.born[0] : p.age; },
+  chlJunior(p, t) {
+    const home = p.home || (p.lg && p.lg !== 'AHL' ? { lg: p.lg } : null), a = this.chlAge(p);
+    if (!home || !CHL.includes(home.lg) || a > 19) return false;
+    if (a < 19 || this.season < 2026) return true;
+    t = t || this.teams[p.tid]; const sp = t && this.chl19Of(t);
+    return !!(sp && sp.id !== p.id);
+  },
+  // the club's 19-year-old spot this season: free, or whose it is
+  // (one already in the AHL - the real rosters a league starts from, or a spot from before this code - counts as the spot)
+  chl19Of(t) {
+    const s = t.chl19; if (s && s.s === this.season && this.players[s.pid]) return this.players[s.pid];
+    if (this.season < 2026) return null;
+    const f = this.farmOf(t).find(p => p.home && CHL.includes(p.home.lg) && this.chlAge(p) === 19);
+    if (f) { t.chl19 = { s: this.season, pid: f.id }; return f; }
+    return null;
+  },
   destOptions(p) {
     const home = p.home || (p.lg && p.lg !== 'AHL' ? { lg: p.lg, cl: p.club } : null), hl = home && LEAGUES[home.lg];
-    // the CHL agreement: a CHL player 19 or younger goes back to junior (no AHL, ECHL or loan to Europe). Anyone else
-    // signed can be sent to the AHL or the ECHL, or loaned to a European pro club (not the KHL: no transfer agreement);
-    // a junior from a non-CHL league (USHL, Swedish J20...) can't stay in amateur hockey once he's signed a pro deal
-    const chlKid = home && CHL.includes(home.lg) && p.age <= 19;
+    // the CHL agreement (chlJunior): a CHL player 19 or younger goes back to junior (no AHL, ECHL or loan to Europe) unless
+    // he's 19 and his club's one 19-year-old spot is free. Anyone else signed can be sent to the AHL or the ECHL, or loaned
+    // to a European pro club (not the KHL: no transfer agreement); a junior from a non-CHL league (USHL, Swedish J20...)
+    // can't stay in amateur hockey once he's signed a pro deal
+    const chlKid = this.chlJunior(p);
     const o = ['NHL'];
     if (!chlKid) o.push('AHL', 'ECHL');
     if (hl && ((CHL.includes(home.lg) && p.age <= 20) || (hl.r === 'EU' && hl.t === 'pro' && home.lg !== 'KHL'))) o.push('LOAN');
@@ -8530,6 +8555,14 @@ Object.assign(League.prototype, {
   },
   aiProspects(t) {
     if (t.tid === this.userTid && !this.isAuto('elc')) return;
+    // the one 19-year-old CHL spot (chlJunior): the club's best signed 19-year-old skater in the CHL goes to the AHL when
+    // the development read (devFit) has the AHL clearly ahead of junior - his ceiling a top-six / top-four one, as real
+    // clubs keep it for their top prospects (a league-level test sent mid-round goalies, whose ratings run on another scale)
+    if (this.season >= 2026 && !this.chl19Of(t)) {
+      const fitOf = p => { const f = this.devFit(p), a = f.find(o => o.k === 'AHL'), j = f.find(o => o.k === 'LOAN'); return a && j ? a.s - j.s : -9; };
+      const k = t.prospects.map(id => this.players[id]).filter(p => p && p.contract && p.pos !== 'G' && this.chlAge(p) === 19 && CHL.includes(p.lg) && dispR(p.pot) >= 84 && fitOf(p) >= .3).sort((a, b) => b.pot - a.pot)[0];
+      if (k) this.attach(t, k, 'farm');
+    }
     for (const id of t.prospects.slice()) {
       const p = this.players[id]; if (!p) continue;
       if (p.contract) { if ((CHL.includes(p.lg) && p.age >= 20) || (p.age >= 21 && p.ovr >= 50)) this.attach(t, p, 'farm'); continue; }
@@ -8617,8 +8650,9 @@ Object.assign(League.prototype, {
     if (main && main.gp >= 15) {
       const L0 = LEAGUES[main.lg]; const rel = p.ovr - L0.lv;
       // (a CHL player under 20 can't go to the AHL: back in junior, a star still grows on top minutes, the first power play,
-      // the World Juniors and his NHL camps - not docked for outgrowing a league he isn't allowed to leave)
-      const chlKid = CHL.includes(main.lg) && p.age <= 19;
+      // the World Juniors and his NHL camps - not docked for outgrowing a league he isn't allowed to leave; a 19-year-old
+      // whose club's one AHL spot is open could leave, so he is)
+      const chlKid = CHL.includes(main.lg) && this.chlJunior(p);
       if (rel >= -9 && rel <= 5) m += .5; else if (rel > 9) m += chlKid ? .25 : -.4; else if (rel < -12) m -= .3;
       if (p.mperf && p.mperf.s === this.season) m += cl(p.mperf.z * .2, -.3, .4);
     } else if (w !== 'roster' && !(s && s.gp >= 20)) m -= .3; // barely played anywhere
@@ -8694,7 +8728,7 @@ Object.assign(League.prototype, {
     }
     if (home && LEAGUES[home.lg] && (opts.includes('LOAN') || !p.contract)) {
       let f = this.fitAt(p, LEAGUES[home.lg].lv);
-      if (f.l === 'Too easy' && CHL.includes(home.lg) && p.age <= 19) f = { s: .3, l: 'Dominant', n: "Too good for junior, but he can't play in the AHL until he's 20: top minutes, the first power play and the World Juniors still bring him along." };
+      if (f.l === 'Too easy' && CHL.includes(home.lg) && this.chlJunior(p)) f = { s: .3, l: 'Dominant', n: this.chlAge(p) === 19 && this.chl19Of(this.teams[p.tid]) ? "Too good for junior, but your one 19-year-old AHL spot this season is taken: top minutes, the first power play and the World Juniors still bring him along." : "Too good for junior, but he can't play in the AHL until he's 20 (19 with your club's one spot a season): top minutes, the first power play and the World Juniors still bring him along." };
       out.push({ k: 'LOAN', lab: lgName(home.lg) + (home.cl ? ' · ' + home.cl : ''), ...f });
     }
     out.sort((a, b) => b.s - a.s);
@@ -14118,7 +14152,7 @@ function vRoster() {
     ? `<th>#</th><th class="l">Name</th>${th('pos', 'Pos')}${th('age', 'Age')}${th('ovr', 'OVR')}${th('pot', 'Potential')}<th class="l">Style</th><th class="l">League · club</th><th class="l">Contract</th>${statHead}<th></th>`
     : `<th>#</th><th class="l">Name</th>${th('pos', 'Pos')}${th('age', 'Age')}${th('ovr', 'OVR')}${th('pot', 'Potential')}<th class="l">Style</th><th title="Skating / Reflexes">SKA</th><th title="Shooting / Positioning">SHT</th><th title="Passing / Rebound control">PAS</th><th>HND</th><th>CHK</th><th>DEF</th><th>FO</th>${th('sal', 'Salary')}<th title="Seasons left on his contract">Yrs</th>${statHead}<th></th>`;
   const note = tab === 'farm' ? `<p class="muted small">Your AHL affiliate${ahl ? `: <b>${esc(L.affName(t))}</b> · ${ahl.w}-${ahl.l}-${ahl.otl} · ${ahlRank ? '#' + ahlRank + ' in the AHL' : ''}` : ''}. AHL players count only ${money(BURY)} less than their salary against the cap (most count $0). Call-ups need a roster spot (max ${ROSTER_MAX}) and cap room. Players without <span class="pill good">WX</span> must clear waivers to be sent back down, and another team may claim them. Stats shown are AHL stats.</p>`
-    : tab === 'prospects' ? `<p class="muted small">Drafted players develop in junior, college or Europe and their stats are simulated every game day. Sign one to a 3-year entry-level contract (ELC) to bring him into the organization. CHL players can't play in the AHL until they turn 20, so they either make the NHL team or go back to junior. Rights to CHL/USHL draftees lapse 2 years after the draft; college and European players 4 years. A signed teenager who stays in junior or Europe has his ELC slide a year.</p>`
+    : tab === 'prospects' ? `<p class="muted small">Drafted players develop in junior, college or Europe and their stats are simulated every game day. Sign one to a 3-year entry-level contract (ELC) to bring him into the organization. CHL players can't play in the AHL until they turn 20, so they either make the NHL team or go back to junior - except one 19-year-old a season per club (the 2026 CBA)${L.chl19Of(t) ? ': this season, ' + esc(L.chl19Of(t).first + ' ' + L.chl19Of(t).last) : ''}. Rights to CHL/USHL draftees lapse 2 years after the draft; college and European players 4 years. A signed teenager who stays in junior or Europe has his ELC slide a year.</p>`
       : mine ? `<p class="muted small">${t.roster.length}/${ROSTER_MAX} on the NHL roster · AHL ${L.ahlOf(t).length}/${AHL_MAX} (${L.ahlOf(t).filter(p => p.pos === 'G').length}/${AHL_GMAX} G) · ECHL ${L.echlOf(t).length}/${ECHL_MAX} · ${L.contracts(t)}/${MAX_CONTRACTS} contracts in the organization. Use ↓ AHL to assign a player to ${esc(L.affName(t))}, and ↓ ECHL from the AHL tab to the ${esc(L.echlName(t))}.</p>` : '';
   return `<div class="card">
     <div class="cardhead"><div class="titlewrap">${teamBadge(t, true)}<div><h2>${esc(t.city)} ${esc(t.name)}</h2><span class="muted">${recStr(t)} · Payroll ${money(pay)} of ${money(CAP)} · ${t.roster.length} NHL · ${(t.farm || []).length} AHL · ${t.prospects.length} prospects · Team OVR ${R(L.teamOvr(t))}</span></div></div>
@@ -14244,7 +14278,7 @@ function euPick(p) {
   const def = EU_LOAN.includes(EU_HOME[p.nat]) ? EU_HOME[p.nat] : 'SHL';
   return `<select id="eulg" aria-label="European league">${EU_LOAN.map(k => `<option value="${k}" ${k === def ? 'selected' : ''}>${esc(LEAGUES[k].n)} · ${esc(L.fitAt(p, LEAGUES[k].lv).l)}</option>`).join('')}</select>`;
 }
-function destDesc(p, k) { const t = UT(); const home = p.home || { lg: p.lg, cl: p.club }; return k === 'NHL' ? `Straight to the NHL. Needs a roster spot (${t.roster.length}/${ROSTER_MAX}) and his full cap hit.` : k === 'AHL' ? `Develops with ${esc(L.affName(t))}. Buried in the minors, he doesn't count against the cap.` : k === 'ECHL' ? `Big minutes with the ${esc(L.echlName(t))}, a level below the AHL. You can recall him any time.` : k === 'EU' ? `Loaned to a European pro club for the season, playing men in a top league. ${euPick(p)}` : `Stays with ${esc(home.cl || 'his club')} (${esc(lgName(home.lg))})${p.age <= 19 ? '. His ELC slides a year if he spends the season there' : ''}.`; }
+function destDesc(p, k) { const t = UT(); const home = p.home || { lg: p.lg, cl: p.club }; return k === 'NHL' ? `Straight to the NHL. Needs a roster spot (${t.roster.length}/${ROSTER_MAX}) and his full cap hit.` : k === 'AHL' ? `Develops with ${esc(L.affName(t))}. Buried in the minors, he doesn't count against the cap.${L.chlAge(p) === 19 && CHL.includes(home.lg) && !L.chl19Of(t) ? ' Uses your one 19-year-old CHL spot this season.' : ''}` : k === 'ECHL' ? `Big minutes with the ${esc(L.echlName(t))}, a level below the AHL. You can recall him any time.` : k === 'EU' ? `Loaned to a European pro club for the season, playing men in a top league. ${euPick(p)}` : `Stays with ${esc(home.cl || 'his club')} (${esc(lgName(home.lg))})${p.age <= 19 ? '. His ELC slides a year if he spends the season there' : ''}.`; }
 const destVal = () => { const v = (document.querySelector('input[name=dest]:checked') || {}).value; return v === 'EU' ? 'EU:' + (($('#eulg') || {}).value || 'SHL') : v; };
 function signModal(pid) {
   const p = L.players[pid]; const t = UT(); const T = L.elcTerms(p); const opts = L.destOptions(Object.assign({}, p, { home: p.home || { lg: p.lg, cl: p.club } }));
@@ -14261,7 +14295,7 @@ function assignModal(pid) {
     ${opts.length ? `<fieldset class="dests">${opts.map((k, i) => `<label class="dest"><input type="radio" name="dest" value="${k}" ${i === 0 ? 'checked' : ''}><b>${DEST_LAB[k]}</b><span class="small muted">${destDesc(p, k)}</span></label>`).join('')}</fieldset><div class="btnrow"><button class="btn primary" data-act="assignDo" data-pid="${p.id}">Move him</button></div>` : '<p class="muted">No other assignment is available for him right now.</p>'}<div id="sign-msg"></div>`);
 }
 function sendDownModal(pid) {
-  const p = L.players[pid]; const ex = L.waiverExempt(p) || p.er; const junior = p.home && CHL.includes(p.home.lg) && p.age <= 19;
+  const p = L.players[pid]; const ex = L.waiverExempt(p) || p.er; const junior = L.chlJunior(p);
   modal(`<h2>Send ${esc(nm(p))} down</h2><p>${junior ? `He is 19 and came from the ${esc(p.home.lg)}, so under the CHL agreement he goes back to junior (${esc(p.home.cl || '')}), not the AHL.` : ex ? `He is waiver-exempt and goes straight to ${esc(L.affName(UT()))}.` : `<b>He must clear waivers first.</b> Any team that wants him can claim him for free, and you would lose him. Teams with a weaker player at his position and cap room are most likely to claim.`}</p>
     <div class="btnrow"><button class="btn ${ex || junior ? 'primary' : 'danger'}" data-act="sendDownDo" data-pid="${p.id}">${ex || junior ? 'Send down' : 'Place on waivers'}</button><button class="btn ghost" data-act="mclose">Cancel</button></div>`);
 }
@@ -14330,7 +14364,7 @@ function lineCallUp(t, pid, g, i, j) {
   const capShort = L.phase !== 'playoffs' && L.payroll(t) - L.buried(p) + L.capHit(p) > L.capLimit();
   if (full || capShort) {
     if (!op || L.where(op) !== 'roster') return toast(full ? 'Your NHL roster is full (' + ROSTER_MAX + '). Send someone down first.' : 'Not enough cap space to call him up.', 'bad');
-    const ex = L.waiverExempt(op) || op.er, junior = op.home && CHL.includes(op.home.lg) && op.age <= 19;
+    const ex = L.waiverExempt(op) || op.er, junior = L.chlJunior(op);
     return modal(`<h2>Call up ${esc(nm(p))}?</h2><p>${full ? 'Your roster is full' : 'You need the cap room'}, so <b>${esc(nm(op))}</b> goes down to make room. ${junior ? `He is 19 and came from the ${esc(op.home.lg)}, so he goes back to junior.` : ex ? `He is waiver-exempt and goes straight to ${esc(L.affName(t))}.` : `<b>He must clear waivers first:</b> any team can claim him for free.`}</p>
       <div class="btnrow"><button class="btn ${ex || junior ? 'primary' : 'danger'}" data-act="lineSwapDo" data-pid="${p.id}" data-out="${op.id}" data-slot="${g}|${i}|${j}">${ex || junior ? 'Swap them' : 'Place him on waivers and call up'}</button><button class="btn ghost" data-act="mclose">Cancel</button></div>`);
   }
