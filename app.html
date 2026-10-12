@@ -5610,7 +5610,7 @@ class League {
       if (this.day === 0) for (const t of this.teams) { if (t.tid !== this.userTid && this.activeLen(t) > ROSTER_MAX) this.aiFarmMoves(t); for (let k = 0; k < 3; k++) this.aiCapComply(t); if (t.tid !== this.userTid || this.isAuto('roster')) { this.minorLimits(t); this.contractComply(t); } }   // everyone's cap-compliant when the games start counting (up to three moves: one dump a pass left Ottawa $6M over for weeks)
       // other teams' game sheets go after a week (only the recent scores open a box score; keeps the save small)
       const old = this.schedule[this.day - 8];
-      if (old) for (const g of old.games) if (g.res && g.h !== this.userTid && g.a !== this.userTid) { delete g.res.ev; delete g.res.box; }
+      if (old) for (const g of old.games) if (g.res && g.h !== this.userTid && g.a !== this.userTid) { delete g.res.ev; delete g.res.box; delete g.res.st3; }
       for (const g of d.games) {
         if (g.res) continue;
         const ht = this.teams[g.h], at = this.teams[g.a];
@@ -12964,6 +12964,198 @@ League.fromNHL = function (D, userTid) {
   L.addNews('Welcome to the ' + S + '-' + (S + 1 - 2000) + ' season, with the real NHL rosters and contracts as of ' + new Date(D.updated).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) + '. You are the GM of the ' + L.tname(userTid) + '.');
   return L;
 };
+// ---------- the live start ----------
+// (2026-10, the user's ask: "start a league as a live start, like OOTP") A new real league begins on the date of the next
+// real games with the real season so far already played: NHL.com's final scores (overtime and shootouts), the standings
+// they make, box scores with NHL.com's three stars, and every player's season to date (update-live.ps1, /api/nhl/live).
+// The games are written as the game keeps its own, not played through applyResult (that rolls injuries and writes made-up
+// stories). Ratings stay as built: nothing here touches a player's ratings, overall or ceiling.
+const LIVE_PEN = { 'too-many-men-on-the-ice': 'Too many men on the ice', 'interference-goalkeeper': 'Goaltender interference', 'delaying-game-puck-over-glass': 'Delay of game (puck over glass)', 'high-sticking-double-minor': 'High-sticking (double minor)', 'game-misconduct': 'Game misconduct', 'unsportsmanlike-conduct': 'Unsportsmanlike conduct', 'delaying-game': 'Delay of game', 'delaying-game-unsuccessful-challenge': 'Delay of game (unsuccessful challenge)', 'high-sticking': 'High-sticking' };
+// (a penalty shot's key starts "ps-": ps-tripping-on-breakaway is "Tripping on breakaway")
+const livePen = k => LIVE_PEN[k] || (s => s.charAt(0).toUpperCase() + s.slice(1))(String(k || 'penalty').replace(/^ps-/, '').replace(/-/g, ' '));
+League.prototype.liveStart = function (X, D) {
+  const asOf = X && X.asOf, ut = this.userTid, T = this.teams, P = this.players;
+  if (!asOf || +X.season !== this.season || !Array.isArray(X.games) || !this.schedule.length || !this.schedule[0].date) throw new Error('no usable real results');
+  const tidOf = {}; for (const t of T) tidOf[t.abbr] = t.tid;
+  const byId = {}; for (const p of Object.values(P)) if (p.hlm != null) byId[String(p.hlm)] = p;
+  const slot = {}; for (const r0 of (D && D.schedule) || []) { const r = Array.isArray(r0) ? r0 : r0 && r0.value; if (r && r[3]) slot[r[3]] = r[0]; }
+  const seen = new Set();
+  const games = X.games.filter(x => x && /^\d{4}-\d\d-\d\d$/.test(x.d) && x.d <= asOf && x.rest !== 0 && Array.isArray(x.s) && tidOf[x.h] != null && tidOf[x.a] != null && !seen.has(x.id) && seen.add(x.id))
+    .sort((a, b) => a.d.localeCompare(b.d) || String(a.t || '').localeCompare(String(b.t || '')) || a.id - b.id);
+  // 1. each real game in its slot on the calendar (league.json's date for its NHL id, else the date it was played); one
+  // played before the date the calendar had for it (made up early) moves to the date it was played
+  let S = this.schedule; const m = {}; S.forEach((e, i) => { m[e.date] = i; });
+  const find = (date, h, a) => { const i = m[date], g = i != null ? S[i].games.find(q => q.h === h && q.a === a) : null; return g ? { i, g } : null; };
+  const tidy = () => { this.schedule = S = S.filter(e => e.games.length).sort((a, b) => a.date.localeCompare(b.date)); S.forEach((e, i) => { e.day = i; }); if (this._clk) this._clk = null; };
+  const pairs = [], used = new Set(), miss = []; let moved = 0;
+  for (const x of games) {
+    const h = tidOf[x.h], a = tidOf[x.a], f = find(slot[x.id] || x.d, h, a) || find(x.d, h, a);
+    if (!f || used.has(f.g)) { miss.push(x.id); continue; }
+    used.add(f.g); pairs.push([f.g, x]);
+    if (S[f.i].date <= asOf) continue;
+    S[f.i].games.splice(S[f.i].games.indexOf(f.g), 1);
+    if (m[x.d] == null) { m[x.d] = S.length; S.push({ day: S.length, date: x.d, games: [] }); }
+    S[m[x.d]].games.push(f.g); moved++;
+  }
+  if (moved) tidy();
+  // 2. the league picks up on the first date after the last real one. A game before it with no real result (postponed,
+  // not made up yet) moves to the first date from there on which neither club plays, so every club still plays them all
+  const firstAfter = () => { const i = S.findIndex(e => e.date > asOf); return i < 0 ? S.length : i; };
+  let N = firstAfter(), strand = 0;
+  if (N >= S.length) throw new Error('the regular season is over');
+  for (let i = 0; i < N; i++) for (const g of S[i].games.slice()) {
+    if (used.has(g)) continue;
+    let j = N; while (j < S.length - 1 && S[j].games.some(q => q.h === g.h || q.a === g.h || q.h === g.a || q.a === g.a)) j++;
+    S[i].games.splice(S[i].games.indexOf(g), 1); S[j].games.push(g); strand++;
+  }
+  if (strand) { tidy(); N = firstAfter(); }
+  const dayOf = new Map(); S.forEach((e, i) => { for (const g of e.games) dayOf.set(g, i); });
+  // 3. the real games in the order they were played: result, game sheet, records, then the players
+  const sn = id => byId[id] ? shortName(byId[id]) : (X.nm && X.nm[id]) || '?';
+  // (the game's clock is the time left in the period - fmtClock; NHL.com gives the time elapsed. Overtime is 5 minutes)
+  const clk = (per, el) => { const left = Math.max(0, (per > 3 ? 300 : 1200) - el); return Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0'); };
+  const acc = (p, k, G, A, sa, ga, win) => { const o = p[k] || (p[k] = { gp: 0, g: 0, a: 0, sa: 0, ga: 0, w: 0 }); o.gp++; o.g += G; o.a += A; o.sa += sa; o.ga += ga; if (win) o.w++; };
+  // (the first Three Stars of the Week and Rookie of the Month cover the right games: the week's stories run when the
+  // day reaches a multiple of 7 - dailyStories - and the month's on the season clock's 28-unit marks)
+  const wk0 = 7 * Math.floor(N / 7), u = Math.floor(this.sclk(N) + 1e-9), K = u - u % 28;
+  let mo0 = 0; if (K > 0) for (let d = 0; d < N; d++) if (Math.floor(this.sclk(d) + 1e-9) < K && K <= Math.floor(this.sclk(d + 1) + 1e-9)) { mo0 = d + 1; break; }
+  const starts = {}, since = {}, back = new Set(), lost = new Set(), upd = String((D && D.updated) || '').slice(0, 10);
+  // (who dressed for each club this season, and in its last real game: step 5b lines the NHL rosters up with them)
+  const dressed = {}, lastIn = {};
+  for (const [g, x] of pairs) {
+    const i = dayOf.get(g), ot = x.o !== 'REG', so = x.o === 'SO', w = x.s[0] > x.s[1] ? 0 : 1, mine = g.h === ut || g.a === ut;
+    const go = (x.go || []).slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), sk = x.sk || [], gk = x.gk || [];
+    const sh = Array.isArray(x.sh) ? x.sh : [0, 0], PP = Array.isArray(x.pp) ? x.pp : [[0, 0], [0, 0]];
+    g.res = { s: [x.s[0], x.s[1]], sh: [sh[0] || 0, sh[1] || 0], ot, so, real: 1 };
+    // the game-winning goal (none in a shootout): the winner's goal that put them one past the loser's final
+    let gwg = null; if (!so) { let n = 0; for (const q of go) if (q[2] === w && ++n === x.s[1 - w] + 1) { gwg = q[3]; break; } }
+    // the game sheet and box score: the user's games, and the last week's for everyone (simDay drops the rest)
+    if (mine || i >= N - 8) {
+      const evs = go.map(q => [q[0], q[1], ['goal', q[2], q[0], clk(q[0], q[1]), sn(q[3]) + ' scores' + (q[6] === 'pp' ? ' (PPG)' : q[6] === 'sh' ? ' (SHG)' : '') + (q[7] === 'en' ? ' (EN)' : q[7] === 'ps' ? ' (PS)' : '') + (q[4] ? ' — assists ' + [q[4], q[5]].filter(Boolean).map(sn).join(', ') : ' — unassisted')]]);
+      for (const q of x.pn || []) {
+        const who = q[3] ? sn(q[3]) : q[8] || 'Bench' + (q[7] ? ' (served by ' + q[7] + ')' : '');
+        evs.push([q[0], q[1], ['penalty', q[2], q[0], clk(q[0], q[1]), q[5] === 'PS' ? who + ' — penalty shot (' + livePen(q[6]) + ')' : who + ' — ' + q[4] + ' min ' + livePen(q[6])]]);
+      }
+      evs.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      g.res.ev = evs.map(e => e[2]);
+      if (so && x.so) g.res.ev.push(['so', w, 5, '0:00', 'Shootout won by ' + T[w ? g.a : g.h].abbr + ' (' + x.so[0] + '-' + x.so[2] + ')']);
+      const box = [];
+      for (const r of sk) { const p = byId[r[0]]; if (p && p.pos !== 'G') box.push([p.id, r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10], r[11], 0, 0]); }
+      for (const r of gk) { const p = byId[r[0]]; if (p && p.pos === 'G') box.push([p.id, r[1], go.filter(q => q[3] === r[0]).length, go.filter(q => q[4] === r[0] || q[5] === r[0]).length, 0, 0, 0, 0, r[5] || 0, r[4], 0, 0, r[2], r[3]]); }
+      g.res.box = box;
+      g.res.st3 = (x.st3 || []).map(([id, side]) => [byId[id] ? byId[id].id : null, side, sn(id)]);
+    }
+    // the records, as applyResult keeps them (goals for and against leave out the shootout's deciding goal)
+    for (const side of [0, 1]) {
+      const t = T[side ? g.a : g.h], r = t.rec, won = w === side, pp = PP[side] || [0, 0], op = PP[1 - side] || [0, 0];
+      r.gf += x.s[side] - (so && won ? 1 : 0); r.ga += x.s[1 - side] - (so && !won ? 1 : 0);
+      if (won) { r.w++; if (!ot) r.rw++; } else if (ot) r.otl++; else r.l++;
+      if (this.staffGame) this.staffGame(t, won, ot);
+      r.last = ((r.last || '') + (won ? 'W' : ot ? 'O' : 'L')).slice(-10);
+      r.ppo = (r.ppo || 0) + (pp[1] || 0); r.ppg = (r.ppg || 0) + (pp[0] || 0); r.pko = (r.pko || 0) + (op[1] || 0); r.pka = (r.pka || 0) + (op[0] || 0);
+      // (the club's streak as gameStories keeps it: an overtime loss ends a winning run)
+      const k = t.strk || (t.strk = { t: '', n: 0 }); if (k.t === (won ? 'W' : 'L')) k.n++; else { k.t = won ? 'W' : 'L'; k.n = 1; }
+      const st0 = gk.find(q => q[1] === side && q[7]); (starts[t.tid] || (starts[t.tid] = [])).push(st0 && byId[st0[0]] ? byId[st0[0]].id : null);
+      if (upd && x.d >= upd) since[t.tid] = (since[t.tid] || 0) + 1;
+      const ids = new Set(); for (const q of sk.concat(gk)) if (q[1] === side && byId[q[0]]) ids.add(byId[q[0]].id);
+      lastIn[t.tid] = ids; const dr = dressed[t.tid] || (dressed[t.tid] = new Map()); for (const id of ids) dr.set(id, (dr.get(id) || 0) + 1);
+    }
+    // the players: each real line goes to the player wherever the league has him (another club, the farm, unsigned)
+    const rr = side => x.s[side] > x.s[1 - side] ? 'W' : ot ? (so ? 'S' : 'O') : 'L';
+    for (const r of sk) {
+      const p = byId[r[0]]; if (!p) { lost.add(r[0]); continue; } if (p.pos === 'G') continue;
+      const side = r[1], G = r[2] || 0, A = r[3] || 0, S2 = p.stats || (p.stats = this.blankStats(p));
+      S2.gp++; S2.g += G; S2.a += A; S2.pm += r[4] || 0; S2.sog += r[5] || 0; S2.hit += r[6] || 0; S2.blk += r[7] || 0; S2.pim += r[8] || 0; S2.toi += r[9] || 0; S2.fow += r[10] || 0; S2.fol += r[11] || 0; S2.ppg += r[12] || 0;
+      if (gwg != null && String(gwg) === String(r[0])) S2.gwg = (S2.gwg || 0) + 1;
+      (p.gl || (p.gl = [])).push([i + 1, side ? g.h : g.a, side ? 0 : 1, rr(side), x.s[side], x.s[1 - side], G, A, r[4] || 0, r[5] || 0, r[6] || 0, Math.round((r[9] || 0) / 6) / 10]);
+      const st = p.strk || (p.strk = { pts: 0, dry: 0 }); st.pts = G + A > 0 ? st.pts + 1 : 0; st.dry = G > 0 ? 0 : st.dry + 1;
+      if (i >= wk0) acc(p, 'wk', G, A, 0, 0, false);
+      if (i >= mo0) acc(p, 'mo', G, A, 0, 0, false);
+      if (upd && x.d >= upd) back.add(p);
+    }
+    for (const r of gk) {
+      const p = byId[r[0]]; if (!p) { lost.add(r[0]); continue; } if (p.pos !== 'G') continue;
+      const side = r[1], sa = r[2] || 0, ga = r[3] || 0, S2 = p.stats || (p.stats = this.blankStats(p));
+      S2.gp++; S2.sa += sa; S2.ga += ga; S2.toi += r[4] || 0;
+      if (r[6] === 'W') S2.w++; else if (r[6] === 'L') S2.l++; else if (r[6] === 'O') S2.otl++;
+      // (NHL.com's shutout: the only goalie his club used, no goals against - a shootout loss included)
+      if (ga === 0 && gk.filter(q => q[1] === side).length === 1) S2.so++;
+      (p.gl || (p.gl = [])).push([i + 1, side ? g.h : g.a, side ? 0 : 1, rr(side), x.s[side], x.s[1 - side], sa, ga, Math.round((r[4] || 0) / 6) / 10]);
+      if (i >= wk0) acc(p, 'wk', 0, 0, sa, ga, r[6] === 'W');
+      if (i >= mo0) acc(p, 'mo', 0, 0, sa, ga, r[6] === 'W');
+      if (upd && x.d >= upd) back.add(p);
+    }
+    if (mine) this.lastUser = { h: g.h, a: g.a, res: g.res };
+  }
+  // 4. the careers before this league: NHL.com's career totals (p.cb) can already hold some of this season's games, which
+  // came in above as this season's stats - the base becomes his NHL regular seasons before this one (p.hist)
+  if (((D && D.players) || []).some(x => x.hist)) for (const p of Object.values(byId)) {
+    if (!p.cb) continue;
+    const G = p.pos === 'G', rs = (p.hist || []).filter(h => Array.isArray(h) && h[0] < this.season && !h[G ? 9 : 8] && h[2] > 0);
+    if (!rs.length) { if (p.cb.gp <= (p.stats ? p.stats.gp : 0)) delete p.cb; continue; }
+    const sum = k => rs.reduce((s, h) => s + (+h[k] || 0), 0);
+    if (sum(2) > p.cb.gp) continue;
+    p.cb = { gp: sum(2), g: G ? 0 : sum(3), a: G ? 0 : sum(4), w: G ? sum(3) : 0, so: G ? sum(8) : 0, seasons: new Set(rs.map(h => h[0])).size };
+  }
+  // 5. injuries since the data's date: a player who has played a real game since is healthy; the others have missed their
+  // club's real games since (still out in real life: at least a game to go)
+  if (upd) for (const p of Object.values(P)) { if (!p.inj || p.cEnd || p.tid < 0) continue; if (back.has(p)) { p.inj = 0; delete p.ltirHold; } else if (since[p.tid]) p.inj = Math.max(1, p.inj - since[p.tid]); }
+  // 5b. the NHL rosters as they really are (2026-10 review: Askarov, Lankinen, Jarry and Silovs - their clubs' last real
+  // starters - opened a live league in the minors, with 77 more who are playing NHL games. League.fromNHL trims each roster
+  // to 23 counting the men on injured reserve, so a club with players hurt sent healthy regulars down.) A player is with his
+  // club's NHL team when he dressed for its last real game, or the data has him on its NHL roster and he has dressed for it
+  // this season. Then the roster goes back to 23 not counting injured reserve (activeLen): the healthy who haven't played
+  // for the club go down first, lowest rated first, then (a club with more than 23 who've played: the data a day behind a
+  // call-up) the one who has dressed least and wasn't in the last game - never anyone from the last real lineup, nor a man
+  // who's hurt (a few days out still counts on the 23: Sanderson went to the AHL) - keeping 13 forwards, 7 defensemen
+  // and 2 goalies healthy. (Left to aiFarmMoves, the extra man went down and the AI's upgrade swaps sent two more of
+  // Philadelphia's regulars with him.)
+  const onRos = new Set(), xBy = {};
+  for (const x of (D && D.players) || []) if (x && x.nhl && !x.merged && !x.gone) { xBy[String(x.nhl)] = x; if (x.list === 'roster') onRos.add(String(x.nhl) + '|' + x.team); }
+  let up = 0, down = 0;
+  for (const t of T) {
+    const dr = dressed[t.tid] || new Map(), li = lastIn[t.tid] || new Set();
+    const real = p => p.tid === t.tid && (li.has(p.id) || (dr.has(p.id) && onRos.has(String(p.hlm) + '|' + t.abbr)));
+    for (const id of this.org(t)) { const p = P[id]; if (p && p.contract && real(p) && this.where(p) !== 'roster') { this.attach(t, p, 'roster'); p.er = 0; up++; } }
+    for (let k = 0; k < 30 && this.activeLen(t) > ROSTER_MAX; k++) {
+      const ros = this.rosterOf(t).filter(q => !q.inj), nG = ros.filter(q => q.pos === 'G').length, nD = ros.filter(q => q.pos === 'D').length, nF = ros.length - nG - nD;
+      const c = ros.filter(q => !li.has(q.id) && (q.pos === 'G' ? nG > 2 : q.pos === 'D' ? nD > 7 : nF > 13)).sort((a, b) => (real(a) ? 1 : 0) - (real(b) ? 1 : 0) || (dr.get(a.id) || 0) - (dr.get(b.id) || 0) || a.ovr - b.ovr)[0];
+      if (!c) break;
+      // (a junior 19 or under goes back to his junior club, as in League.fromNHL)
+      const jx = xBy[String(c.hlm)], jl = jx && nhlDataLeague(jx);
+      if (jl && CHL.includes(jl) && c.age <= 19) { this.attach(t, c, 'prospects'); c.loan = 1; this.setLeague(c, jl); } else this.attach(t, c, 'farm');
+      down++;
+    }
+    // (still over: a man hurt a few more days counts on the 23 here, but every injury at a live start is the data's injured
+    // reserve - IR, LTIR, SOIR - so he is on IR, out at least the week IR means. Vancouver had Thomas and Thompson at 5-6
+    // days with 23 who play, and aiFarmMoves sent down Ohgren, Pettersson and Brisebois from the last real lineup)
+    for (const q of this.rosterOf(t)) { if (this.activeLen(t) <= ROSTER_MAX) break; if (q.inj > 0 && q.inj < 7 && !li.has(q.id)) q.inj = 7; }
+  }
+  // (and, as League.fromNHL does for opening night, a club the call-ups put over the cap is using long-term IR the data
+  // doesn't label: its priciest injured players go on it - else aiCapComply sent a real regular straight back down)
+  if (up) for (const t of T) for (const p of this.rosterOf(t).filter(q => q.inj && q.inj < 24).sort((a, b) => this.capHit(b) - this.capHit(a))) { if (this.payroll(t) - this.ltirRelief(t) - CAP <= 0) break; p.inj = ri(30, 60); }
+  // 6. the day: the first date after the last real one. Then what opening night does for every club (simDay at day 0,
+  // which a live start never plays): cap-compliant, legal rosters, lines
+  this.day = N; if (this._clk) this._clk = null; this.tradeDeadline = this.dlIndex();
+  for (const t of T) { if (t.tid !== ut && this.activeLen(t) > ROSTER_MAX) this.aiFarmMoves(t); for (let k = 0; k < 3; k++) this.aiCapComply(t); if (t.tid !== ut || this.isAuto('roster')) { this.minorLimits(t); this.contractComply(t); } }
+  for (const t of T) {
+    this.autoLines(t);
+    // the goalie rotation picks up from the real starts: who went last (the back-to-back rule, gameStarters) and the
+    // number one's run of straight starts (goalieFatigue)
+    const a = starts[t.tid] || [], g0 = t.lines && t.lines.G[0]; let n = 0; for (let k = a.length - 1; k >= 0 && a[k] && a[k] === g0; k--) n++;
+    t.gRun = n; if (a.length) t.gLast = a[a.length - 1]; else delete t.gLast;
+  }
+  for (const p of Object.values(P)) if (p.gl && p.tid !== ut && p.gl.length > 20) p.gl.splice(0, p.gl.length - 20);
+  this.updateStatuses(true);
+  { const u0 = Math.floor(this.sclk() + 1e-9); if (u0 > 0) this.scoutTick(u0); }
+  const md = s => { const [y, mo, d] = s.split('-').map(Number); return new Date(y, mo - 1, d).toLocaleDateString('en-US', { month: 'long', day: 'numeric' }); };
+  // (a check against NHL.com's standings on the same date: only a game the calendar couldn't place makes them differ)
+  const bad = []; for (const t of T) { const s = X.std && X.std[t.abbr], r = t.rec; if (s && (r.w !== s[1] || r.l !== s[2] || r.otl !== s[3] || r.rw !== s[7] || r.gf !== s[5] - s[8] || r.ga !== s[6] - s[9])) bad.push(t.abbr); }
+  if (bad.length) console.warn('live start: records differ from NHL.com\'s standings for ' + bad.join(', '));
+  this.lstart = { asOf, day: N, n: pairs.length, upd: X.updated || null, miss: miss.length, lost: lost.size, chk: bad.length };
+  this.addNews('Live start: the league picks up on ' + md(S[N].date) + ' with the real season so far - ' + pairs.length + ' games played through ' + md(asOf) + ', with their scores, box scores and standings, and every player\'s stats, from NHL.com.');
+  return Object.assign({ moved, strand, up, down }, this.lstart);
+};
 async function hlmLogo(blob, size) {   // shrink a logo to a small PNG data URL that lives in the save
   try {
     const bmp = await createImageBitmap(blob);
@@ -13452,7 +13644,7 @@ function cfgForm(c, inLeague) {
       ${row('Trade deadline', sel('st-dl', CFG_OPTS.dl, c.dl))}
       ${chk('st-lot', c.lottery, 'Draft lottery', 'Off: the worst record picks first')}
       ${row('Job security', sel('st-job', CFG_OPTS.job, c.job || 'off'), 'The owner judges each season against the points pace he expects (Home). Miss it too many years in a row and you\'re fired')}
-      ${!inLeague && c.real ? chk('st-stats', c.stats, 'Adjust ratings to recent NHL stats', 'Shooting, passing, puck skills and goalies move toward their real production') : ''}</div>
+      ${!inLeague && c.real ? chk('st-stats', c.stats, 'Adjust ratings to recent NHL stats', 'Shooting, passing, puck skills and goalies move toward their real production') : ''}${!inLeague && c.nhl ? liveRow() : ''}</div>
     ${inLeague ? '' : `<div class="card st-wide"><h3>Your staff handles</h3><p class="muted small">Switch on the jobs you'd rather not do yourself. You can change these any time under League → Settings.</p><div class="duties">${AUTO_DUTIES.map(([k, n, d]) => `<label class="duty"><input type="checkbox" class="st-auto" data-k="${k}"><span><b>${esc(n)}</b><small>${esc(d)}</small></span></label>`).join('')}</div></div>`}</div>`;
 }
 function readCfg() {
@@ -13460,7 +13652,7 @@ function readCfg() {
   document.querySelectorAll('.st-auto').forEach(x => { if (x.checked) auto[x.dataset.k] = true; });
   return { trade: v('st-trade').value, inj: v('st-inj').value, dev: v('st-dev').value, dl: +v('st-dl').value, lottery: v('st-lot').checked, reveal: v('st-reveal').checked,
     stats: v('st-stats') ? v('st-stats').checked : true, cap: Math.max(50, Math.min(500, +v('st-cap').value || 104)), auto,   /* (500: the cap grows ~4% a year - by the 2040s it is past 200, where saving the rules used to cut it) */
-    mood: v('st-mood') ? v('st-mood').checked : true,
+    mood: v('st-mood') ? v('st-mood').checked : true, start: v('st-start') && v('st-start').value === 'live' ? 'live' : 'open',
     diff: v('st-diff').value, ai: v('st-ai').value, con: v('st-con').value, fa: v('st-fa').value, sce: v('st-sce').value, job: v('st-job').value,
     gm: v('st-gm') ? v('st-gm').value.trim().replace(/\s+/g, ' ').slice(0, 32) : undefined, gmPh: v('st-gmph') ? gmPhRead(v('st-gmph').value) : undefined, gmNat: v('st-gmnat') && NAT_NAME[v('st-gmnat').value] ? v('st-gmnat').value : undefined };
 }
@@ -13517,14 +13709,62 @@ function gmPhFile(inp) {
   img.onerror = () => { URL.revokeObjectURL(url); toast('That file could not be read as a picture.', 'bad'); };
   img.src = url;
 }
+// ---------- the live start's setup row ----------
+// (2026-10, the user's ask: start a league as a live start, like OOTP) The data: /api/nhl/live - update-live.ps1 on a PC,
+// the copy published with the phone version. Null until it has loaded.
+let liveX = null, liveSt = null, liveAsk = false, liveAt = 0, liveOn = false, livePolling = false;
+const liveYmd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+// (a date string as the calendar shows it: new Date('2026-10-12') is midnight UTC - October 11 in North America)
+const liveMd = s => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+// the first date on league.json's calendar after the real results (where a live start begins), or null
+function liveNext(X, H) { let n = null; for (const r0 of (H && H.schedule) || []) { const r = Array.isArray(r0) ? r0 : r0 && r0.value; if (r && r[0] > X.asOf && (!n || r[0] < n)) n = r[0]; } return n; }
+function liveOk(X, H) { return !!(X && X.asOf && H && H.kind === 'nhl' && +X.season === +H.season && Array.isArray(X.games) && X.games.length && liveNext(X, H)); }
+function liveRow() {
+  const H = hlmData, X = liveX, ok = liveOk(X, H), today = liveYmd(new Date()), was = $('#st-start'), sel = ok && was && was.value === 'live' ? 'live' : 'open';
+  const first = ((H && H.schedule) || []).map(r0 => Array.isArray(r0) ? r0[0] : r0 && r0.value && r0.value[0]).filter(Boolean).sort()[0];
+  const nx = ok ? liveNext(X, H) : null, n = ok ? X.games.filter(x => x.d <= X.asOf).length : 0, getting = liveOn || !liveAt || !!(liveSt && liveSt.refreshing);
+  const help = ok ? `Live start begins ${nx === today ? 'today, ' : ''}${liveMd(nx)}, with the real season so far already played: ${n} games through ${liveMd(X.asOf)}, with their scores, standings, box scores and every player's stats${nx < today ? (getting ? ' (getting the newer results now)' : ' (newer results couldn\'t be downloaded)') : ''}`
+    : getting ? 'Getting the real results so far from NHL.com…'
+    : X && !X.asOf && X.start ? `Live start opens once the regular season begins (${liveMd(X.start)})`
+    : X && X.asOf && !liveNext(X, H) ? 'The regular season is over' : 'The real results aren\'t downloaded yet';
+  const opts = [['open', 'Opening night' + (first ? ' · ' + liveMd(first) : '')]].concat(ok ? [['live', 'Live start · ' + (nx === today ? 'today, ' : '') + liveMd(nx)]] : []);
+  return `<label class="st-row" id="st-start-row"><span><b>Season start</b><small>${esc(help)}</small></span><select id="st-start">${opts.map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+}
+function liveRowUpd() { const el = $('#st-start-row'); if (el) el.outerHTML = liveRow(); }
+async function liveLoad() {
+  if (liveOn) return; liveOn = true; liveRowUpd();
+  let X = null, st = null;
+  try { const r = await fetch('/api/nhl/live', { cache: 'no-store' }); if (r.ok) X = await r.json(); } catch (e) { X = null; }
+  if (!X || !Array.isArray(X.games)) X = null;
+  if (DESK && !MOBILE) try { const r = await fetch('/api/nhl/live/state', { cache: 'no-store' }); if (r.ok) st = await r.json(); } catch (e) { st = null; }
+  liveX = X; liveSt = st; liveAt = Date.now(); liveOn = false;
+  // (none on this PC yet, or behind last night's games: the program fetches what's new - a minute or so - once a visit)
+  const today = liveYmd(new Date()), nx = X && X.asOf && hlmData ? liveNext(X, hlmData) : null;
+  if (DESK && !MOBILE && !liveAsk && !(st && st.refreshing) && (!X || (nx && nx < today) || (!X.asOf && X.start && X.start <= today))) {
+    liveAsk = true; try { const r = await fetch('/api/nhl/live', { method: 'POST', headers: { 'X-BLGM': '1' } }); if (r.ok) liveSt = { refreshing: true }; } catch (e) { }
+  }
+  liveRowUpd();
+  if (liveSt && liveSt.refreshing && !livePolling) { livePolling = true; setTimeout(livePoll, 5000); }
+}
+// (one poll at a time, while the setup page is up. Leaving it - "Pick a different team" - stops the poll; renderSetup starts
+// it again when the page comes back with a run still going, or the row sat on "Getting the real results…" for good)
+async function livePoll() {
+  if (!pendingStart || !$('#st-start-row')) { livePolling = false; return; }
+  let st = null; try { const r = await fetch('/api/nhl/live/state', { cache: 'no-store' }); if (r.ok) st = await r.json(); } catch (e) { }
+  if (st && st.refreshing) { liveSt = st; setTimeout(livePoll, 5000); return; }
+  livePolling = false; liveSt = st; liveLoad();
+}
 function renderSetup() {
   const ps = pendingStart, H = hlmData;
   const t = ps.kind === 'hlm' ? H.teams[ps.i] : (x => ({ city: x[0], name: x[1], abbr: x[2], c1: x[5], c2: x[6] }))(TEAMS[ps.tid]);
   const season = ps.kind === 'hlm' ? H.season : 2026;
-  const c = Object.assign({}, CFG_DEF, { cap: ps.kind === 'hlm' ? (H.cap && H.cap.upper) || capFor(season) : 88, real: ps.kind === 'hlm' && !!H.real && H.kind !== 'nhl', gmT: t });
+  const c = Object.assign({}, CFG_DEF, { cap: ps.kind === 'hlm' ? (H.cap && H.cap.upper) || capFor(season) : 88, real: ps.kind === 'hlm' && !!H.real && H.kind !== 'nhl', nhl: ps.kind === 'hlm' && H.kind === 'nhl', gmT: t });
   $('#main').innerHTML = `<section class="hero st-hero">${teamBadge(t, true)}<div><h1>League settings</h1><p>You're the GM of the <b>${esc(t.city + ' ' + t.name)}</b> for the ${season}-${String(season + 1).slice(2)} season${ps.kind === 'hlm' && H.real ? ', with real NHL rosters' : ''}. Set the rules, then start.</p></div></section>
     ${cfgForm(c, false)}
     <div class="btnrow st-go"><button class="btn ghost" data-act="setupBack">← Pick a different team</button><button class="btn primary" data-act="setupGo">Start the league</button></div>`;
+  // (the live start's row loads its data once a visit, again after ten minutes - liveLoad)
+  if (c.nhl && !liveOn && (!liveAt || Date.now() - liveAt > 6e5)) liveLoad();
+  else if (c.nhl && !liveOn && liveSt && liveSt.refreshing && !livePolling) { livePolling = true; livePoll(); }
 }
 function renderNew() {
   document.body.classList.add('newgame');
@@ -16924,11 +17164,12 @@ function boxModal(h, a, res, title) {
   // three stars
   const all = (res.box || []).map(r => ({ p: L.players[r[0]], r })).filter(x => x.p);
   const score = x => x.p.pos === 'G' ? (x.r[12] - x.r[13]) * 0.12 - x.r[13] * 0.8 + (x.r[13] === 0 ? 2 : 0) : x.r[2] * 2.2 + x.r[3] * 1.3 + x.r[4] * .3 + x.r[5] * .12 + x.r[6] * .05;
-  const stars = all.sort((a, b) => score(b) - score(a)).slice(0, 3);
-  modal(`<div class="eyebrow">${esc(title || 'Box score')}</div>
+  // (a real game's stars are NHL.com's - res.st3 [pid or null, side, name] from a live start - under the club he played for that night)
+  const stars = res.st3 ? res.st3.map(([id, side, name]) => ({ p: L.players[id] || null, r: (res.box || []).find(b => b[0] === id) || null, t: side ? at : ht, name })) : all.sort((a, b) => score(b) - score(a)).slice(0, 3).map(x => Object.assign(x, { t: L.teams[x.p.tid], name: nm(x.p) }));
+  modal(`<div class="eyebrow">${esc(title || 'Box score')}${res.real ? ' · real NHL result' : ''}</div>
   <div class="boxhead">${teamBadge(at, true)}<div><b>${esc(at.city)}</b><span>${esc(at.name)}</span></div><b class="bs">${res.s[1]}</b><span class="bsep">${res.so ? 'SO' : res.ot ? 'OT' : 'Final'}</span><b class="bs">${res.s[0]}</b><div class="r"><b>${esc(ht.city)}</b><span>${esc(ht.name)}</span></div>${teamBadge(ht, true)}</div>
   <div class="tblwrap"><table class="tbl lines-score"><thead><tr><th class="l"></th><th>1</th><th>2</th><th>3</th>${hasOT ? '<th>OT</th>' : ''}<th>T</th><th>SOG</th></tr></thead><tbody>${[[at, 1], [ht, 0]].map(([t, s]) => `<tr><td class="l">${teamBadge(t)}</td><td>${per[s][0]}</td><td>${per[s][1]}</td><td>${per[s][2]}</td>${hasOT ? `<td>${per[s][3] + (res.so && res.s[s] > res.s[1 - s] ? 1 : 0)}</td>` : ''}<td><b>${res.s[s]}</b></td><td>${res.sh ? res.sh[s] : ''}</td></tr>`).join('')}</tbody></table></div>
-  ${stars.length ? `<div class="stars">${stars.map((x, i) => `<div><span class="avatar">${faceSVG(x.p, L.teams[x.p.tid], 48)}</span><div><span>${['1st', '2nd', '3rd'][i]} star</span><b><button class="link" data-act="player" data-pid="${x.p.id}">${esc(nm(x.p))}</button></b><small>${L.teams[x.p.tid] ? L.teams[x.p.tid].abbr : ''} · ${x.p.pos === 'G' ? (x.r[12] - x.r[13]) + ' saves' : x.r[2] + 'G ' + x.r[3] + 'A'}</small></div></div>`).join('')}</div>` : ''}
+  ${stars.length ? `<div class="stars">${stars.map((x, i) => `<div><span class="avatar">${x.p ? faceSVG(x.p, x.t, 48) : ''}</span><div><span>${['1st', '2nd', '3rd'][i]} star</span><b>${x.p ? `<button class="link" data-act="player" data-pid="${x.p.id}">${esc(nm(x.p))}</button>` : esc(x.name || '')}</b><small>${x.t ? x.t.abbr : ''}${x.r && x.p ? ' · ' + (x.p.pos === 'G' ? (x.r[12] - x.r[13]) + ' saves' : x.r[2] + 'G ' + x.r[3] + 'A') : ''}</small></div></div>`).join('')}</div>` : ''}
   <div class="pgrid"><div><h3 class="eyebrow">Scoring</h3><ul class="evlist">${goals.map(e => `<li><span>${e[2] > 3 ? 'OT' : 'P' + e[2]} ${e[3]}</span><b>${esc((e[1] === 0 ? ht : at).abbr)}</b> ${esc(e[4])}</li>`).join('') || '<li class="muted">No goals</li>'}${so ? `<li><span>SO</span>${esc(so[4])}</li>` : ''}</ul></div><div><h3 class="eyebrow">Penalties</h3><ul class="evlist">${pens.map(e => `<li><span>${e[2] > 3 ? 'OT' : 'P' + e[2]} ${e[3]}</span><b>${esc((e[1] === 0 ? ht : at).abbr)}</b> ${esc(e[4])}</li>`).join('') || '<li class="muted">None</li>'}</ul></div></div>
   ${res.box ? `<div class="box2"><div><h3 class="eyebrow">${esc(at.name)}</h3><div class="tblwrap">${skT(1)}</div>${gT(1)}</div><div><h3 class="eyebrow">${esc(ht.name)}</h3><div class="tblwrap">${skT(0)}</div>${gT(0)}</div></div>` : ''}`, 'wide boxm');
 }
@@ -17612,11 +17853,19 @@ const ACT = {
   gmBuy: d => { const g = L.gmInit(), a = g.ab || (g.ab = {}); if (L.gmPoints() > 0 && (a[d.k] || 0) < 3 && GM_BR.some(b => b.k === d.k)) { a[d.k] = (a[d.k] || 0) + 1; save(); toast('Unlocked: ' + GM_BR.find(b => b.k === d.k).ab[a[d.k] - 1][0] + '.', 'good'); } render(); gmProfile(); },
   setupGo: () => {
     const c = readCfg(), ps = pendingStart;
-    busy(true, ps.kind === 'hlm' ? 'Building your league…' : 'Generating league…');
+    busy(true, ps.kind === 'hlm' ? (c.start === 'live' ? 'Building your league and playing in the real season so far…' : 'Building your league…') : 'Generating league…');
     setTimeout(() => {
       try {
+        const D0 = hlmData;
         if (ps.kind === 'hlm') { hlmData.noStats = !c.stats; L = hlmData.kind === 'nhl' ? League.fromNHL(hlmData, ps.i) : League.fromHLM(hlmData, ps.i); hlmData = null; } else L = League.create(ps.tid);
-        applyCfg(L, c); pendingStart = null; view = 'home'; sub = {}; save();
+        applyCfg(L, c);
+        // a live start (2026-10, the user's ask): the real season so far, played in by League.liveStart. If it can't be set
+        // up the league opens on opening night, rebuilt from the same data (liveStart may have changed the first one)
+        if (c.start === 'live' && ps.kind === 'hlm' && D0 && D0.kind === 'nhl') {
+          try { const r = L.liveStart(liveX, D0); console.info('live start', r); }
+          catch (e) { console.error(e); L = League.fromNHL(D0, ps.i); applyCfg(L, c); toast('The live start couldn\'t be set up (' + (e.message || e) + '), so the league opens on opening night.', 'bad'); }
+        }
+        pendingStart = null; view = 'home'; sub = {}; save();
       } catch (e) { L = null; toast('Could not build the league: ' + (e.message || e), 'bad'); console.error(e); }
       busy(false); render(); coachRecBackfill();   // (a real league's coaches get their real records)
       if (L) setTimeout(() => { if (L) gmCreate(); }, 60);   // (then the new GM's first day: photo, name, nationality, specialty)

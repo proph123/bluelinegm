@@ -7,7 +7,7 @@
 //  - the 3D game, NHL.com look-ups, roster files: not on a phone (404 - the page carries on without them)
 // Updates: a new version is published with a new VERSION; the page's "Check for updates" (GET /api/update) compares
 // version.json with this one, and installing it activates the new worker and reloads (index.html's updInstall).
-const VERSION = '2026.10.12.2';
+const VERSION = '2026.10.12.3';
 const SHELL = 'blgm-shell-' + VERSION, MEDIA = 'blgm-media';
 const BASE = new URL('./', self.location).pathname;   // where the app lives (a GitHub Pages project path, or / locally)
 // a request's path relative to the app: the game asks for /api/..., /photos/... from the site root (as on a PC), which
@@ -85,6 +85,10 @@ async function api(req, url) {
   const p = rel(url);   // 'api/...', 'photos/...', 'assets/...'
   if (p.startsWith('api/saves')) return saves(req, url);
   if (p === 'api/nhl') return file('data/league.json');
+  // the live start's real results so far, as published (tools/build_mobile.py copies the PC's update-live.ps1 output);
+  // the phone can't fetch NHL.com itself, so a refresh request just gets an answer
+  if (p === 'api/nhl/live') return req.method === 'POST' ? text('started') : file('data/live.json');
+  if (p === 'api/nhl/live/state') return json({ updated: null, refreshing: false, log: '' });
   if (p === 'api/nhl/families') return file('data/families.json');
   if (p === 'api/nhl/coaches') return file('data/coaches.json');
   if (p === 'api/nhl/famcoach') return file('data/famcoach.json');
