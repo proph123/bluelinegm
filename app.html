@@ -15838,7 +15838,7 @@ function vLeague(only) {
       <label class="small lg-opt"><input type="checkbox" id="sync-stats" ${(L.statAlg || 0) >= STAT_ALG ? '' : 'checked'}> Also adjust ratings to recent NHL stats (shooting, passing, puck skills, goalies' save %)${L.statV ? ' · already done once, on ' + esc(String(L.statV).slice(0, 10)) : ''}</label>
       <div class="btnrow"><button class="btn" data-act="syncReal">Sync with NHL.com rosters</button></div><div id="sync-msg"></div></div>` : '';
     const saveC = `<div class="card"><h2>Save</h2><p class="muted small">Your league saves automatically ${DESK ? 'on this PC' : 'in this browser'}. Copy a save code to back it up or move it to another device.</p>
-      <div class="btnrow">${DESK ? '<button class="btn primary" data-act="mainMenu">Main menu</button>' : ''}<button class="btn" data-act="exportSave">Copy save code</button>${DESK ? '' : '<button class="btn" data-act="importOpen">Import a league</button><button class="btn danger" data-act="newConfirm">Start a new league</button>'}</div><div id="settings-msg"></div></div>`;
+      <div class="btnrow">${DESK ? '<button class="btn primary" data-act="mainMenu">Main menu</button>' : ''}<button class="btn" data-act="exportSave">Copy save code</button><button class="btn" data-act="exportFile">Save to a file</button>${DESK ? '' : '<button class="btn" data-act="importOpen">Import a league</button><button class="btn danger" data-act="newConfirm">Start a new league</button>'}</div><div id="settings-msg"></div></div>`;
     const c = Object.assign({}, CFG_DEF, L.cfg || {}, { cap: L.cap || CAP, dl: L.dlG ?? L.tradeDeadline, gm: L.gmName || '', gmPh: L.gmPh || null, gmT: L.teams[L.userTid], gmNat: L.gmNat });
     const rules = `<div class="card"><h2>League rules</h2>${cfgForm(c, true)}<div class="btnrow"><button class="btn primary" data-act="lgRules">Save rules</button></div></div>`;
     setTimeout(rdStatus, 0);
@@ -17190,6 +17190,9 @@ const DESK = !!window.BLGM_DESKTOP;
 // page's own engine and viewer (watchGame) instead of the Windows 3D game. DESK stays on, since the /api paths are the same
 const MOBILE = !!window.BLGM_MOBILE;
 if (MOBILE) document.body.classList.add('mobile');
+// (a phone's browser may clear a site's stored data to free space unless the site asks to keep it: the leagues live
+// there - ask once, quietly; browsers that honour it then never evict them)
+if (MOBILE && navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => {});
 let deskPollT = null, deskBackT = null, deskBackJs = null;
 function deskBackup(js) {   // every save lands in the league's slot in the program's saves folder (debounced)
   deskBackJs = js; if (deskBackT) return;
@@ -17845,6 +17848,9 @@ const ACT = {
   draftAll: () => { drStop(); busy(true, 'Running the draft…'); setTimeout(() => { while (L.phase === 'draft') L.aiPickOne(); busy(false); view = 'home'; save(); render(); }, 30); },
   exportSave: () => { const code = JSON.stringify(L); const m = $('#settings-msg'); m.innerHTML = `<label for="savecode" class="small muted">Save code (${Math.round(code.length / 1024)} KB)</label><textarea id="savecode" readonly rows="4"></textarea>`; const ta = $('#savecode'); ta.value = code; navigator.clipboard && navigator.clipboard.writeText(code).then(() => toast('Save code copied to clipboard.', 'good')).catch(() => { ta.select(); toast('Select the text and copy it.'); }); if (!navigator.clipboard) ta.select(); },
   importOpen: () => { modal(`<h2>Import a league</h2><p class="muted small">Paste a save code or choose a saved file.</p><textarea id="imp-text" rows="6" placeholder="Paste save code"></textarea><input type="file" id="imp-file" accept=".json,.txt,application/json"><div class="btnrow"><button class="btn primary" data-act="importDo">Load league</button></div><div id="imp-msg"></div>`); $('#imp-file').addEventListener('change', e => { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => $('#imp-text').value = r.result; r.readAsText(f); }); },
+  // the league as a file to keep (a phone's Files / Downloads) - Import a league reads it back; a save code of 7-9 MB
+  // was too big for a phone's clipboard
+  exportFile: () => { try { const t = UT(), b = new Blob([JSON.stringify(L)], { type: 'application/json' }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'BlueLineGM-' + (t ? t.abbr : 'league') + '-' + L.season + '.json'; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); toast('League saved to a file.', 'good'); } catch (e) { toast('Could not save the file.', 'bad'); } },
   importDo: () => { try { const txt = $('#imp-text').value, d = JSON.parse(txt); if (!d.teams || !d.players) throw 0; if (!loadFrom(txt)) throw 0; save(); closeModal(); view = 'home'; render(); toast('League loaded.', 'good'); } catch (e) { $('#imp-msg').innerHTML = '<p class="neg">That save code could not be read.</p>'; } },
   newConfirm: () => { $('#settings-msg').innerHTML = `<p>This replaces your current league in this browser. Copy a save code first if you want to keep it.</p><button class="btn danger" data-act="newDo">Yes, start over</button>`; },
   newDo: () => { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } L = null; hlmAuto = false; hlmSkip = false; hlmData = null; render(); },
