@@ -1393,6 +1393,19 @@ body.mobile .lines-card .ln-bench .lc .lc-face, body.mobile .lines-card .ln-benc
 body.mobile .lines-card .ln-bench .lc .lc-nm { width: 100%; min-width: 0 } body.mobile .lines-card .ln-bench .lc .lc-nm b { font-size: 11.5px !important; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap } body.mobile .lines-card .ln-bench .lc .lc-nm small { font-size: 9.5px !important; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 body.mobile .lines-card .ln-bench .lc .ovr { position: absolute !important; top: 3px; right: 4px; font-size: 14px !important } body.mobile .lines-card .ln-bench .lc .lc-pos { position: absolute !important; top: 4px; left: 5px; font-size: 9.5px }
 body.mobile .lines-card .ln-bench .lc .lc-xf { display: none !important }
+/* the power play and penalty kill rinks (NHL and AHL): small tiles - face, last name, overall, the spot's name on a tab
+   over the top - that leave every setup's spots apart and inside the rink down to 360px. The desktop's 112px cards on a
+   307px rink overlapped (Draisaitl over Podkolzin) and the point man hung off the top edge, so a tap could pick the wrong
+   player (phone audit, 2026-10) */
+body.mobile .rk-spot { width: 58px !important; gap: 0 !important }
+body.mobile .rk-spot em { position: absolute; top: -6px; left: 50%; transform: translateX(-50%); z-index: 2; max-width: 100%; box-sizing: border-box; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 7.5px; line-height: 11px; padding: 0 3px; letter-spacing: .03em; pointer-events: none }
+body.mobile .lines-card .rk-spot .lc { width: 58px !important; padding: 7px 1px 3px !important; gap: 1px !important; border-radius: 6px }
+body.mobile .lines-card .rk-spot .lc .lc-face, body.mobile .lines-card .rk-spot .lc .lc-face svg, body.mobile .lines-card .rk-spot .lc .lc-face .phwrap { width: 26px !important; height: 26px !important; flex-basis: 26px !important; border-radius: 3px }
+body.mobile .lines-card .rk-spot .lc .lc-nm b { font-size: 10px !important; line-height: 12px; letter-spacing: 0 }
+body.mobile .lines-card .rk-spot .lc .lc-nm small, body.mobile .lines-card .rk-spot .lc .lc-xf, body.mobile .lines-card .rk-spot .lc .capb, body.mobile .lines-card .rk-spot .lc .finb { display: none !important }   /* (the name gets the tile's width: the C / A is on the Lines' even-strength tiles) */
+body.mobile .lines-card .rk-spot .lc .ovr { top: 2px !important; right: 2px !important; font-size: 11.5px !important; min-width: 0 !important; padding: 0 !important }
+body.mobile .lines-card .rk-spot .lc .lc-pos { top: 3px !important; left: 3px !important; font-size: 7.5px !important; opacity: .8 }
+body.mobile .lines-card .rk-spot .lc.empty .lc-empty { font-size: 9px; padding: 9px 0 }
 /* Home on a phone (mHome): the next-game card, your games, swipe cards, your club, the news */
 .mhome { display: flex; flex-direction: column; gap: 10px }
 .mh-tabs { display: flex; gap: 4px; background: var(--panel2); border-radius: 8px; padding: 3px; position: sticky; top: 52px; z-index: 5 } .mh-tabs button { all: unset; flex: 1; text-align: center; padding: 7px 0; border-radius: 6px; font: 800 12.5px var(--f-display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); cursor: pointer } .mh-tabs button.on { background: var(--blue); color: #fff }
@@ -4723,7 +4736,7 @@ class League {
     for (const t of this.teams || []) if (/^N\.?Y\.?\s/i.test(t.city || '')) t.city = 'New York';   // leagues built from NHL.com's "N.Y. Rangers" / "NY Islanders" place names ("the N.Y. Rangers Rangers")
   }
   static create(userTid) {
-    const L = new League({ version: 1, season: 2026, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, potGV: 1, potDV: 1 });
+    const L = new League({ version: 1, season: 2026, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, dyV: 1, potGV: 1, potDV: 1 });
     TEAMS.forEach((t, i) => L.teams.push({ tid: i, city: t[0], name: t[1], abbr: t[2], conf: t[3], div: t[4], c1: t[5], c2: t[6], roster: [], farm: [], prospects: [], lines: null, tactics: { aggr: 50, shoot: 50, phys: 50, depth: 50 }, rec: { w: 0, l: 0, otl: 0, gf: 0, ga: 0, rw: 0, streak: '' }, dead: [] }));
     const slots = [['C', 72.5], ['C', 70], ['C', 66], ['C', 61], ['LW', 72], ['LW', 69.5], ['LW', 66], ['LW', 61], ['RW', 72], ['RW', 69.5], ['RW', 66], ['RW', 61], ['C', 57], ['D', 71.5], ['D', 70], ['D', 68], ['D', 66], ['D', 63], ['D', 61], ['D', 57], ['D', 55], ['G', 73], ['G', 62]];
     for (const t of L.teams) {
@@ -5834,9 +5847,15 @@ class League {
     this.addNews('The development lab is open for the summer: ' + LAB_SLOTS + ' slots for anyone in your organization. Put players in programs on the Development page; the results come at training camp.', this.userTid, 'player');
   }
   // ---------- picks & draft ----------
+  // (draft years: a pick's k.season is the season whose draft it's used in - the 2026-27 season's picks are k.season 2026 -
+  // but that draft is held in June 2027 and the NHL calls it the 2027 draft, so it's shown as 2027 (pickLabel). A
+  // player's p.draft.season is the NHL's year: Kaprizov's 2015, and a pick made at the end of 2026-27 is 2027. The user
+  // saw "2026 R2 (COL)" traded in September 2026 and took it for a pick already used, 2026-10)
   initPicks() { this.picks = []; for (const s of [this.season, this.season + 1]) this.addPickYear(s); }
-  addPickYear(s) { if (this.picks.some(x => x.season === s)) return; for (const t of this.teams) for (let r = 1; r <= 7; r++) this.picks.push({ id: 'k' + s + '_' + t.tid + '_' + r, season: s, round: r, orig: t.tid, owner: t.tid }); }   // (once: an offer sheet may have made a year early)
-  pickLabel(k) { return k.season + ' R' + k.round + (k.orig !== k.owner ? ' (' + this.teams[k.orig].abbr + ')' : ''); }
+  // (pkHold: real pick trades for drafts further out than the two kept - [season, round, orig, owner] from the real data -
+  // applied when that year's picks are made)
+  addPickYear(s) { if (this.picks.some(x => x.season === s)) return; for (const t of this.teams) for (let r = 1; r <= 7; r++) this.picks.push({ id: 'k' + s + '_' + t.tid + '_' + r, season: s, round: r, orig: t.tid, owner: t.tid }); if (this.pkHold) { for (const h of this.pkHold) if (h[0] === s) { const k = this.picks.find(x => x.season === s && x.round === h[1] && x.orig === h[2]); if (k && this.teams[h[3]]) k.owner = h[3]; } this.pkHold = this.pkHold.filter(h => h[0] !== s); } }   // (once: an offer sheet may have made a year early)
+  pickLabel(k) { return (k.season + 1) + ' R' + k.round + (k.orig !== k.owner ? ' (' + this.teams[k.orig].abbr + ')' : ''); }
   // where a pick would fall if the standings held (worst first; the lottery can move the top 16): this draft and next
   // year's only, once the original club has played 5 games; null otherwise
   projPick(k) {
@@ -6081,7 +6100,7 @@ class League {
     const t = this.teams[s.owner];
     if (t.tid === this.userTid) { const ld = this.scLead(p); p.scSnap = { by: ld ? ld.id : null, n: ld ? scName(ld.s) : null, g: ld ? scGrade(ld.s.jud) : null, pot: estMid(p, 'pot'), ovr: estMid(p, 'ovr'), cons: p.scout, pk: D.cur + 1, s: this.season }; }   // what our scouts said, to judge later
     delete p.scW;
-    p.tid = t.tid; p.prospect = true; t.prospects.push(pid); if (t.tid === this.userTid) p.sp = 100; p.draft = { season: this.season, round: s.round, pick: D.cur + 1, tid: t.tid };
+    p.tid = t.tid; p.prospect = true; t.prospects.push(pid); if (t.tid === this.userTid) p.sp = 100; p.draft = { season: this.season + 1, round: s.round, pick: D.cur + 1, tid: t.tid };   // (the NHL's year: this season's draft is next June's)
     if (s.round === 1 && D.cur < 5) this.addNews('#' + (D.cur + 1) + ' overall: the ' + t.name + ' select ' + p.pos + ' ' + p.first + ' ' + p.last + '.', t.tid);
     if (t.tid === this.userTid) this.addNews('You drafted ' + p.pos + ' ' + p.first + ' ' + p.last + ' (round ' + s.round + ', #' + (D.cur + 1) + ').', t.tid);
     D.cur++;
@@ -7534,7 +7553,7 @@ class League {
     const star = dispR(p.ovr) >= 88 && p.age <= 30;
     // ...and its three best prospects by ceiling, whatever the tier (Minnesota's front office sent Kiviharju for Ryan Shea)
     const top3 = new Set([...buyer.prospects, ...(buyer.farm || [])].map(id => P[id]).filter(x => x && x.age <= 23).sort((a, b) => b.pot - a.pot).slice(0, 3).map(x => x.id));
-    const blue = x => (x.draft && x.draft.round === 1 && x.draft.pick <= 10 && this.season - x.draft.season <= 4) || dispR(x.pot) >= 86 || top3.has(x.id);
+    const blue = x => (x.draft && x.draft.round === 1 && x.draft.pick <= 10 && this.season + 1 - x.draft.season <= 4) || dispR(x.pot) >= 86 || top3.has(x.id);
     const assets = [...buyer.prospects, ...(buyer.farm || []).filter(id => P[id].age <= 23)].filter(id => star || !blue(P[id])).map(id => ({ k: 'p', id, v: this.pValue(P[id], sel) })).concat([...this.picks.filter(k => k.owner === buyer.tid && k.round <= 3).map(k => ({ k: 'k', id: k.id, v: this.kValue(k, sel) }))]).sort((a, b) => b.v - a.v);
     const used = new Set();
     while (got < need && give.players.length + give.picks.length < 4) {
@@ -8116,8 +8135,12 @@ Object.assign(League.prototype, {
   capHit(p) { const c = p.contract; if (!c) return 0; const cs = this.capSeason(); return c.ext && cs > c.exp ? c.ext.sal : c.exp >= cs ? c.sal + (c.bon || 0) : 0; },
   buried(p) { return Math.max(0, this.capHit(p) - BURY); },
   waiverExempt(p) { return p.age <= 21 || (p.wx != null && p.wx >= this.capSeason()); },
+  // (the NHL's rule: a club holds an unsigned pick's rights two years from his draft for a junior - CHL or USHL - and four
+  // for a college or European player, to the June of that year. Counted from the season his draft ended - p.draft.season
+  // is the NHL's year, a June, so the season before it: a real 2025 pick from the OHL had until the summer of 2028 when it
+  // was read as a season, a year past the real deadline of June 1, 2027)
   rightsLimit(p) { return p.lg === 'NCAA' ? 4 : CHL.includes(p.lg) || p.lg === 'USHL' ? 2 : 4; },
-  rightsUntil(p) { return (p.draft ? p.draft.season : this.season) + this.rightsLimit(p); }, // lapses in the offseason of this season
+  rightsUntil(p) { return (p.draft ? p.draft.season - 1 : this.season) + this.rightsLimit(p); }, // lapses in the offseason of this season
   // ---------- league placement ----------
   pickLeague(p) {
     const a = p.age, o = p.ovr, r = Math.random();
@@ -8150,7 +8173,7 @@ Object.assign(League.prototype, {
     return 'SHL';
   },
   setLeague(p, lg, club) { p.lg = lg; p.club = club || pickA(CLUBS[lg] || ['—']); p.form = Math.round(cl(1 + gauss() * .12, .7, 1.35) * 100) / 100; if (lg === 'NCAA' && !p.ncy) p.ncy = 1; },
-  fakeDraft(p, t) { const yrs = Math.max(0, p.age - 18); const round = p.pot >= 72 ? 1 : p.pot >= 66 ? ri(1, 3) : ri(2, 7); p.draft = { season: this.season - 1 - yrs, round, pick: (round - 1) * 32 + ri(1, 32), tid: t.tid }; },
+  fakeDraft(p, t) { const yrs = Math.max(0, p.age - 18); const round = p.pot >= 72 ? 1 : p.pot >= 66 ? ri(1, 3) : ri(2, 7); p.draft = { season: this.season - yrs, round, pick: (round - 1) * 32 + ri(1, 32), tid: t.tid }; },   // (the NHL year of the June he turned 18 by: an 18-year-old now went in the draft just held)
   stint(p, lg, club) {
     const ms = p.ms || (p.ms = []); let s = ms[ms.length - 1];
     if (!s || s.lg !== lg || s.cl !== club) { s = p.pos === 'G' ? { lg, cl: club, gp: 0, w: 0, l: 0, sa: 0, ga: 0, so: 0 } : { lg, cl: club, gp: 0, g: 0, a: 0, pm: 0, pim: 0 }; ms.push(s); }
@@ -8689,7 +8712,7 @@ Object.assign(League.prototype, {
   rightsCheck() {
     for (const t of this.teams) for (const id of t.prospects.slice()) {
       const p = this.players[id]; if (!p || p.contract) continue;
-      const yrs = this.season - (p.draft ? p.draft.season : this.season - 1);
+      const yrs = this.season - (p.draft ? p.draft.season - 1 : this.season - 1);   // (seasons since his draft's: p.draft.season is the NHL's year, the June after - rightsUntil)
       const lapse = yrs >= this.rightsLimit(p) || p.age >= 24 || (t.tid !== this.userTid && yrs >= 1 && p.pot < 58);
       if (!lapse) continue;
       this.detach(p); p.prospect = false; p.tid = -1; p.loan = 0; this.setAsk(p);
@@ -11883,6 +11906,26 @@ function loadFrom(s) { try { { L = new League(JSON.parse(s)); repairNaN(L); undo
   // (the NHL's own rule became the default, 2026-10: a league still on the old default, game 60, moves to it once)
   if (!L.dlCbaV) { L.dlCbaV = 1; if (L.dlG === 60) { L.dlG = 0; if (L.phase !== 'playoffs') L.tradeDeadline = L.dlIndex(); } }
   if (L.dlG === 0 && !L.dlCbaD) L.dlIndex();
+  // (2026-10: draft years are the NHL's - the pick made at the end of 2026-27 is a 2027 pick, p.draft.season 2027, where
+  // this league stored the season, 2026; the real players' were the NHL's already. A player this league drafted (p.serr:
+  // he came through a draft class) or gave a made-up draft (fakeDraft: always a year before the first June a player born
+  // when he was could go, which no real record is) moves up a year, so his signing deadline stays where it was. The pick
+  // labels already written - news, the trade log, players' trade notes - read a year on, as the picks now show)
+  if (!L.dyV) {
+    const late = b => b[1] > 9 || (b[1] === 9 && b[2] > 15) ? 1 : 0;
+    for (const p of Object.values(L.players)) { const d = p.draft; if (!d || !(+d.season > 0)) continue; d.season = +d.season; if (p.serr || (p.born && p.born[0] ? d.season < p.born[0] + late(p.born) + 18 : p.hlm == null)) d.season++; }
+    const y0 = (L.history || []).length ? Math.min(...L.history.map(h => h.season)) : L.season;   /* the league's first season */
+    for (const r of L.retired || []) if (r.dr && r.hlm == null && (!(L.real || L.hlm) || r.dr[0] >= y0)) r.dr[0]++;   /* (an archived player keeps no birth date: the made-up ones, by their draft year in a real league) */
+    const lab = s => typeof s === 'string' ? s.replace(/\b(20\d\d) R([1-7])\b/g, (m, y, r) => (+y + 1) + ' R' + r) : s;
+    for (const n of L.news || []) n.text = lab(n.text);
+    for (const t of L.trades || []) for (const g of [t.ga, t.gb]) if (g && g.pk) g.pk = g.pk.map(lab);
+    for (const p of Object.values(L.players)) for (const x of p.tx || []) x.w = lab(x.w);
+    if (L.dd && L.dd.log) for (const x of L.dd.log) x.text = lab(x.text);
+    // (the real pick trades went on the season after their draft: still in the first season, before its draft, they can be
+    // moved once the data is read - nhlBackfill, realPickFix - for every pick no trade in this league has touched)
+    if (L.real && !(L.history || []).length && (L.phase === 'regular' || L.phase === 'playoffs') && L.picks.some(k => k.season === L.season)) L.dyPk = 0;
+    L.dyV = 1;
+  }
   return true; } } catch (e) { } return false; }
 function UT() { return L.teams[L.userTid]; }
 
@@ -12870,10 +12913,18 @@ function nhlRerate(D) {
   if (n) { L.news = L.news.filter(x => !/^Player ratings updated to the latest rating model/.test(x.text)); L.addNews('Player ratings updated to the latest rating model (' + n + ' players).', -1, 'player'); }   // (one line, not one per update)
   return n;
 }
+// the real data's traded picks ({ y: the NHL's draft year, r, orig: the club's full name, owner: its abbreviation }) as
+// [season, round, original club, owner] in this league's terms: the 2027 draft is the 2026-27 season's, season 2026
+function realPickMoves(L, D) {
+  const ab = {}, nm = {}; L.teams.forEach(t => { ab[t.abbr] = t.tid; });
+  for (const x of D.teams || []) if (ab[x.abbr] != null) nm[x.full || x.name] = ab[x.abbr];
+  const out = []; for (const k of D.picks || []) { const o = nm[k.orig], w = ab[k.owner]; if (o == null || w == null || o === w || !(+k.y > 0)) continue; out.push([+k.y - 1, k.r, o, w]); }
+  return out;
+}
 League.fromNHL = function (D, userTid) {
   const S = D.season, born = s => (String(s || '').match(/(\d{4})-(\d{2})-(\d{2})/) || []).slice(1).map(Number);
   const teams = D.teams;   // already in picker order (nhlRead)
-  const L = new League({ version: 1, season: S, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, potGV: 1, potDV: 1, potD27: 1, prdV: 1, cap: D.cap && D.cap.upper || capFor(S), real: { updated: D.updated, source: 'NHL.com and CapWages' } });
+  const L = new League({ version: 1, season: S, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, dyV: 1, potGV: 1, potDV: 1, potD27: 1, prdV: 1, cap: D.cap && D.cap.upper || capFor(S), real: { updated: D.updated, source: 'NHL.com and CapWages' } });
   const tidOf = {}, tidByName = {};
   teams.forEach((t, i) => {
     const nick = t.name;
@@ -12926,7 +12977,7 @@ League.fromNHL = function (D, userTid) {
     p.arch = archOf(p); p.xf = xfOf(p);   // (after his history: archOf reads his scoring record)
     if (x.car && x.car.gp > 0) p.cb = { gp: x.car.gp, g: x.car.g, a: x.car.a, w: x.car.w, so: x.car.so, seasons: x.car.seasons || 1 };
     if (x.draft) { const dt = tidOf[x.draft.t]; p.draft = { season: x.draft.y, round: x.draft.r, pick: x.draft.pk, tid: dt != null ? dt : -1 }; }
-    else if (x.dy && x.dr) p.draft = { season: x.dy, round: x.dr, pick: x.dpk || 0, tid: tidOf[x.team] ?? -1 };
+    else if (x.dy && x.dr) p.draft = { season: +x.dy, round: x.dr, pick: x.dpk || 0, tid: tidOf[x.team] ?? -1 };   // (the cap site's year can come as text: "2000")
     ratingAdj(p);
     if (dispR(p.ovr) >= 97) p.gen = true;
     L.players[p.id] = p; L.resetStats(p); x.p = p;
@@ -12984,7 +13035,10 @@ League.fromNHL = function (D, userTid) {
   // 5. the rest of league setup, as for any league
   L.initMinors(); L.initStaff(); L.clauseV = 1; L.certV = 1; L.xfV = 2;
   L.fixNumbers(); L.teams.forEach(t => L.autoLines(t)); L.initPicks();
-  for (const k of D.picks || []) { const pk = L.picks.find(q => q.season === k.y && q.round === k.r && q.orig === tidByName[k.orig]); if (pk && tidOf[k.owner] != null) pk.owner = tidOf[k.owner]; }
+  // (the data's pick years are the NHL's draft years: its 2027 picks are this season's draft, k.season 2026. Matched on the
+  // year itself, every real pick trade landed on the next season's pick - Toronto held Colorado's 2028 first, not its 2027
+  // one - and the trades two or more years out were lost; those now wait in L.pkHold until their year is made)
+  for (const m of realPickMoves(L, D)) { const pk = L.picks.find(q => q.season === m[0] && q.round === m[1] && q.orig === m[2]); if (pk) pk.owner = m[3]; else if (m[0] > L.season + 1) (L.pkHold || (L.pkHold = [])).push(m); }
   L.rsch = realSched(D, tidOf, S);   // NHL.com's calendar for this season (null: the round robin)
   L.makeSchedule(); L.scoutLevel = 2; L.initScouts(); L.dShapeV = 1; L.makeDraftClass(); L.updateStatuses(true); L.seedCareers();
   // real head coaches by name (ratings come from the coaching model)
@@ -13466,7 +13520,7 @@ function hlmCurve(raw, ref) {   // monotone map from HLM overall to ours: ranks 
 }
 
 League.fromHLM = function (H, userTid) {
-  const L = new League({ version: 1, season: H.season, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, potGV: 1, potDV: 1, cap: ({ 2024: 88, 2025: 95.5, 2026: 104, 2027: 113.5 })[H.season] || 104, hlm: { name: H.name, dir: H.dir || null } });
+  const L = new League({ version: 1, season: H.season, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, dyV: 1, potGV: 1, potDV: 1, cap: ({ 2024: 88, 2025: 95.5, 2026: 104, 2027: 113.5 })[H.season] || 104, hlm: { name: H.name, dir: H.dir || null } });
   H.teams.forEach((t, i) => L.teams.push({ tid: i, city: t.city, name: t.name, abbr: t.abbr, conf: t.conf, div: t.div, c1: t.c1, c2: t.c2, logo: t.logo || null, roster: [], farm: [], prospects: [], lines: null, tactics: { aggr: 50, shoot: 50, phys: 50, depth: 50 }, rec: { w: 0, l: 0, otl: 0, gf: 0, ga: 0, rw: 0, streak: '' }, dead: [],
     aff: t.aff ? { city: t.aff.city, name: t.aff.name || t.aff.abbr, abbr: t.aff.abbr, logo: t.aff.logo || null, rec: { w: 0, l: 0, otl: 0, gf: 0, ga: 0 } } : null }));
   const tidOf = {}; H.teams.forEach((t, i) => { tidOf[t.hid] = i; });
@@ -13851,7 +13905,7 @@ const ordn = n => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', '
 function vHome() {
   const t = UT(), reg = L.phase === 'regular', r = t.rec;
   const when = reg ? gameDate(Math.min(L.day, L.schedule.length - 1)).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-    : ({ playoffs: 'Playoffs', draft: 'Draft day', resign: 'Re-signing period', freeagency: 'Free agency' }[L.phase] || '') + ' · ' + L.season;
+    : ({ playoffs: 'Playoffs', draft: 'Draft day', resign: 'Re-signing period', freeagency: 'Free agency' }[L.phase] || '') + ' · ' + (L.season + 1);   // (the spring and summer after the season's games: the 2026-27 season's draft is in June 2027)
   // (Arena Night hero: the club's name big over its record, points, place in the division and team rating)
   const dpl = L.standings(x => x.div === t.div).indexOf(t) + 1;
   const head = `<div class="ofhead">${t.logo ? `<img class="logo" src="${t.logo}" alt="">` : lgImg(t, 'big')}<div class="oh-name"><small class="when">${esc(when)}${reg ? ' · Game ' + Math.min(r.w + r.l + r.otl + 1, L.gpt()) + ' of ' + L.gpt() : ''}</small><h2>${esc(t.city)} <span>${esc(t.name)}</span></h2></div>
@@ -14281,7 +14335,7 @@ function leaders(t) {
   return `<div class="leaders">${top(p => p.stats.g + p.stats.a, 'Points')}${top(p => p.stats.g, 'Goals')}${top(p => p.stats.a, 'Assists')}${top(p => p.stats.pm, '+/-', p => (p.stats.pm > 0 ? '+' : '') + p.stats.pm)}${g ? `<button class="leader" data-act="player" data-pid="${g.id}"><span>Goalie</span><b>${esc(nm(g))}</b><em>${sv(g.stats.ga, g.stats.sa)}</em></button>` : ''}</div>`;
 }
 function offseasonCard() {
-  if (L.phase === 'draft') return `<div class="card"><div class="eyebrow">Offseason · step 1 of 3</div><h2>The ${L.season} draft</h2><p>${L.history[0] ? 'Champion: <b>' + esc(L.history[0].champName) + '</b>. ' : ''}${L.userOnClock() ? 'You are on the clock.' : 'Draft picks are being made.'}</p><div class="btnrow"><button class="btn primary" data-act="nav" data-v="draft">Go to the draft</button></div></div>`;
+  if (L.phase === 'draft') return `<div class="card"><div class="eyebrow">Offseason · step 1 of 3</div><h2>The ${L.season + 1} draft</h2><p>${L.history[0] ? 'Champion: <b>' + esc(L.history[0].champName) + '</b>. ' : ''}${L.userOnClock() ? 'You are on the clock.' : 'Draft picks are being made.'}</p><div class="btnrow"><button class="btn primary" data-act="nav" data-v="draft">Go to the draft</button></div></div>`;
   if (L.phase === 'resign') {
     const ex = L.expiring(UT()), np = UT().prospects.map(id => L.players[id]).filter(p => p && !p.contract && L.rightsUntil(p) <= L.season).length;
     return `<div class="card"><div class="eyebrow">Offseason · step 2 of 3</div><h2>Re-sign your players</h2><p class="muted">${ex.length ? `${ex.length} expiring contract${ex.length > 1 ? 's' : ''}` : 'No expiring contracts left'}${np ? ` and ${np} unsigned prospect${np > 1 ? 's' : ''} whose rights run out` : ''}. Re-sign them on the Contracts page - players you don't re-sign become free agents on July 1.</p>
@@ -15230,7 +15284,7 @@ function drTicker() {
   if (!it.length) return '';
   const dur = Math.max(20, it.length * 5), now = performance.now(); if (!DR.tk0) DR.tk0 = now;
   const row = it.map(x => `<span class="tk-i">${x}</span>`).join('');
-  return `<div class="dr-tick"><b class="dr-tick-h">${L.season} NHL DRAFT</b><div class="dr-tick-w"><div class="dr-tick-r" style="animation-duration:${dur}s;animation-delay:-${((now - DR.tk0) / 1000 % dur).toFixed(2)}s">${row}${row}</div></div></div>`;
+  return `<div class="dr-tick"><b class="dr-tick-h">${L.season + 1} NHL DRAFT</b><div class="dr-tick-w"><div class="dr-tick-r" style="animation-duration:${dur}s;animation-delay:-${((now - DR.tk0) / 1000 % dur).toFixed(2)}s">${row}${row}</div></div></div>`;
 }
 const clockTxt = t => Math.floor(t / 60) + ':' + String(Math.floor(t % 60)).padStart(2, '0');
 function drStart() { DR.live = true; DR.paused = false; DR.slot = -1; clearInterval(DR.iv); DR.iv = setInterval(drTick, 200); drArm(); render(); }
@@ -15299,7 +15353,7 @@ function drRoom(cur) {
   const D = L.draft; if (!cur) return '';
   const t = L.teams[cur.owner], mine = cur.owner === L.userTid;
   const a = DR.ann != null ? D.slots[DR.ann] : null, ap = a && L.players[a.pid];
-  const ann = ap ? `<div class="dr-ann" data-act="player" data-pid="${ap.id}" role="button" tabindex="0" title="Open ${esc(nm(ap))}'s profile" style="cursor:pointer">${faceSVG(ap, L.teams[a.owner], 54)}<div><small>With the #${DR.ann + 1} pick in the ${L.season} NHL Draft, the ${esc(L.tname(a.owner))} select</small><b>${ap.pos} ${esc(nm(ap))}</b><span class="muted small">${esc(NAT_NAME[ap.nat] || ap.nat)} · age ${ap.age} · ${tierChip(ap, 'pot')}</span></div>${lgImg(L.teams[a.owner], 'dr-ann-lg')}</div>` : '';
+  const ann = ap ? `<div class="dr-ann" data-act="player" data-pid="${ap.id}" role="button" tabindex="0" title="Open ${esc(nm(ap))}'s profile" style="cursor:pointer">${faceSVG(ap, L.teams[a.owner], 54)}<div><small>With the #${DR.ann + 1} pick in the ${L.season + 1} NHL Draft, the ${esc(L.tname(a.owner))} select</small><b>${ap.pos} ${esc(nm(ap))}</b><span class="muted small">${esc(NAT_NAME[ap.nat] || ap.nat)} · age ${ap.age} · ${tierChip(ap, 'pot')}</span></div>${lgImg(L.teams[a.owner], 'dr-ann-lg')}</div>` : '';
   const o = DR.offer, lab = ids => ids.map(i => '#' + (i + 1) + (D.slots[i].round > 1 ? ' (round ' + D.slots[i].round + ')' : '')).join(' + ');
   const offer = o ? `<div class="dr-offer">📞 ${o.mine ? 'Offer to' : ''} <b>${esc(L.tname(o.tid))}</b>${o.mine ? '' : o.kind === 'down' ? ' want to move up' : ' would move down'}: you give <b>${lab(o.give)}</b>, you get <b>${lab(o.get)}</b>.
     <span class="btnrow"><button class="btn sm primary" data-act="drAccept">${o.mine ? 'Make the trade' : 'Accept'}</button><button class="btn sm" data-act="drDecline">${o.mine ? 'Cancel' : 'Decline'}</button></span></div>` : '';
@@ -15311,7 +15365,7 @@ function vDraft() {
   const ut = UT();
   if (L.phase !== 'draft' || !L.draft) {
     const mine = L.picks.filter(k => k.owner === L.userTid).sort((a, b) => a.season - b.season || a.round - b.round);
-    return `<div class="card"><h2>Draft</h2><p>The draft runs after the playoffs: 7 rounds, 224 picks. The 16 non-playoff teams enter a two-draw lottery (worst record 18.5%, a team can jump at most 10 spots); rounds 2–7 follow reverse standings and playoff teams pick in order of elimination. Unsigned draftees' rights expire three years after the draft.</p><h3 class="eyebrow">Your picks</h3><ul class="chips">${mine.map(k => `<li>${esc(L.pickLabel(k))}</li>`).join('') || '<li>None</li>'}</ul>
+    return `<div class="card"><h2>Draft</h2><p>The draft runs after the playoffs: 7 rounds, 224 picks. The 16 non-playoff teams enter a two-draw lottery (worst record 18.5%, a team can jump at most 10 spots); rounds 2–7 follow reverse standings and playoff teams pick in order of elimination. An unsigned draftee's rights run two years from his draft if he plays junior (CHL or USHL), four from college or Europe.</p><h3 class="eyebrow">Your picks</h3><ul class="chips">${mine.map(k => `<li>${esc(L.pickLabel(k))}</li>`).join('') || '<li>None</li>'}</ul>
     <h3 class="eyebrow">Your prospects</h3>${ut.prospects.length ? `<ul class="plist">${ut.prospects.map(id => { const p = L.players[id]; return `<li><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> · ${p.pos} · age ${p.age} · <span class="ovr ${ovrCls(R(p.ovr))}">${R(p.ovr)}</span> → ${tierChip(p, 'pot')}</li>`; }).join('')}</ul>` : '<p class="muted">No prospects.</p>'}</div>`;
   }
   const D = L.draft; const cur = D.slots[D.cur];
@@ -15336,7 +15390,7 @@ function vDraft() {
   const myPicks = `<div class="card"><h3>Your picks</h3><ul class="dlist mypk">${mySl.length ? mySl.map(([s, k]) => { const p = s.pid && L.players[s.pid], now = k === D.cur;
     return `<li class="${k < D.cur ? 'done' : ''}"><span>#${k + 1}</span><small>R${s.round}${s.orig !== L.userTid ? ' via ' + L.teams[s.orig].abbr : ''}</small><small>${p ? `<button class="link" data-act="player" data-pid="${p.id}">${esc(p.pos + ' ' + nm(p))}</button>` : now ? '<b>On the clock</b>' : '<span class="muted">' + (k - D.cur) + ' pick' + (k - D.cur === 1 ? '' : 's') + ' away</span>'}</small></li>`; }).join('') : '<li class="muted">You have no picks in this draft</li>'}</ul></div>`;
   const made = D.slots.slice(Math.max(0, D.cur - 10), D.cur).reverse().map((s, i) => { const p = L.players[s.pid]; return `<li class="${s.owner === L.userTid ? 'mine' : ''}"><span>#${D.cur - i}</span>${dTm(L.teams[s.owner])}<small>${p ? `<button class="link" data-act="player" data-pid="${p.id}">${esc(p.pos + ' ' + nm(p))}</button>` : ''}</small></li>`; }).join('');
-  return `${drTicker()}<div class="grid draft"><div class="card"><div class="cardhead"><h2>${L.season} draft · Round ${D.slots[D.cur] ? D.slots[D.cur].round : 7} · Pick ${D.cur + 1} of ${D.slots.length}</h2><div class="tabs inline">${tb('', 'All')}${tb('F', 'F')}${tb('D', 'D')}${tb('G', 'G')}</div></div>
+  return `${drTicker()}<div class="grid draft"><div class="card"><div class="cardhead"><h2>${L.season + 1} draft · Round ${D.slots[D.cur] ? D.slots[D.cur].round : 7} · Pick ${D.cur + 1} of ${D.slots.length}</h2><div class="tabs inline">${tb('', 'All')}${tb('F', 'F')}${tb('D', 'D')}${tb('G', 'G')}</div></div>
     ${drRoom(cur)}
     <div class="btnrow">${!onClock ? '<button class="btn" data-act="drSimOne" title="The club on the clock makes its pick now">Sim Pick</button><button class="btn' + (DR.live ? '' : ' primary') + '" data-act="draftToMe">Sim to my next pick</button>' : '<button class="btn" data-act="draftAuto">Auto-pick for me</button>'}<button class="btn ghost" data-act="draftAll">Sim Draft</button></div>
     <div class="tblwrap"><table class="tbl"><thead><tr><th></th>${dth('my', 'My rank')}${dth('rd', 'Proj')}${dth('name', 'Prospect', 'l')}${dth('pos', 'Pos')}${dth('age', 'Age')}${dth('ovr', 'Est. OVR')}${dth('pot', 'Potential', 'l')}${dth('style', 'Style', 'l')}${dth('sp', 'Scouted')}</tr></thead><tbody>${pool.slice(0, 80).map(p => `<tr><td class="nowrap">${onClock ? `<button class="btn sm primary" data-act="draftPick" data-pid="${p.id}">Draft</button> ` : ''}${starBtn(p)}</td><td><b>${DCS.myRank[p.id] || ''}</b></td>${(ps => `<td class="nowrap${/^R[2-7]|UDFA|—/.test(ps) ? ' muted' : ''}" title="Where the public lists have him going: #${DCS.rank[p.id] || '?'} on the consensus ranking">${DCS.rank[p.id] ? '#' + DCS.rank[p.id] + ' · ' : ''}${ps}</td>`)(projSlot(DCS, p))}<td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${dMark(p)}</td><td>${p.pos}</td><td>${p.age}</td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${archChip(p)}</td><td>${spBar(p)}</td></tr>`).join('')}</tbody></table></div>
@@ -15660,7 +15714,7 @@ function myPicksCard(yr) {
   for (const y of yrs) rows.push([y, L.picks.filter(k => k.owner === ui && k.season === y).sort((a, b) => a.round - b.round || ord.indexOf(a.orig) - ord.indexOf(b.orig)).map(k => {
     const at = y === L.season && (L.phase === 'regular' || L.phase === 'playoffs') && ord.includes(k.orig) ? (k.round - 1) * n + ord.indexOf(k.orig) + 1 : 0;
     return `<span class="mpk"><b>R${k.round}</b>${at ? ' ~#' + at : ''}${k.orig !== ui ? ' <small>via ' + esc(L.teams[k.orig].abbr) + '</small>' : ''}</span>`; })]);
-  return `<h3 class="eyebrow">Your picks</h3>${rows.length ? rows.map(([y, list]) => `<div class="mpk-y"><em>${y}</em><div>${list.join('')}</div></div>`).join('') : '<p class="small muted">You own no draft picks.</p>'}<p class="muted small">${L.phase === 'draft' ? '#: the draft order.' : L.phase === 'regular' || L.phase === 'playoffs' ? '~#: projected from the current standings, before the lottery.' : 'Where they fall is set by next season\'s standings.'}</p>`;
+  return `<h3 class="eyebrow">Your picks</h3>${rows.length ? rows.map(([y, list]) => `<div class="mpk-y"><em>${y + 1}</em><div>${list.join('')}</div></div>`).join('') : '<p class="small muted">You own no draft picks.</p>'}<p class="muted small">${L.phase === 'draft' ? '#: the draft order.' : L.phase === 'regular' || L.phase === 'playoffs' ? '~#: projected from the current standings, before the lottery.' : 'Where they fall is set by next season\'s standings.'}</p>`;
 }
 function mockOrder() {
   if (L.phase === 'draft' && L.draft) return L.draft.slots.slice(L.draft.cur, L.draft.cur + 32).map(s => s.owner);
@@ -15884,7 +15938,7 @@ function scoutModal(sid) {
     ${s.trait ? `<p class="small">${traitPill(s)} ${esc(SC_TRAITS[s.trait][2])}</p>` : ''}
     <p class="small">${s.st === 'emp' ? 'Contract: ' + money(s.sal) + ' through ' + s.exp + ' · ' + esc(scStatus(s, L.scAwaySet())) : s.st === 'pool' ? 'Available · asks ' + money(L.scoutAsk(s, 2)) + ' a year' : s.to != null ? 'Now with the ' + esc(L.tname(s.to)) : 'Retired'}</p>
     ${s.role === 'reg' && s.st === 'emp' ? `<p class="small">This class: lead report on ${leads} prospect${leads === 1 ? '' : 's'} · <label>Works in <select data-act="scMove" data-sid="${sid}"><option value="">Roaming</option>${SC_REG.map(([k, n]) => `<option value="${k}" ${s.at === k ? 'selected' : ''}>${esc(n)}${k === s.home ? ' ★' : ''}</option>`).join('')}</select></label></p>` : ''}
-    ${calls.length ? `<h4 class="srep-h">His calls on your picks</h4><ul class="pf-inj">${calls.map(p => { const v = L.scVerdict(p); return `<li><span>${p.scSnap.s}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">#${p.scSnap.pk} · our read ${esc(tierL(p, p.scSnap.pot))} · lists ${esc(tierL(p, p.scSnap.cons))} · now ${esc(tierL(p, p.pot))}</small><b class="${v[1]}">${v[0]}</b></li>`; }).join('')}</ul>` : ''}
+    ${calls.length ? `<h4 class="srep-h">His calls on your picks</h4><ul class="pf-inj">${calls.map(p => { const v = L.scVerdict(p); return `<li><span>${p.scSnap.s + 1}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">#${p.scSnap.pk} · our read ${esc(tierL(p, p.scSnap.pot))} · lists ${esc(tierL(p, p.scSnap.cons))} · now ${esc(tierL(p, p.pot))}</small><b class="${v[1]}">${v[0]}</b></li>`; }).join('')}</ul>` : ''}
     <div class="btnrow">${btns}</div></div>`, 'wide');
 }
 // a prospect's scouting report in the game's own terms: his overall now, the ceiling tier, when he'd be NHL-ready,
@@ -15922,11 +15976,11 @@ function draftRealityCard() {
   const ps = Object.values(L.players).filter(p => p.scSnap && p.scSnap.s >= L.season - 3).sort((a, b) => b.scSnap.s - a.scSnap.s || a.scSnap.pk - b.scSnap.pk).slice(0, 21);
   if (!ps.length) return '';
   const tl = (p, v) => tierOf(p.pos, showR(v)).label;
-  return `<div class="card"><h3>Draft reports vs. reality</h3><p class="muted small">Your picks, what your scouts said, what the lists said, and what they are now.</p><ul class="pf-inj">${ps.map(p => { const v = L.scVerdict(p), sn = p.scSnap; return `<li><span>R${Math.ceil(sn.pk / 32)} #${sn.pk}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">${sn.s} · ours ${esc(tl(p, sn.pot))} · lists ${esc(tl(p, sn.cons))} · now ${esc(tl(p, p.pot))}${sn.n ? ' · ' + esc(sn.n) : ''}</small><b class="${v[1]}">${v[0]}</b></li>`; }).join('')}</ul></div>`;
+  return `<div class="card"><h3>Draft reports vs. reality</h3><p class="muted small">Your picks, what your scouts said, what the lists said, and what they are now.</p><ul class="pf-inj">${ps.map(p => { const v = L.scVerdict(p), sn = p.scSnap; return `<li><span>R${Math.ceil(sn.pk / 32)} #${sn.pk}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">${sn.s + 1} · ours ${esc(tl(p, sn.pot))} · lists ${esc(tl(p, sn.cons))} · now ${esc(tl(p, p.pot))}${sn.n ? ' · ' + esc(sn.n) : ''}</small><b class="${v[1]}">${v[0]}</b></li>`; }).join('')}</ul></div>`;
 }
 function vScouting() {
   const cls = (L.draftClass || []).map(id => L.players[id]).filter(p => p && p.tid === -2);
-  const yr = L.phase === 'regular' || L.phase === 'playoffs' ? L.season : L.season + 1;
+  const yr = L.phase === 'regular' || L.phase === 'playoffs' ? L.season : L.season + 1;   // (the season whose draft is next; the class is titled with the NHL's year, a June later - pickLabel)
   const sl = (L.shortlist || []).filter(id => L.players[id] && L.players[id].tid === -2);
   const f = sub.sfilter || 'all';
   let list = cls.filter(p => f === 'all' || (f === 'short' ? sl.includes(p.id) : f === 'F' ? ['C', 'LW', 'RW'].includes(p.pos) : p.pos === f));
@@ -15938,7 +15992,7 @@ function vScouting() {
   const tb = (k, lab) => `<button class="${f === k ? 'on' : ''}" data-act="sfilter" data-k="${k}">${lab}</button>`;
   const avg = cls.length ? Math.round(cls.reduce((s, p) => s + (p.sp || 0), 0) / cls.length) : 0;
   const dir = L.scDir(), dA = L.dirAcc(), SMK = draftMarks(CS, cls);   // (the same gems and bust risks as the draft room's)
-  return `${cls.length ? scoutMapCard(cls, CS) : ''}${scoutMarketCard()}<div class="grid draft"><div class="card"><div class="cardhead"><h2>${yr} draft class</h2><div class="tabs inline">${tb('all', 'All')}${tb('short', 'Shortlist (' + sl.length + ')')}${tb('F', 'F')}${tb('D', 'D')}${tb('G', 'G')}</div></div>
+  return `${cls.length ? scoutMapCard(cls, CS) : ''}${scoutMarketCard()}<div class="grid draft"><div class="card"><div class="cardhead"><h2>${(L.phase === 'draft' ? L.season : yr) + 1} draft class</h2><div class="tabs inline">${tb('all', 'All')}${tb('short', 'Shortlist (' + sl.length + ')')}${tb('F', 'F')}${tb('D', 'D')}${tb('G', 'G')}</div></div>
     ${classOutlook(dir)}<p class="muted small">${cls.length} prospects · average scouted ${avg}%. Every game day your scouts file reports; a prospect seen by several scouts is read more reliably, and starred players get extra eyes. Your board: ${dir ? 'Director ' + esc(scName(dir)) + ' (' + scGrade(dir.jud) + ') · ranges ×' + (1.25 - .5 * dA).toFixed(2) + ' · catches ' + Math.round(50 * dA) + '% of misreads' : '<span class="neg">no director</span>'}.${(L.cfg || {}).reveal ? ' True ratings shown; My rank still reflects your scouts.' : ''}</p>
     ${cls.length ? `<div class="tblwrap"><table class="tbl dctbl"><thead><tr><th></th><th><button class="sort ${sub.ssort === 'mine' || !sub.ssort ? 'on' : ''}" data-act="ssort" data-k="mine" title="Your scouts' rank">My #</button></th><th><button class="sort ${sub.ssort === 'cons' ? 'on' : ''}" data-act="ssort" data-k="cons" title="The consensus rank (the public lists)">Cons #</button></th><th>Projected</th><th class="l">Prospect</th><th>Pos</th><th>Age</th><th class="l">League · club</th><th title="Estimated overall">Est OVR</th><th class="l" title="Estimated potential">Est pot</th><th class="l">Style</th><th>Scouted</th></tr></thead><tbody>${list.slice(0, 150).map(p => `<tr><td>${starBtn(p)}</td><td><b>${CS.myRank[p.id]}</b></td><td>${CS.rank[p.id]}</td><td class="small">${projLabel(CS.rank[p.id])}</td><td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${SMK(p)}</td><td>${p.pos}</td><td>${p.age}</td><td class="l nowrap">${lgPill(p)} <span class="small dc-club" title="${esc(p.club || '')}">${clubLogo(p.lg, p.club)}${esc(p.club || '')}</span></td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${(a => hidden(p) && (p.sp || 0) < 25 ? archChip(p) : `<span class="arch" title="${esc(a + ': ' + ((ARCH[a] || {}).d || ''))}">${esc(ARCH_AB[a] || a)}</span>`)(p.arch || archOf(p))}</td><td title="${esc((l => l ? 'Report: ' + scName(l.s) + ' (' + scGrade(l.s.jud) + ')' : 'No report yet')(L.scLead(p)))}">${spBar(p)}${(l => l ? ` <small class="muted">${scGrade(l.s.jud)}</small>` : '')(L.scLead(p))}</td></tr>`).join('')}</tbody></table></div>` : '<p>The next draft class appears when the new season starts.</p>'}</div>
     <div class="col">${scoutStaffCard()}<div class="card">
@@ -16492,7 +16546,7 @@ function natHistory(nat, M, ps) {
 // a scouting event's report: standouts, risers, fallers and the shortlist, each with his line from the event
 function scoutReport(rep) {
   const sec = (title, rows, cls) => { const li = rows.map(([id, line, c]) => { const p = L.players[id]; if (!p) return ''; return `<li><span class="srep-face">${faceSVG(p, null, 40)}</span><div><div><button class="link" data-act="player" data-pid="${id}">${esc(nm(p))}</button> <span class="muted small">${p.pos} ${natFlag(p.nat, p)} ${esc(lgName(p.lg) || '')}</span>${line ? ` <b class="srep-line">${line}</b>` : ''}</div><p class="small">${esc(c)}</p></div>${starBtn(p)}</li>`; }).join(''); return li ? `<h4 class="srep-h ${cls || ''}">${title}</h4><ul class="srep">${li}</ul>` : ''; };
-  modal(`<p class="eyebrow">Scouting report · ${rep.s}-${String(rep.s + 1).slice(2)} draft class</p><h2>${esc(rep.n)}</h2><p class="muted small">${rep.by ? 'Report: ' + rep.by.map(b => { const s = L.scoutDB && L.scoutDB[b.id]; return (s ? scFace(s, 20) + ' ' + scLink(s) : esc(b.n)) + ' (' + b.g + ')'; }).join(' · ') : rep.scouts + ' scout' + (rep.scouts > 1 ? 's' : '') + ' on site'} · ${rep.field} draft prospects seen${rep.scouts < 3 ? ' · more scouts there would have given a sharper read' : ''}</p>
+  modal(`<p class="eyebrow">Scouting report · ${rep.s + 1} draft class</p><h2>${esc(rep.n)}</h2><p class="muted small">${rep.by ? 'Report: ' + rep.by.map(b => { const s = L.scoutDB && L.scoutDB[b.id]; return (s ? scFace(s, 20) + ' ' + scLink(s) : esc(b.n)) + ' (' + b.g + ')'; }).join(' · ') : rep.scouts + ' scout' + (rep.scouts > 1 ? 's' : '') + ' on site'} · ${rep.field} draft prospects seen${rep.scouts < 3 ? ' · more scouts there would have given a sharper read' : ''}</p>
     ${sec('Standouts', rep.stand)}${sec('▲ Risers', rep.rise, 'up')}${sec('▼ Fallers', rep.fall, 'down')}${sec('★ Your shortlist', rep.mine)}`, 'wide');
 }
 function evAwards() {
@@ -16539,7 +16593,7 @@ function evLottery() {
   const odds = D.base.map((tid, i) => `<div class="ev-lr${mine(tid) ? ' mine' : ''}"><span class="ev-pk">${i + 1}</span>${lgImg(T(tid))}<b>${esc(T(tid).abbr)}</b><em>${(D.odds && D.odds[i] != null ? D.odds[i] : .5)}%</em></div>`).join('');
   const done = shown >= n, nextPick = n - shown, top = T(D.lottery[0]);
   const call = done ? `The ${esc(L.tname(D.lottery[0]))} win the first overall pick!` : nextPick <= 2 ? (nextPick === 2 ? 'And the second overall pick goes to…' : 'And the winner of the draft lottery is…') : 'Revealing the order from #' + nextPick;
-  modal(`<div class="ev ev-lotm"><div class="ev-eyebrow">${L.season} NHL Draft</div><h2>Draft Lottery</h2>
+  modal(`<div class="ev ev-lotm"><div class="ev-eyebrow">${L.season + 1} NHL Draft</div><h2>Draft Lottery</h2>
     <div class="ev-call${!done && nextPick <= 2 ? ' sus' : ''}">${done && top ? lgImg(top, 'ev-biglogo') : ''}<span>${call}</span></div>
     <div class="ev-lot"><div>${rows}</div><div class="ev-odds"><h4>Pre-lottery order · odds of #1</h4>${odds}</div></div>
     <div class="btnrow ev-btns">${done ? `<button class="btn primary" data-act="evDone">Done</button>` : `<button class="btn primary" data-act="lotNext">Reveal pick #${nextPick}</button><button class="btn" data-act="lotAuto">Reveal all</button>`}</div></div>`, 'wide ev-box');
@@ -17018,7 +17072,8 @@ function profJersey(p, t) {
 function profHistory(p) {
   const ev = {};
   const add = (s, html) => (ev[s] = ev[s] || []).push(html);
-  if (p.draft) add(p.draft.season, `🎓 ${p.draft.season} draft · round ${p.draft.round} (#${p.draft.pick}) by ${esc(L.teams[p.draft.tid] ? L.teams[p.draft.tid].city + ' ' + L.teams[p.draft.tid].name : 'a team')}`);
+  // (the draft under the season it closed: the 2027 draft, June 2027, sits with 2026/27)
+  if (p.draft) add(p.draft.season - 1, `🎓 ${p.draft.season} draft · round ${p.draft.round} (#${p.draft.pick}) by ${esc(L.teams[p.draft.tid] ? L.teams[p.draft.tid].city + ' ' + L.teams[p.draft.tid].name : 'a team')}`);
   const club = tid => L.teams[tid] ? esc(L.teams[tid].city + ' ' + L.teams[tid].name) : 'another club';
   for (const t of p.tx || []) add(t.s, `🔁 Traded by the ${club(t.f)} to the ${club(t.t)}${t.w ? ' for ' + newsLinks(t.w) : ''}`);
   // trades made before players kept their own log, from the news - completed ones only (not offers, requests or rumours)
@@ -17630,9 +17685,33 @@ function jrClass(D) {
   L.jrY = J.year; save();
   return n;
 }
+// once, for a real-roster league made before 2026-10 and still in its first season (L.dyPk 0 - loadFrom): the real pick
+// trades went on the season after their draft (the data's 2027 picks on the June 2028 draft's). Each club's pick for this
+// season's draft and the next season's go to their real owners - only where neither has changed hands in this league (a
+// pair with a pick traded here is left as it is, so no deal made in the game is undone); later years wait in L.pkHold
+function realPickFix(L, D) {
+  if (!L || L.dyPk !== 0 || !D || !D.picks) return 0;
+  const S = L.season; L.dyPk = 1;
+  if (+D.season !== S || (L.history || []).length || !(L.phase === 'regular' || L.phase === 'playoffs')) return 0;
+  const want = {}, was = {}, key = (s, r, o) => s + ':' + r + ':' + o;
+  for (const [s, r, o, w] of realPickMoves(L, D)) { want[key(s, r, o)] = w; was[key(s + 1, r, o)] = w; if (s > S + 1 && !(L.pkHold || []).some(h => h[0] === s && h[1] === r && h[2] === o)) (L.pkHold || (L.pkHold = [])).push([s, r, o, w]); }
+  const moved = new Set(); let left = 0, ex = null;
+  for (const t of L.teams) for (let r = 1; r <= 7; r++) {
+    const o = t.tid, k0 = L.picks.find(k => k.season === S && k.round === r && k.orig === o), k1 = L.picks.find(k => k.season === S + 1 && k.round === r && k.orig === o); if (!k0 || !k1) continue;
+    const w0 = want[key(S, r, o)] ?? o, w1 = want[key(S + 1, r, o)] ?? o;
+    if (k0.owner === w0 && k1.owner === w1) continue;
+    if (k0.owner !== (was[key(S, r, o)] ?? o) || k1.owner !== (was[key(S + 1, r, o)] ?? o)) { left += (k0.owner !== w0) + (k1.owner !== w1); continue; }   // (traded in this league since)
+    for (const [k, w] of [[k0, w0], [k1, w1]]) if (k.owner !== w) { k.owner = w; moved.add(k.id); if (!ex && k.round === 1 && k.season === S) ex = k; }
+  }
+  if (!moved.size) return 0;
+  L.offers = (L.offers || []).filter(o => ![...(o.get && o.get.picks || []), ...(o.give && o.give.picks || [])].some(id => moved.has(id)));   // (an offer built on a pick its club no longer has)
+  L.addNews('Draft picks corrected: the picks real clubs have traded now sit in the right draft - they had been put on the year after' + (ex ? ' (' + L.pickLabel(ex) + ' belongs to the ' + L.teams[ex.owner].name + ')' : '') + '. ' + moved.size + ' picks changed hands' + (left ? '; ' + left + ' more stay where trades in this league have taken them' : '') + '.', -1, 'trade');
+  return moved.size;
+}
 async function nhlBackfill() {
   coachRecBackfill();
   let D = null; try { const r = await fetch('/api/nhl', { cache: 'no-store' }); if (r.ok) D = await r.json(); } catch (e) { }
+  if (L && realPickFix(L, D)) save();
   { const nJr = jrClass(D); if (nJr) { L.addNews('Draft: the ' + (L.season + 1) + ' class now has its real junior players - ' + nJr + ' from the OHL, WHL, QMJHL and USHL, rated on their production. The rest of the class is scouted from Europe and the NCAA.', L.userTid, 'draft'); save(); } }
   // real players' families (Wikidata, shipped with the program), once per league
   if (L && L.real) { famCoachLoad(); histXLoad(); }   // (relatives who coached, for the Family cards; past seasons' hits and faceoffs)
