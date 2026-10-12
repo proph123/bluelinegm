@@ -3691,6 +3691,28 @@ class HockeyGame {
     }
     return { x: e.tx, y: e.ty };
   }
+  // in live play too (engine.gd _clear_goalie): a skater's spot is kept clear of a goalie in his crease, and a way to it
+  // through the goalie goes round him (the user's screenshot, 2026-10: a D glued to his own goalie's side with the play at
+  // the blue line - the net-front spots fell inside the goalie, ~10 times a game)
+  clearGoalie(e, wp) {
+    const GC = 4.4;
+    for (const t of this.T) {
+      const g = t.g;
+      if (!g || t.pulled || hyp(g.x + t.d * 85, g.y) > 7) continue;
+      let vx = wp.x - g.x, vy = wp.y - g.y; const d = hyp(vx, vy);
+      if (d < GC) {
+        const side = Math.abs(vy) > 0.3 ? Math.sign(vy) : (Math.abs(e.y - g.y) > 0.1 ? Math.sign(e.y - g.y) : 1);
+        if (vx * t.d < 0.3 || d < 0.05) { vx = t.d * 0.8; vy = side * 0.6; }   // behind him or on top of him: out front, on his side
+        const n = hyp(vx, vy) || 1; wp = { x: g.x + vx / n * GC, y: g.y + vy / n * GC };
+      }
+      const sd = segDist(g.x, g.y, e.x, e.y, wp.x, wp.y);
+      if (sd[0] < 3.4 && sd[1] > 0.05 && sd[1] < 0.95 && hyp(e.x - g.x, e.y - g.y) > 3.4) {
+        const s = Math.abs(e.y - g.y) > 0.2 ? Math.sign(e.y - g.y) : (Math.abs(wp.y - g.y) > 0.2 ? Math.sign(wp.y - g.y) : 1);
+        return { x: g.x + t.d * 3, y: g.y + s * (GC + 0.6) };   // round the front of him, his own side first
+      }
+    }
+    return wp;
+  }
   moveAll(dt, dead) {
     const p = this.puck;
     for (const e of this.ent) {
@@ -3719,7 +3741,8 @@ class HockeyGame {
         const car = pc0 === e ? e : e.bat, wi = wallInfo(car.x, car.y), k = e === car ? 1.2 : -2.6;
         e.tx = car.x + wi[1] * k; e.ty = car.y + wi[2] * k; maxS = Math.min(maxS, 7);
       }
-      const wp = dead && !e.isG && (this.stopSet || this.phase === 'fo') ? this.roundCrease(e) : { x: e.tx, y: e.ty };   // lining up: round the crease, not through the goalie
+      let wp = dead && !e.isG && (this.stopSet || this.phase === 'fo') ? this.roundCrease(e) : { x: e.tx, y: e.ty };   // lining up: round the crease, not through the goalie
+      if (!dead && !e.isG && !e.bat && e !== p.owner) wp = this.clearGoalie(e, wp);   // (the carrier keeps his wraparounds and dekes)
       e.stx += (wp.x - e.stx) * kk; e.sty += (wp.y - e.sty) * kk;
       const dx = e.stx - e.x, dy = e.sty - e.y, dd = hyp(dx, dy);
       // pace (engine.gd move_all): all out for the carrier, the man on the puck, a pass target, a race or a backcheck;
@@ -7614,10 +7637,13 @@ class League {
           .sort((a, b) => this.payroll(a) - this.payroll(b))[0];
         if (!recv) continue;
         const pick = sweet(p);
+        // (logged as a trade like any other - its card then shows the player and the pick on the side that got them; with
+        // only the player's note it put "with a pick" under the dumping club, as if they'd received it - the user, 2026-10)
+        const trId = this.logTrade(t, recv, { players: [p.id], picks: pick ? [pick.id] : [] }, { players: [], picks: [] });
         this.attach(recv, p, this.where(p) || 'roster'); if (pick) pick.owner = recv.tid;
         this.fixNumbers(); this.autoLines(t); this.autoLines(recv); this.ensureRoster(t); this.aiFarmMoves(recv); this.ensureRoster(recv);
         this.noteTrade([p.id], t, recv, pick ? 'future considerations, with a ' + this.pickLabel(pick) + ' pick' : 'future considerations');
-        this.addNews('Cap dump: the ' + t.name + ' send ' + p.first + ' ' + p.last + ' ($' + hit.toFixed(2) + 'M)' + (pick ? ' and a ' + this.pickLabel(pick) + ' pick' : '') + ' to the ' + recv.name + ' to get under the cap.', t.tid, 'trade');
+        this.addNews('Cap dump: the ' + t.name + ' send ' + p.first + ' ' + p.last + ' ($' + hit.toFixed(2) + 'M)' + (pick ? ' and a ' + this.pickLabel(pick) + ' pick' : '') + ' to the ' + recv.name + ' to get under the cap.', t.tid, 'trade'); this.news[0].tr = trId;
         moved = true; dumped = true; break;
       }
       if (moved) continue;
@@ -7718,9 +7744,11 @@ class League {
     const vGive = give.players.reduce((s, id) => s + this.pValue(P[id], ot, rg(id)), 0) + give.picks.reduce((s, id) => s + this.kValue(this.picks.find(k => k.id === id), ot), 0);
     const salIn = give.players.reduce((s, id) => s + (P[id].contract ? P[id].contract.sal - rg(id) : 0), 0);
     const salOut = get.players.reduce((s, id) => s + (P[id].contract ? P[id].contract.sal - rt(id) : 0), 0);
-    const rosterOnly = ids => ids.filter(id => this.where(P[id]) === 'roster');
-    const utRos = ut.roster.length - rosterOnly(give.players).length + rosterOnly(get.players).length;
-    const otRos = ot.roster.length + rosterOnly(give.players).length - rosterOnly(get.players).length;
+    // (the 23 counted as the league counts them, injured reserve left out - activeLen: a club at 26 with 6 hurt could
+    // make no trade at all, not even one for one, and the AI's offers to it never came - the phone audit, 2026-10)
+    const rosterOnly = ids => ids.filter(id => this.where(P[id]) === 'roster' && !(P[id].inj >= 7));
+    const utRos = this.activeLen(ut) - rosterOnly(give.players).length + rosterOnly(get.players).length;
+    const otRos = this.activeLen(ot) + rosterOnly(give.players).length - rosterOnly(get.players).length;
     let msg = null;
     // (the retained part stays on the trading club's cap; the club getting him carries the rest)
     const hit = id => this.where(P[id]) === 'roster' ? this.capHit(P[id]) : this.where(P[id]) === 'farm' ? this.buried(P[id]) : 0;
@@ -11890,6 +11918,8 @@ function render() {
 }
 // the phone version's header: a ☰ button that slides the side menu (#nav, the PC's own) out from the left, the page's
 // name and the club's logo (the user asked for the side menu rather than bottom tabs, 2026-10)
+// scroll to a part of the page - on a phone first showing the panel it sits in (mBar.reveal, the panel chips)
+function jumpTo(el, smooth) { if (MOBILE && mBar.reveal) mBar.reveal(el); el.scrollIntoView(smooth ? { behavior: 'smooth', block: 'start' } : { block: 'start' }); }
 function mBar() {
   let b = document.getElementById('mbar');
   if (!b) { b = document.createElement('header'); b.id = 'mbar'; document.body.prepend(b); const sh = document.createElement('div'); sh.id = 'mshade'; sh.dataset.act = 'mMenu'; document.body.appendChild(sh); }
@@ -11980,6 +12010,9 @@ function mBar() {
       const show = i => { secs.forEach((c, j) => { c.style.display = i === j ? '' : 'none'; }); bar.querySelectorAll('button').forEach((b, j) => b.classList.toggle('on', i === j)); };
       bar.querySelectorAll('button').forEach((b, i) => b.addEventListener('click', () => { sub[key] = i; show(i); window.scrollTo(0, 0); }));
       show(cur);
+      // (a button that jumps to a panel - Replace the coach, the scout market, Go to Scouting - first shows that panel's
+      // chip: it scrolled to a hidden one and seemed to do nothing, the phone audit found)
+      mBar.reveal = el => { const i = secs.findIndex(c => c.contains(el)); if (i >= 0) { sub[key] = i; show(i); } };
     }
   }
   // the phone Home's swipe cards: the dot under them follows the card in view
@@ -14255,7 +14288,10 @@ function offseasonCard() {
       <p class="muted small">Cap space for next season: <b>${money(CAP - L.payroll(UT()))}</b> (you may go up to 10% over, ${money(L.capLimit())}, until opening night).</p>
       <div class="btnrow"><button class="btn primary" data-act="nav" data-v="contracts">Open contracts</button><button class="btn" data-act="continue">Open free agency</button></div></div>`;
   }
-  if (L.phase === 'freeagency') return `<div class="card"><div class="eyebrow">Offseason · step 3 of 3</div><h2>Free agency</h2><p>Sign players to fill out your roster (${UT().roster.length}/${ROSTER_MAX}; you need at least 2 G, 7 D and 12 F). When you start the season, other teams finish their signings and empty spots are filled at the league minimum.</p><div class="btnrow"><button class="btn primary" data-act="nav" data-v="fa">Browse free agents</button><button class="btn" data-act="faWeek">Sim a week of free agency</button><button class="btn" data-act="continue">Start ${L.season + 1} season</button></div></div>`;
+  if (L.phase === 'freeagency') return `<div class="card"><div class="eyebrow">Offseason · step 3 of 3</div><h2>Free agency</h2><p>Sign players to fill out your roster (${UT().roster.length}/${ROSTER_MAX}; you need at least 2 G, 7 D and 12 F). When you start the season, other teams finish their signings and empty spots are filled at the league minimum.</p><div class="btnrow"><button class="btn primary" data-act="nav" data-v="fa">Browse free agents</button><button class="btn" data-act="faWeek">Sim a week of free agency</button><button class="btn" data-act="continue">Open training camp</button></div></div>`;
+  // training camp: its way back from Home (left for the roster or lines, there was none - on a phone the season couldn't
+  // be started: the phone audit, 2026-10)
+  if (L.phase === 'camp') return `<div class="card"><div class="eyebrow">Offseason · training camp</div><h2>${L.camp && L.camp.done ? 'Camp is done' : 'Training camp'}</h2><p class="muted">${L.camp && L.camp.done ? 'Set your opening-night roster and lines, then start the season.' : 'Battles for jobs and the preseason games decide who makes the team.'}</p><div class="btnrow"><button class="btn primary" data-act="${L.camp && L.camp.done ? 'continue' : 'nav'}" data-v="camp">${L.camp && L.camp.done ? 'Start ' + (L.season + 1) + ' season' : 'Go to training camp'}</button>${L.camp && L.camp.done ? '<button class="btn" data-act="nav" data-v="camp">Back to camp</button>' : ''}</div></div>`;
   return '';
 }
 // the playoff bracket as a bracket (2026-10, the user's ask - the list of rounds needed a scroll bar): the East's rounds
@@ -17982,7 +18018,7 @@ const ACT = {
   offerDecline: d => { const o = (L.offers || []).find(x => x.id === d.id); L.declineOffer(d.id); if (!(L.offers || []).length) closeModal(); else if (!$('#modal').hidden) modal(offerCards(false), 'wide'); save(); render(); if (o) toast('You turned down the ' + L.teams[o.tid].name + '.');
     const ps = pausedSim; if (ps && ps.id === d.id) { pausedSim = null; closeModal(); simDays(ps.left, ps.opts); } },   // the offer that paused a sim: carry on with it
   offerCounter: d => { const o = (L.offers || []).find(x => x.id === d.id); if (!o) return; closeModal(); sub.trade = { tid: o.tid, give: JSON.parse(JSON.stringify(o.give)), get: JSON.parse(JSON.stringify(o.get)) }; view = 'trade'; render(); const c = document.querySelector('.tradegrid'); if (c) c.scrollIntoView({ block: 'start' }); toast('Their offer is loaded below. Adjust it and press Make trade.'); },
-  staffRole: d => { sub.stRole = d.k; sub.stTid = L.userTid; render(); const m = $('#coach-market'); if (m) m.scrollIntoView({ block: 'start' }); },
+  staffRole: d => { sub.stRole = d.k; sub.stTid = L.userTid; render(); const m = $('#coach-market'); if (m) jumpTo(m); },
   stView: d => { sub.stTid = +d.tid; render(); window.scrollTo(0, 0); },
   hireCoach: d => { const c = L.coaches[d.cid]; const t = UT(); L.hire(t, c, d.k); L.addNews('You hired ' + L.coachName(c) + ' as ' + ROLE_NAME[d.k].toLowerCase() + ' (' + money(c.sal) + ' through ' + c.exp + ').', t.tid, 'front'); L.topUpPool(); save(); render(); toast(L.coachName(c) + ' hired.', 'good'); },
   fireCoach: d => { const c = L.coaches[d.cid]; L.fireCoach(UT(), c); save(); render(); toast(L.coachName(c) + ' fired.'); },
@@ -18024,11 +18060,11 @@ const ACT = {
   scSend: d => { const s = L.scoutDB[d.sid]; if (!s) return; s.at = d.k; L.scoutsSet = true; SCREV++; save(); render(); },
   scRecall: d => { const s = L.scoutDB[d.sid]; if (!s) return; s.at = null; L.scoutsSet = true; SCREV++; save(); render(); },
   scUnbook: d => { const E = L.scEvState(); E.b = E.b || {}; E.b[d.k] = L.evBooked(d.k).filter(x => x !== d.sid); save(); render(); },
-  scMkt: d => { sub.scMkt = d.k != null ? true : !scMktOpen(); if (d.k != null) sub.scMktDir = +d.k; render(); const m = document.getElementById('scout-market'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'start' }); },
+  scMkt: d => { sub.scMkt = d.k != null ? true : !scMktOpen(); if (d.k != null) sub.scMktDir = +d.k; render(); const m = document.getElementById('scout-market'); if (m) jumpTo(m, true); },
   scMktTab: d => { sub.scMktDir = +d.k; render(); },
   scAuto: () => { L.scStaff(); L.autoAssignScouts(); L.scoutsSet = false; save(); render(); toast('Scouts sent where the talent is, home experts first.'); },
   scAutoPop: () => { closeModal(); ACT.scAuto(); },
-  scGoStaff: () => { closeModal(); view = 'scouting'; render(); const c = $('#sc-staff'); if (c) c.scrollIntoView({ block: 'start' }); else window.scrollTo(0, 0); },
+  scGoStaff: () => { closeModal(); view = 'scouting'; render(); const c = $('#sc-staff'); if (c) jumpTo(c); else window.scrollTo(0, 0); },
   scEvAdd: d => { const ev = SC_EVENTS.find(e => e.k === d.k), E = L.scEvState(); E.b = E.b || {}; const b = E.b[d.k] = L.evBooked(d.k), s = L.pickForEvent(ev, b); if (!s) return toast(L.scEmp().length ? 'Every scout is already booked.' : 'You have no scouts to send.', 'bad'); b.push(s.id); save(); render(); toast(s.last + ' booked for the ' + ev.n + (L.scEvField(ev).some(p => scRegOf(p) === s.home) ? ' (' + regShort(s.home) + ' expert).' : '.')); },
   scEvSub: d => { const E = L.scEvState(); E.b = E.b || {}; const b = L.evBooked(d.k); b.pop(); E.b[d.k] = b; save(); render(); },  scRep: d => { const E = L.scEvState(); if (E.rep && E.rep[d.k]) scoutReport(E.rep[d.k]); },
   intlSel: d => { sub.intlI = +d.i; sub.intlNat = null; view = 'intl'; closeModal(); render(); },
@@ -18114,8 +18150,26 @@ const ACT = {
 // right-click closes what's on top, OOTP style: an open window (player card, box score, report), the search dropdown,
 // else back to the previous page. Text boxes and selected text keep the usual menu; a line card's right-click (Lines)
 // opens the player and is left alone.
+// On a phone the system Back (Android's button or gesture) does what right-click does on a PC: closes the top pop-up or
+// the side menu, else goes back a page. It used to leave the app (nothing was in the browser's history), losing a game
+// being watched; now one entry is kept armed. A game on screen ignores it; at Home with nowhere to go, a second Back leaves.
+// (Long-press on a phone fires contextmenu too: it no longer acts as Back there - the phone audit, 2026-10.)
+if (MOBILE) {
+  const arm = () => { try { history.pushState({ blgm: 1 }, ''); } catch (e) { } };
+  arm();
+  window.addEventListener('popstate', () => {
+    if (!L) return;
+    if (!$('#game').hidden || !$('#busy').hidden) return void arm();
+    if (!$('#modal').hidden) { closeTop(); return void arm(); }
+    const pop = $('#qs-pop'); if (pop && !pop.hidden) { qsHide(); return void arm(); }
+    if (document.body.classList.contains('navopen')) { document.body.classList.remove('navopen'); return void arm(); }
+    if (goBack()) return void arm();
+    if (view !== 'home') { view = 'home'; render(); window.scrollTo(0, 0); return void arm(); }
+    toast('Press back again to leave Blue Line GM.');
+  });
+}
 document.addEventListener('contextmenu', e => {
-  if (e.defaultPrevented || !L || !$('#game').hidden || !$('#busy').hidden) return;   // (not over a game being played, or mid-sim)
+  if (MOBILE || e.defaultPrevented || !L || !$('#game').hidden || !$('#busy').hidden) return;   // (not over a game being played, or mid-sim)
   if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable], canvas')) return;
   if (String(window.getSelection ? getSelection() : '').trim()) return;
   e.preventDefault();
