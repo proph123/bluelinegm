@@ -499,6 +499,9 @@ td.b { font-weight: 700 }
 .sr-second { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 7px 0 2px; border-top: 1px solid var(--line); margin-top: 6px } .sr-lk-h { color: var(--blue); font-weight: 600 } .sr-lk-m { color: var(--good); font-weight: 600 } .sr-lk-l { color: var(--bad); font-weight: 600 }
 .sc-rc { display: inline-block; min-width: 18px; text-align: center; font-weight: 700; font-size: 11px; line-height: 17px; border-radius: 4px; padding: 0 4px; color: #fff; vertical-align: middle } .rc-a { background: var(--good) } .rc-b { background: var(--warn); color: #1a1a1a } .rc-c { background: var(--bad) }
 .sc-job { font-size: 11.5px; color: var(--muted) } .sc-job .btn { margin-left: 6px } .sc-jl li { align-items: center; flex-wrap: wrap } .sc-jl li .btn { margin-left: auto } .sc-jl small { color: var(--muted) } .sc-sug { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 7px 9px; margin: 8px 0; border: 1px dashed var(--line); border-radius: 8px; font-size: 12.5px } .sc-sug .btn { margin-left: auto }
+.sc-dis { font-size: 10.5px; border: 1px solid currentColor; border-radius: 999px; padding: 0 6px; white-space: nowrap; vertical-align: middle } .d-consensus { color: var(--good) } .d-mixed { color: var(--warn) } .d-split { color: var(--bad) } .sc-slp { font-size: 11px; color: var(--blue); white-space: nowrap }
+.bb-head { margin: 4px 0 6px } .bb-mv { display: inline-flex; flex-direction: column; vertical-align: middle; margin-left: 2px } .bb-mv button { background: none; border: 0; color: var(--muted); font-size: 9px; line-height: 10px; padding: 0 3px; cursor: pointer } .bb-mv button:hover { color: var(--ink, #fff) }
+.cmb td, .cmb th { padding-left: 6px; padding-right: 6px } #combine, #mock { margin-top: 14px } #mock ol.mock { display: grid; grid-template-columns: 1fr 1fr; grid-auto-flow: column; grid-template-rows: repeat(16, auto); column-gap: 24px } body.mobile #mock ol.mock { display: flex } @media (max-width: 700px) { #mock ol.mock { display: flex } } .sc-lb li { align-items: flex-start } .sc-lb li > span:nth-child(2) { flex: 1; min-width: 0 }
 .sc-notes li { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 6px } .sc-notes em { font-style: normal; font-weight: 600 }
 .sr-grades.sc-nums { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 12px 0 4px } .sc-nums b { font-size: 18px } .sr-info dd { min-width: 0 } .sr-info select { max-width: 100% }
 .sr-flags { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 6px 0; font-size: 12px } .sr-flags span { border: 1px solid var(--line); border-radius: 999px; padding: 0 8px } .sr-flags .pos { color: var(--good, #2a8) } .sr-flags .neg { color: var(--bad) } .sr-out { font-size: 12.5px; margin: 4px 0 }
@@ -6069,6 +6072,7 @@ class League {
   // see more than one); nobody sent means a look on video only. final: the draft is here, so whatever's left happens now.
   scoutEvents(final) {
     if (!this.draftClass) return;
+    if (!final) { try { this.warRoomTick(); } catch (e) { if (typeof console !== 'undefined') console.warn('warroom', e); } }   // (sleeper alerts, the Combine, the first mock)
     const E = this.scEvState(); this.scStaff();
     for (const ev of SC_EVENTS) {
       if (E.done[ev.k] != null || (!final && this.sclk() < ev.d)) continue;
@@ -6182,6 +6186,7 @@ class League {
       slots.push({ round: r, orig: tid, owner: k ? k.owner : tid, pid: null });
     }
     this.draft = { pool, slots, cur: 0, lottery: r1Order.slice(0, 16), base: base.slice(0, 16), odds: wts.slice(0, base.length), rounds: 7 };
+    try { this.mkMock('Final mock draft', true); } catch (e) { if (typeof console !== 'undefined') console.warn('mock', e); }   // (draft eve: the real order, the clubs' own reads)
   }
   // the NHL draft lottery, as in the real league in early May: drawn once the regular season is over and the playoff
   // field is set (two draws among the 16 non-playoff clubs, odds by finish, a jump of 10 spots at most, one win a club),
@@ -6281,7 +6286,7 @@ class League {
   aiPickOne() {
     const D = this.draft; const s = D.slots[D.cur]; const t = this.teams[s.owner];
     // the user's own picks (auto, or the clock ran out) come off his board: his scouts' reads, not the public lists
-    const val = s.owner === this.userTid ? (m => p => m.get(p.id))(new Map(D.pool.map(id => [id, this.myVal(this.players[id])]))) : p => this.draftValue(p, t);
+    const val = s.owner === this.userTid ? (m => p => m.get(p.id))(new Map(this.boardOrder(D.pool.map(id => this.players[id])).map((p, i) => [p.id, -i]))) : p => this.draftValue(p, t);   // (yours: the top of your big board - your order if you've set one, else your staff's reads)
     const best = D.pool.map(id => this.players[id]).sort((a, b) => val(b) - val(a))[0];
     this.draftPick(best.id);
   }
@@ -8205,6 +8210,10 @@ const SC_BIAS = {
   dour: ['🌧️', 'Hard to impress', 'His ceilings run low across the board.', -3],
   grit: ['💪', 'Sold on character', 'Rates hard workers and smart kids higher, and coasters lower, than they are.', 1],
 };
+// (phase 3) the Combine doctors' injury types (invented junior injuries: generated prospects only), and whether a
+// player is one the game made up (not from the real data: no NHL-data id, not a real NHL father's legacy son)
+const SC_MED_IT = ['Shoulder separation', 'Knee sprain (MCL)', 'Concussion', 'High ankle sprain', 'Broken wrist', 'Groin strain', 'Back spasms'];
+const scGenP = p => !!p.gv && p.hlm == null && !p.nhl && !(typeof LEGACY_KIDS !== 'undefined' && LEGACY_KIDS.some(k => k.n === p.first + ' ' + p.last));
 // (phase 2) a scout's call on a player he has seen enough of: what each letter means
 const SC_RECT = { A: 'must target: worth taking early or paying up for', B: 'worth it at the right slot or price', C: 'pass' };
 const SC_BIAS_POOL = ['size', 'size', 'flash', 'flash', 'cons', 'cons', 'opt', 'opt', 'dour', 'grit', 'grit'];
@@ -8250,6 +8259,7 @@ const scName = s => s ? s.first[0] + '. ' + s.last : '—';
 const r3 = x => Math.round(x * 1000) / 1000;
 const regName = k => (SC_REG.find(r => r[0] === k) || [, k])[1], regShort = k => (SC_REG.find(r => r[0] === k) || [, , k])[2];
 const SCB = new WeakMap();   // estimate cache: prospect -> {st, ovr, pot}
+const SPL = new WeakMap();   // (phase 3) the scouts' disagreement on a prospect: {st, v} (scSplit)
 let SCREV = 0, SCDA = [-1, 0];   // bumped by every new read and staff change; [SCREV, director accuracy]
 // the scouting calendar: the season's showcase events. Scouts you send leave their regions for about a week; when the
 // event is held they file reports on everyone in it (d: game day, past the regular season into the playoffs; 999 =
@@ -10197,7 +10207,11 @@ Object.assign(League.prototype, {
     const base = s.role === 'dir' ? .15 + .85 * x * x : .08 + .42 * x * x, ageK = s.age < 32 ? .75 : s.age < 40 ? .9 : 1, tk = { 1: 1.08, 2: 1, 3: .96 }[yrs] || 1;
     return Math.round(Math.max(.05, base * ageK * tk * (s.trait && s.trait !== 'size' ? 1.12 : 1)) * 100) / 100;   // an ability costs a little more
   },
-  scStaff() { if (!this.scoutV) this.migrateScouts(); if (this.scoutV < 2) this.scoutV2(); return this.scEmp(); },
+  scStaff() { if (!this.scoutV) this.migrateScouts(); if (this.scoutV < 2) this.scoutV2(); if (this.scoutV < 3) this.scoutV3(); return this.scEmp(); },
+  scoutV3() {   // (the user's call: no invented injuries on real players) the Combine's made-up junior injuries come off anyone not generated
+    for (const p of Object.values(this.players)) if (p.ih && p.ih.length && !scGenP(p)) { const k = p.ih.filter(e => !(e[4] === 'cb' || (SC_MED_IT.includes(e[1]) && e[3] === 0))); if (k.length !== p.ih.length) { if (k.length) p.ih = k; else delete p.ih; } }
+    this.scoutV = 3;
+  },
   // (scouting phase 1) an older save's scouts get specialties, maybe a tendency and a seeded record; the old 'Loves
   // size' ability becomes his (already known) tendency; calls on picks made before now are scored like new ones
   scoutV2() {
@@ -10342,6 +10356,111 @@ Object.assign(League.prototype, {
     const p = (this.draftClass || []).map(id => this.players[id]).filter(q => q && q.tid === -2 && !on.has(q.id)).sort((a, b) => b.scout - a.scout).slice(0, 40).find(q => (q.sp || 0) < 35);
     if (!p) return null; const s = free.slice().sort((a, b) => this.scAcc(b, p) - this.scAcc(a, p) || this.scTravel(a, scRegOf(p)) - this.scTravel(b, scRegOf(p)))[0];
     return { s, p };
+  },
+  // ---- (scouting phase 3) the draft war room ----
+  // your big board (this.board: {k: the class's season, ids: your order}): your own order once you move someone, else
+  // your staff's reads (myVal: the director-corrected blend). It is what auto-pick and the draft room use.
+  boardOrder(ps) {
+    const mv = new Map(ps.map(p => [p.id, this.myVal(p)])), staff = ps.slice().sort((a, b) => mv.get(b.id) - mv.get(a.id));
+    const B = this.board && this.board.k === this.season ? this.board.ids : null; if (!B) return staff;
+    const at = new Map(B.map((id, i) => [id, i]));
+    return [...staff.filter(p => at.has(p.id)).sort((a, b) => at.get(a.id) - at.get(b.id)), ...staff.filter(p => !at.has(p.id))];
+  },
+  boardMove(pid, d) {
+    const cls = (this.draftClass || []).map(id => this.players[id]).filter(p => p && p.tid === -2);
+    if (!this.board || this.board.k !== this.season) this.board = { k: this.season, ids: this.boardOrder(cls).map(p => p.id) };
+    const a = this.board.ids, i = a.indexOf(pid); if (i < 0) return;
+    let j = i + d; while (j >= 0 && j < a.length && !(this.players[a[j]] && this.players[a[j]].tid === -2)) j += d;   // (past anyone already drafted)
+    if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; SCREV++;
+  },
+  boardReset() { this.board = null; SCREV++; },
+  consRanks(ps) { const v = p => p.scout * .75 + p.ovr * .25 + (p.pos === 'G' && p.scout < 88 ? -3 : 0), r = {}; ps.slice().sort((a, b) => v(b) - v(a)).forEach((p, i) => r[p.id] = i + 1); return r; },   // (the public lists' order, as consensus() has it)
+  // how much your scouts disagree on him: the spread of their own reads of his ceiling (shown scale), and their calls
+  scSplit(p) {
+    const c = SPL.get(p); if (c && c.st === SCREV) return c.v;
+    const rd = [], seen = new Set(); for (const id of [...Object.keys(p.scW || {}), ...Object.keys(p.scV || {})]) { if (id === '~' || seen.has(id)) continue; seen.add(id); const s = this.scoutDB && this.scoutDB[id]; if (!s || s.st === 'gone' || !(((p.scW || {})[id] || 0) >= SC_K || (p.scV && p.scV[id] && p.scV[id].n))) continue; rd.push(showR(this.scOwnRead(s, p))); }
+    let v = null; if (rd.length >= 2) { const sp = Math.max(...rd) - Math.min(...rd), L3 = new Set(this.scRecs(p).map(x => x[1])); v = { n: rd.length, sp, lab: sp >= 6 || (L3.has('A') && L3.has('C')) ? 'Split' : sp >= 3 ? 'Mixed' : 'Consensus' }; }
+    SPL.set(p, { st: SCREV, v }); return v;
+  },
+  // the season's run-up to the draft, on game days: the sleeper alert (mid-season), and once the playoffs start the
+  // Combine's invitations and the first mock draft; the final mock comes on draft eve (setupDraft)
+  warRoomTick() {
+    if (!this.draftClass) return;
+    if (this.sclk() >= 55 && this.sleepS !== this.season) { this.sleepS = this.season; this.sleeperCheck(); }
+    if (this.phase === 'playoffs') { this.combState(); if (!this.mocks || this.mocks.s !== this.season) { this.mkMock('First mock draft'); this.sleeperCheck(); } }
+  },
+  sleeperCheck() {   // prospects your staff has well above their spot on the lists: late-round value, flagged on the board
+    const cls = (this.draftClass || []).map(id => this.players[id]).filter(p => p && p.tid === -2), cr = this.consRanks(cls), mine = this.boardOrder(cls);
+    const S = this.sleep && this.sleep.s === this.season ? this.sleep : (this.sleep = { s: this.season, ids: [] });
+    const nw = mine.map((p, i) => [p, i + 1]).filter(([p, m]) => m <= 96 && cr[p.id] - m >= 30 && cr[p.id] > 32 && (p.sp || 0) >= 25 && !S.ids.includes(p.id)).slice(0, 3);   // (well enough seen to trust, a round or more above his spot, not a first-rounder anyway)
+    for (const [p, m] of nw) { S.ids.push(p.id); const ld = this.scLead(p); this.addNews('Sleeper alert: ' + (ld ? ld.s.first + ' ' + ld.s.last : 'your staff') + ' has ' + p.pos + ' ' + p.first + ' ' + p.last + ' (' + (p.club || p.lg || '') + ') at #' + m + ' on your board; the lists have him #' + cr[p.id] + '. Late-round value if they\'re right.', this.userTid, 'scout', p.id); }
+  },
+  // the NHL Scouting Combine (this.comb): the top 100 on the lists invited once the playoffs start; measurements, fitness
+  // tests and medicals for all of them, and 12 interviews you choose, each settling his character for certain
+  combState() {
+    if (!this.draftClass || !['playoffs', 'draft'].includes(this.phase)) return this.comb && this.comb.s === this.season ? this.comb : null;
+    if (!this.comb || this.comb.s !== this.season) {
+      const cls = (this.draftClass || []).map(id => this.players[id]).filter(p => p && p.tid === -2), cr = this.consRanks(cls);
+      this.comb = { s: this.season, inv: cls.filter(p => cr[p.id] <= 100).sort((a, b) => cr[a.id] - cr[b.id]).map(p => p.id), iv: [], max: 12 };
+      // the doctors' files: a GENERATED prospect's junior injuries the game didn't track before the draft (about one in six
+      // had one, a few a serious one), written into his injury history (p.ih, marked 'cb') so every page shows the same
+      // record. Real players never get invented injuries (the user's call): theirs is only what the game itself recorded.
+      for (const id of this.comb.inv) { const p = this.players[id]; if (!p || !scGenP(p) || (p.ih && p.ih.length)) continue; const h = hashStr(p.id + ':med') % 1000; if (h >= 170) continue; const n = h < 25 ? 2 : 1; p.ih = []; for (let i = 0; i < n; i++) p.ih.push([this.season - (n - i - 1), SC_MED_IT[(h + i * 3) % SC_MED_IT.length], h < 25 ? 14 + (h % 20) : 3 + (h % 12), 0, 'cb']); }
+
+      this.addNews('The NHL Scouting Combine has invited ' + this.comb.inv.length + ' draft prospects: measurements, fitness testing and medicals for all of them, and your staff can interview ' + this.comb.max + '. Pick them on the Scouting page.', this.userTid, 'scout');
+    }
+    return this.comb;
+  },
+  combMeas(p) {
+    const [ht, wt] = this.bodyOf(p), h = k => (hashStr(p.id + ':cb' + k) % 1000) / 1000, r = p.r || {};
+    return { ht, wt, ws: Math.round((ht + 1 + h(1) * 4) * 10) / 10, bench: Math.round(cl(3 + ((r.chk || 60) - 50) * .25 + h(2) * 6, 0, 20)), vert: Math.round((17 + ((r.ska || r.ref || 60) - 50) * .18 + h(3) * 5) * 10) / 10, vo2: Math.round((47 + ((r.end ?? 70) - 60) * .2 + h(4) * 6) * 10) / 10 };
+  },
+  combMed(p) {   // [label, class, what]: his injury history and durability
+    const ih = p.ih || [], g = ih.reduce((t, x) => t + (x[2] || 0), 0), dur = p.r && p.r.dur;
+    if (ih.some(x => x[3]) || g >= 30 || (dur != null && dur < 45)) return ['Red flag', 'neg', ih.length ? ih.map(x => x[1]).slice(-2).join(', ') : 'durability'];
+    if (ih.length || (dur != null && dur < 55)) return ['Minor concern', '', ih.length ? ih.map(x => x[1]).slice(-2).join(', ') : 'durability'];
+    return ['Clean', 'pos', ''];
+  },
+  combIvErr(pid) { const C = this.combState(); if (!C) return 'The Combine opens with the playoffs'; if (!C.inv.includes(pid)) return 'Not invited to the Combine'; if (C.iv.includes(pid)) return 'Already interviewed'; return C.iv.length >= C.max ? 'All ' + C.max + ' interviews used' : ''; },
+  combIv(pid) {   // the interview: his work ethic, hockey sense and leadership for certain, and now and then a red flag
+    const C = this.combState(), p = this.players[pid]; C.iv.push(pid); const T = traitsOf(p), h = (hashStr(p.id + ':ivw') % 100) / 100;
+    p.ivw = { s: this.season, red: T.work < 0 && (T.lead < 0 || h < .5) ? 'Red flag: questions about his commitment came up in the room.' : T.iq < 0 && h < .3 ? 'Red flag: struggled to talk through the game on video.' : null };
+    SCREV++; return p.ivw;
+  },
+  // a mock draft from the AI clubs' own reads (their scouting staffs, teamRead) and needs, not the public lists; your
+  // slots from your board. this.mocks: {s, l: [{n, dt, picks: [[owner, pid]]}]}
+  mkMock(name, useD) {
+    const D = (useD || this.phase === 'draft') && this.draft ? this.draft : null, cls = (D ? D.pool : this.draftClass || []).map(id => this.players[id]).filter(p => p && p.tid === -2);
+    const order = D ? D.slots.slice(D.cur, D.cur + 32).map(s => s.owner) : this.pctStandings().reverse().map(t => { const k = this.picks.find(x => x.season === this.season && x.round === 1 && x.orig === t.tid); return k ? k.owner : t.tid; }).slice(0, 32);
+    const cr = this.consRanks(cls), cand = cls.filter(p => cr[p.id] <= 90), mine = this.boardOrder(cls), taken = new Set(), picks = [], nM = this.mocks && this.mocks.s === this.season ? this.mocks.l.length : 0;
+    const grp = p => p.pos === 'G' ? 'G' : p.pos === 'D' ? 'D' : 'F', need = {};
+    for (const tid of new Set(order)) { const c = { F: 0, D: 0, G: 0 }; for (const id of this.teams[tid].prospects || []) { const q = this.players[id]; if (q) c[grp(q)] += grp(q) === 'F' ? .5 : grp(q) === 'G' ? 2 : 1; } need[tid] = Object.keys(c).sort((a, b) => c[a] - c[b])[0]; }
+    for (const tid of order) {
+      const t = this.teams[tid]; let p;
+      if (tid === this.userTid) p = mine.find(q => !taken.has(q.id));
+      else { const w = t.status === 'Rebuilding' ? .85 : t.status === 'Contender' ? .65 : .75; let bv = -1e9; for (const q of cand) { if (taken.has(q.id)) continue; const v = this.teamRead(q, t) * w + q.ovr * (1 - w) + (grp(q) === need[tid] ? .8 : 0) + (q.pos === 'G' && this.teamRead(q, t) < 88 ? -3 : 0) + hgauss(t.abbr + q.id + ':mk' + nM) * .8; if (v > bv) { bv = v; p = q; } } }   // (nM: each mock's own whispers, so names rise and fall between them)
+      if (!p) break; taken.add(p.id); picks.push([tid, p.id]);
+    }
+    const M = this.mocks && this.mocks.s === this.season ? this.mocks : (this.mocks = { s: this.season, l: [] });
+    const dt = useD ? 'Draft eve' : this.phase === 'playoffs' ? 'Early playoffs, with the Combine invitations' : typeof gameDate === 'function' ? gameDate(this.clkDay(this.sclk())).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    M.l.push({ n: name, dt, picks }); if (M.l.length > 3) M.l.shift();
+    const f = picks[0] && this.players[picks[0][1]]; if (f) this.addNews(name + ': ' + f.first + ' ' + f.last + ' first overall to the ' + this.tname(picks[0][0]) + ', built from what the clubs\' own scouts are saying. See it on the Scouting page.', this.userTid, 'draft', f.id);
+    return M;
+  },
+  // three drafts on, how your picks turned out: each against the men taken in the six picks after him (a fair look at who
+  // you could have had), your scouts' calls on him, and a grade for the draft
+  lookBack() {
+    const out = {}, val = q => .5 * showR(q.ovr) + .5 * showR(Math.max(q.ovr, q.pot)), y0 = this.rxS ?? ((this.history || []).length ? Math.min(...this.history.map(h => h.season)) : this.season);   // (the league's first season)
+    for (const p of Object.values(this.players)) { const d = p.draft; if (!d || !d.pick) continue; (out[d.season] = out[d.season] || []).push(p); }
+    const res = [];
+    for (const Y of Object.keys(out).map(Number).sort((a, b) => b - a)) {
+      if (this.season + 1 - Y < 3 || Y <= y0) continue;   /* (only drafts this league has run: not the real clubs' picks from before it began) */ const all = out[Y], mine = all.filter(p => p.draft.tid === this.userTid && p.scSnap).sort((a, b) => a.draft.pick - b.draft.pick); if (!mine.length) continue;
+      const rows = mine.map(p => { const after = all.filter(q => q.draft.pick > p.draft.pick && q.draft.pick <= p.draft.pick + 6), better = after.filter(q => val(q) > val(p) + 1), best = after.slice().sort((a, b) => val(b) - val(a))[0];
+        return { p, best, beat: after.length - better.length, of: after.length, g: !after.length ? 'B' : better.length === 0 ? 'A' : better.length <= 1 ? 'B' : better.length <= 3 ? 'C' : 'D' }; });
+      const gp = { A: 4, B: 3, C: 2, D: 1 }, avg = rows.reduce((t, r) => t + gp[r.g], 0) / rows.length;
+      res.push({ Y, rows, grade: avg >= 3.5 ? 'A' : avg >= 3 ? 'B+' : avg >= 2.5 ? 'B' : avg >= 2 ? 'C' : 'D' });
+    }
+    return res;
   },
   scOwnRead(s, p) { return p.pot + this.scRead(s, p, 'pot', true) * this.sceK(); },   // (one scout's own read of a ceiling: his call, scored later)
   scTrkScore() {   // the summer: calls three drafts old are judged against what the player became
@@ -16244,7 +16363,9 @@ function vDraft() {
   // the board sorts on any column (sub.dsort: key and direction; a second click flips it); by your scouts' ceiling
   // estimate until you pick one
   const SK = { my: p => -(DCS.myRank[p.id] || 999), cons: p => -(DCS.rank[p.id] || 999), rd: p => -(DCS.rank[p.id] || 999), name: p => nm(p), pos: p => p.pos, age: p => -p.age, ovr: p => estMid(p, 'ovr'), pot: p => estMid(p, 'pot'), style: p => p.arch || archOf(p), sp: p => p.sp || 0 };
-  const ds = sub.dsort && SK[sub.dsort.k] ? sub.dsort : { k: 'pot', dir: 1 }, kf = SK[ds.k];
+  const ds = sub.dsort && SK[sub.dsort.k] ? sub.dsort : { k: 'my', dir: 1 }, kf = SK[ds.k];   // (your big board first)
+  const nb = L.boardOrder(D.pool.map(id => L.players[id]))[0], nbRc = nb ? L.scRecs(nb) : [];   // (the top of your board still there: the suggestion)
+  const sug = nb ? `<div class="sc-sug"><span><span class="muted">Your board's best available:</span> <button class="link" data-act="player" data-pid="${nb.id}"><b>${esc(nm(nb))}</b></button> <small class="muted">${nb.pos} · your #${DCS.myRank[nb.id]} · lists #${DCS.rank[nb.id]}</small> ${nbRc.map(([x, r]) => recChip(r, x)).join('')} ${splitChip(nb)}</span>${onClock ? `<button class="btn sm primary" data-act="draftPick" data-pid="${nb.id}">Draft him</button>` : ''}</div>` : '';
   const pool = D.pool.map(id => L.players[id]).filter(p => !sub.dpos || (sub.dpos === 'F' ? ['C', 'LW', 'RW'].includes(p.pos) : p.pos === sub.dpos))
     .sort((a, b) => { const x = kf(a), y = kf(b); const c = typeof x === 'string' ? x.localeCompare(y) : y - x;   /* (names A-Z, numbers best first) */ return (c * ds.dir) || estMid(b, 'pot') - estMid(a, 'pot') || (b.sp || 0) - (a.sp || 0); });
   const dth = (k, lab, cls) => `<th class="dsort${cls ? ' ' + cls : ''}${ds.k === k ? ' on' : ''}" data-act="dsort" data-k="${k}" title="Sort">${lab}${ds.k === k ? (ds.dir > 0 ? ' ▼' : ' ▲') : ''}</th>`;
@@ -16262,9 +16383,9 @@ function vDraft() {
     return `<li class="${k < D.cur ? 'done' : ''}"><span>#${k + 1}</span><small>R${s.round}${s.orig !== L.userTid ? ' via ' + L.teams[s.orig].abbr : ''}</small><small>${p ? `<button class="link" data-act="player" data-pid="${p.id}">${esc(p.pos + ' ' + nm(p))}</button>` : now ? '<b>On the clock</b>' : '<span class="muted">' + (k - D.cur) + ' pick' + (k - D.cur === 1 ? '' : 's') + ' away</span>'}</small></li>`; }).join('') : '<li class="muted">You have no picks in this draft</li>'}</ul></div>`;
   const made = D.slots.slice(Math.max(0, D.cur - 10), D.cur).reverse().map((s, i) => { const p = L.players[s.pid]; return `<li class="${s.owner === L.userTid ? 'mine' : ''}"><span>#${D.cur - i}</span>${dTm(L.teams[s.owner])}<small>${p ? `<button class="link" data-act="player" data-pid="${p.id}">${esc(p.pos + ' ' + nm(p))}</button>` : ''}</small></li>`; }).join('');
   return `${drTicker()}<div class="grid draft"><div class="card"><div class="cardhead"><h2>${L.season + 1} draft · Round ${D.slots[D.cur] ? D.slots[D.cur].round : 7} · Pick ${D.cur + 1} of ${D.slots.length}</h2><div class="tabs inline">${tb('', 'All')}${tb('F', 'F')}${tb('D', 'D')}${tb('G', 'G')}</div></div>
-    ${drRoom(cur)}
+    ${drRoom(cur)}${sug}
     <div class="btnrow">${!onClock ? '<button class="btn" data-act="drSimOne" title="The club on the clock makes its pick now">Sim Pick</button><button class="btn' + (DR.live ? '' : ' primary') + '" data-act="draftToMe">Sim to my next pick</button>' : '<button class="btn" data-act="draftAuto">Auto-pick for me</button>'}<button class="btn ghost" data-act="draftAll">Sim Draft</button></div>
-    <div class="tblwrap"><table class="tbl"><thead><tr><th></th>${dth('my', 'My rank')}${dth('rd', 'Proj')}${dth('name', 'Prospect', 'l')}${dth('pos', 'Pos')}${dth('age', 'Age')}${dth('ovr', 'Est. OVR')}${dth('pot', 'Potential', 'l')}${dth('style', 'Style', 'l')}${dth('sp', 'Scouted')}</tr></thead><tbody>${pool.slice(0, 80).map(p => `<tr><td class="nowrap">${onClock ? `<button class="btn sm primary" data-act="draftPick" data-pid="${p.id}">Draft</button> ` : ''}${starBtn(p)}</td><td><b>${DCS.myRank[p.id] || ''}</b></td>${(ps => `<td class="nowrap${/^R[2-7]|UDFA|—/.test(ps) ? ' muted' : ''}" title="Where the public lists have him going: #${DCS.rank[p.id] || '?'} on the consensus ranking">${DCS.rank[p.id] ? '#' + DCS.rank[p.id] + ' · ' : ''}${ps}</td>`)(projSlot(DCS, p))}<td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${dMark(p)}</td><td>${p.pos}</td><td>${p.age}</td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${archChip(p)}</td><td>${spBar(p)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="tblwrap"><table class="tbl"><thead><tr><th></th>${dth('my', 'My rank')}<th title="Your board against the lists: + you rate him higher">±</th>${dth('rd', 'Proj')}${dth('name', 'Prospect', 'l')}${dth('pos', 'Pos')}${dth('age', 'Age')}${dth('ovr', 'Est. OVR')}${dth('pot', 'Potential', 'l')}${dth('style', 'Style', 'l')}${dth('sp', 'Scouted')}</tr></thead><tbody>${pool.slice(0, 80).map(p => `<tr><td class="nowrap">${onClock ? `<button class="btn sm primary" data-act="draftPick" data-pid="${p.id}">Draft</button> ` : ''}${starBtn(p)}</td><td><b>${DCS.myRank[p.id] || ''}</b></td><td>${(d => Math.abs(d) < 5 ? `<span class="muted">${d > 0 ? '+' : ''}${d}</span>` : `<b class="${d > 0 ? 'pos' : 'neg'}">${d > 0 ? '+' : ''}${d}</b>`)((DCS.rank[p.id] || 0) - (DCS.myRank[p.id] || 0))}</td>${(ps => `<td class="nowrap${/^R[2-7]|UDFA|—/.test(ps) ? ' muted' : ''}" title="Where the public lists have him going: #${DCS.rank[p.id] || '?'} on the consensus ranking">${DCS.rank[p.id] ? '#' + DCS.rank[p.id] + ' · ' : ''}${ps}</td>`)(projSlot(DCS, p))}<td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${dMark(p)} ${(rc => rc.length ? recChip(rc[0][1], rc[0][0]) : '')(L.scRecs(p))} ${splitChip(p)}</td><td>${p.pos}</td><td>${p.age}</td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${archChip(p)}</td><td>${spBar(p)}</td></tr>`).join('')}</tbody></table></div>
     <p class="muted small">Ratings are your scouts' estimates. The more a prospect has been scouted, the narrower the range. 💎 a gem your scouts rate far above the public lists, <span class="dmk bust">◆</span> a bust risk they rate far below them (sort by Proj to see them all). <svg class="fammk" viewBox="0 0 16 14" aria-hidden="true"><circle cx="5" cy="3" r="2.4"/><path d="M1 13v-3.2C1 7.6 2.8 6.4 5 6.4s4 1.2 4 3.4V13z"/><circle cx="12" cy="6" r="1.9"/><path d="M9.2 13v-2.2c0-1.6 1.2-2.6 2.8-2.6s2.8 1 2.8 2.6V13z"/></svg> a hockey family (hover it for who). Proj: the public lists' rank and where that has him going. Click a column to sort. Starred prospects get extra attention from your staff during the season (see Scouting).</p></div>
     <div class="col">${myPicks}<div class="card"><h3>Draft order</h3><ul class="dlist">${upcoming}</ul><p class="muted small">▲▼ lottery moves · ${DR_SHOP} open to trading the pick</p></div><div class="card"><h3>Recent picks</h3><ul class="dlist">${made || '<li class="muted">None yet</li>'}</ul></div></div></div>`;
 }
@@ -16559,7 +16680,7 @@ function consensus() {
   const val = p => p.scout * .75 + p.ovr * .25 + (p.pos === 'G' && p.scout < 88 ? -3 : 0);
   const ranked = cls.slice().sort((a, b) => val(b) - val(a));
   const rank = {}; ranked.forEach((p, i) => rank[p.id] = i + 1);
-  const mv = new Map(cls.map(p => [p.id, L.myVal(p)])), mine = cls.slice().sort((a, b) => mv.get(b.id) - mv.get(a.id));   // (your board: your scouts' reads)
+  const mine = L.boardOrder(cls);   // (your big board: your own order where you've set one, else your scouts' reads)
   const myRank = {}; mine.forEach((p, i) => myRank[p.id] = i + 1);
   return { ranked, rank, myRank };
 }
@@ -16912,8 +17033,8 @@ function scoutReportCard(p, rep) {
   const rk = boom + (sp < 40 ? 2 : sp < 70 ? 1 : 0) + (a < .45 ? 1.5 : a < .65 ? .5 : 0), risk = rk >= 7.5 ? ['High', 'neg', 'boom or bust'] : rk >= 4.5 ? ['Medium', '', 'some volatility'] : ['Low', 'pos', 'a safe read'];
   const tLo = tierOf(p.pos, Math.max(eo, rng[0])), tHi = tierOf(p.pos, Math.max(eo, rng[1]));
   // character and medicals, as his scout reads them (a weak one misses some; one sold on character never does)
-  const T = traitsOf(p), miss = k => s.bias !== 'grit' && faceRng(s.id + '|' + p.id + '|' + k)() < .35 * (1 - a);
-  const flags = sp < 40 ? [] : [['work', 'Hard worker', 'Questions about his work ethic'], ['iq', 'High hockey IQ', 'Questions about his hockey sense'], ['lead', 'Leader in the room', '']].filter(([k]) => T[k] && !miss(k)).map(([k, hi, lo]) => T[k] > 0 ? [hi, 'pos'] : lo ? [lo, 'neg'] : null).filter(Boolean);
+  const T = traitsOf(p), miss = k => !p.ivw && s.bias !== 'grit' && faceRng(s.id + '|' + p.id + '|' + k)() < .35 * (1 - a);   // (a Combine interview settles it)
+  const flags = sp < 40 && !p.ivw ? [] : [['work', 'Hard worker', 'Questions about his work ethic'], ['iq', 'High hockey IQ', 'Questions about his hockey sense'], ['lead', 'Leader in the room', '']].filter(([k]) => T[k] && !miss(k)).map(([k, hi, lo]) => T[k] > 0 ? [hi, 'pos'] : lo ? [lo, 'neg'] : null).filter(Boolean);
   const med = p.ih && p.ih.length ? 'Medical: ' + p.ih.slice(-2).map(([sn, ty, g, end]) => ty + (end ? ' (career-ending)' : ' (' + g + ' games, ' + sn + ')')).join('; ') : p.r && p.r.dur != null && p.r.dur < 55 ? 'Medical: durability questions' : 'Medical: clean';
   const word = v => v >= 89 ? 'elite' : v >= 82 ? 'strong' : v >= 76 ? 'solid' : v >= 69 ? 'average' : 'limited';
   const he = G ? 'goalie' : p.pos === 'D' ? 'defenseman' : 'forward', tl = tier.label;
@@ -16943,7 +17064,8 @@ function scoutReportCard(p, rep) {
       ${lk && LKP[lk.c] ? row('To reach it', `<span class="${LKP[lk.c][1]}">${LKP[lk.c][0]}</span> <span class="small muted">chance of reaching that ceiling</span>`) : ''}
       ${(rc => row('Recommend', rc.length ? rc.map(([x, r]) => recChip(r, x) + ' <span class="small">' + esc(x.last) + '</span>').join(' ') + (new Set(rc.map(x => x[1])).size > 1 ? ' <span class="small neg">· they disagree</span>' : ` <span class="small muted">· ${esc(SC_RECT[rc[0][1]])}</span>`) : ''))(L.scRecs(p))}
       ${row('Plays like', cmp ? `${an(cmp.first.toLowerCase()).toLowerCase()} <b>${esc(cmp.first + ' ' + cmp.last)}</b> type <span class="small muted">· ${esc(L.teams[cmp.tid].abbr)} · ${esc(arch)}, similar build, at his projected level (a style comparison, not a promise)</span>` : '')}
-      ${sp >= 40 ? row('Character', `<span class="sr-flags">${flags.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).join('') || '<span>No flags</span>'}</span>`) + row('Medical', `<span class="${/clean/.test(med) ? '' : 'neg'}">${esc(med.replace(/^Medical: /, '').replace(/^clean$/, 'Clean'))}</span>`) : row('Character', '<span class="small muted">Character and medical reads come with more viewing (40%).</span>')}
+      ${(v => v ? row('Scouts', `${splitChip(p)} <span class="small muted">· ${v.n} reads of his ceiling, ${v.sp} points apart</span>`) : '')(L.scSplit(p))}
+      ${sp >= 40 || p.ivw ? row('Character', `<span class="sr-flags">${p.ivw && p.ivw.red ? `<span class="neg">⚑ ${esc(p.ivw.red.replace(/^Red flag: /, ''))}</span>` : ''}${flags.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).join('') || '<span>No flags</span>'}${p.ivw ? '<span class="pos" title="Settled in a Combine interview">✓ Interviewed</span>' : ''}</span>`) + row('Medical', (cm => cm ? `<span class="${cm[1]}">${cm[0]}</span>${cm[2] ? ' <span class="small muted">· ' + esc(cm[2]) + ' (Combine medical)</span>' : ' <span class="small muted">· Combine medical</span>'}` : `<span class="${/clean/.test(med) ? '' : 'neg'}">${esc(med.replace(/^Medical: /, '').replace(/^clean$/, 'Clean'))}</span>`)(L.comb && L.comb.s === L.season && L.comb.inv.includes(p.id) ? L.combMed(p) : null)) : row('Character', '<span class="small muted">Character and medical reads come with more viewing (40%).</span>')}
     </dl>
     ${scNotesHtml(p)}${rep || ''}${second ? `<div class="sr-second">${scFace(second, 24)}<span class="small"><span class="muted">Second opinion</span> ${scLink(second)} ${gradePill(second)}</span><span class="tier ${t2.cls}">${esc(t2.label)}</span><span class="small muted">${t2.label === tl ? 'agrees' : ep2 > ep ? 'sees more' : 'sees less'} · has seen ${kn2}% of him</span></div>` : ''}${star}</div>`;
 }
@@ -16952,6 +17074,38 @@ function draftRealityCard() {
   if (!ps.length) return '';
   const tl = (p, v) => tierOf(p.pos, showR(v)).label;
   return `<div class="card"><h3>Draft reports vs. reality</h3><p class="muted small">Your picks, what your scouts said, what the lists said, and what they are now.</p><ul class="pf-inj">${ps.map(p => { const v = L.scVerdict(p), sn = p.scSnap; return `<li><span>R${Math.ceil(sn.pk / 32)} #${sn.pk}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">${sn.s + 1} · ours ${esc(tl(p, sn.pot))} · lists ${esc(tl(p, sn.cons))} · now ${esc(tl(p, p.pot))}${sn.n ? ' · ' + esc(sn.n) : ''}</small><b class="${v[1]}">${v[0]}</b></li>`; }).join('')}</ul></div>`;
+}
+// ---- (phase 3) the war room's pieces: the scouts' disagreement chip, the Combine, the mock drafts, the look-back ----
+const splitChip = p => { const v = L.scSplit(p); return v ? `<span class="sc-dis d-${v.lab.toLowerCase()}" title="${v.n} of your scouts have read him: their ceilings span ${v.sp} points${v.lab === 'Split' ? ', or their calls run from A to C' : ''}">${v.lab}</span>` : ''; };
+function combineCard(CS) {
+  const C = L.combState(); if (!C) return '';
+  const all = !!sub.combAll, ps = C.inv.map(id => L.players[id]).filter(p => p && p.tid === -2).sort((a, b) => (CS.myRank[a.id] || 999) - (CS.myRank[b.id] || 999)), show = all ? ps : ps.slice(0, 25);
+  const ft = i => Math.floor(i / 12) + "'" + Math.round(i % 12) + '"';
+  const ivTxt = p => { const T = traitsOf(p), r = [T.work > 0 ? ['Hard worker', 'pos'] : T.work < 0 ? ['Coasts', 'neg'] : null, T.iq > 0 ? ['High IQ', 'pos'] : T.iq < 0 ? ['Low IQ', 'neg'] : null, T.lead > 0 ? ['Leader', 'pos'] : null].filter(Boolean); return (p.ivw && p.ivw.red ? `<b class="neg" title="${esc(p.ivw.red)}">⚑ Red flag</b> ` : '') + (r.map(([t, c]) => `<span class="${c}">${t}</span>`).join(' · ') || '<span class="muted">No concerns</span>'); };
+  return `<div class="card" id="combine"><div class="cardhead"><h3>NHL Scouting Combine</h3><span class="small muted">Interviews ${C.iv.length} of ${C.max}</span></div>
+    <p class="muted small">The top ${C.inv.length} on the lists, measured and tested (height, weight, wingspan, bench reps at 150 lb, vertical jump, VO2 max) and through the doctors. An interview settles a prospect's work ethic, hockey sense and leadership for certain, and now and then turns up a red flag. Sorted by your board.</p>
+    <div class="tblwrap"><table class="tbl cmb"><thead><tr><th class="l">Prospect</th><th>My #</th><th>Ht</th><th>Wt</th><th>Wing</th><th>Bench</th><th>Vert</th><th>VO2</th><th class="l">Medical</th><th class="l">Interview</th></tr></thead><tbody>${show.map(p => { const m = L.combMeas(p), md = L.combMed(p), iv = C.iv.includes(p.id), e = L.combIvErr(p.id);
+      return `<tr><td class="l nowrap"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">${p.pos}</small></td><td>${CS.myRank[p.id] || ''}</td><td>${ft(m.ht)}</td><td>${Math.round(m.wt)}</td><td>${ft(m.ws)}</td><td>${m.bench}</td><td>${m.vert}"</td><td>${m.vo2}</td><td class="l nowrap"><span class="${md[1]}" title="${esc(md[2])}">${md[0]}</span></td><td class="l nowrap">${iv ? ivTxt(p) : `<button class="btn sm" data-act="combIv" data-pid="${p.id}" ${e ? `disabled title="${esc(e)}"` : ''}>Interview</button>`}</td></tr>`; }).join('')}</tbody></table></div>
+    ${ps.length > 25 ? `<div class="btnrow"><button class="btn sm ghost" data-act="combAll">${all ? 'Show the top 25' : 'Show all ' + ps.length}</button></div>` : ''}</div>`;
+}
+function mockCard(CS) {
+  const M = L.mocks && L.mocks.s === L.season ? L.mocks : null; if (!M || !M.l.length) return '';
+  const i = Math.min(sub.mockI ?? M.l.length - 1, M.l.length - 1), m = M.l[i], prev = i > 0 ? M.l[i - 1] : null, pAt = prev ? new Map(prev.picks.map(([t, id], k) => [id, k])) : null;
+  const myAt = m.picks.findIndex(([t]) => t === L.userTid), slp = new Set(L.sleep && L.sleep.s === L.season ? L.sleep.ids : []);
+  const tg = [...new Set([...(L.shortlist || []), ...slp])].map(id => L.players[id]).filter(p => p && p.tid === -2).slice(0, 6);
+  const tgt = tg.map(p => { const k = m.picks.findIndex(([, id]) => id === p.id), ld = L.scLead(p); const say = k < 0 ? 'not in this mock\'s first round: a second-round target' : myAt >= 0 && k > myAt ? 'should still be there at your pick (#' + (myAt + 1) + ')' : k === myAt ? 'goes to you here' : 'gone before your pick' + (myAt >= 0 ? ' (#' + (myAt + 1) + ')' : '') + ': you\'d have to trade up';
+    return `<li><span>${k >= 0 ? '#' + (k + 1) : 'R2+'}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button><small class="muted">${ld ? esc(ld.s.last) + ': ' : ''}${esc(say)}</small></li>`; }).join('');
+  return `<div class="card" id="mock"><div class="cardhead"><h3>${esc(m.n)}</h3>${M.l.length > 1 ? `<div class="tabs inline">${M.l.map((x, k) => `<button class="${k === i ? 'on' : ''}" data-act="mockI" data-k="${k}">${k + 1}</button>`).join('')}</div>` : ''}</div>
+    <p class="muted small">${esc(m.dt ? m.dt + ' · ' : '')}Built from what the clubs' own scouts say and what they need, not the public lists${prev ? '; ▲▼ against the mock before' : ''}. Your slots follow your board.</p>
+    ${tgt ? `<h4 class="pf-sub">Your targets</h4><ul class="pf-inj sc-jl">${tgt}</ul>` : ''}
+    <ol class="mock">${m.picks.map(([tid, id], k) => { const p = L.players[id]; if (!p) return ''; const was = pAt ? pAt.get(id) : null, mvT = !pAt ? '' : was == null ? '<em class="pos">new</em>' : was > k ? `<em class="pos">▲${was - k}</em>` : was < k ? `<em class="neg">▼${k - was}</em>` : '';
+      return `<li class="${tid === L.userTid ? 'mine' : ''}"><span>${k + 1}</span>${teamBadge(L.teams[tid])}<button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button><small>${p.pos} · your #${CS.myRank[p.id] || '—'} ${mvT}</small></li>`; }).join('')}</ol></div>`;
+}
+function lookBackCard() {
+  const res = L.lookBack(); const tl = (p, v) => tierOf(p.pos, showR(v)).label;
+  if (!res.length) return `<div class="card"><h3>Draft look-back</h3><p class="muted small">Three drafts on, each of your drafts gets judged here: your picks against the men taken in the six picks after them, your scouts' calls, and a grade. The first one comes three summers after your first draft.</p></div>`;
+  return `<div class="card" id="lookback"><h3>Draft look-back</h3><p class="muted small">Your picks three drafts on, against the six picks after each (who you could have had) and your scouts' calls at the time.</p>${res.slice(0, 3).map(r => `<h4 class="pf-sub">${r.Y} draft · grade <span class="sc-rc rc-${r.grade[0].toLowerCase()}">${r.grade}</span></h4><ul class="pf-inj sc-lb">${r.rows.map(x => { const p = x.p, sn = p.scSnap;
+    return `<li><span>#${p.draft.pick}</span><span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">now ${R(p.ovr)} · ${esc(tl(p, p.pot))}${sn && sn.n ? ' · ' + esc(sn.n) + ' had him ' + esc(tl(p, sn.pot)) : ''}</small>${x.best ? `<br><small class="muted">Best of the next ${x.of}: <button class="link" data-act="player" data-pid="${x.best.id}">${esc(nm(x.best))}</button> (#${x.best.draft.pick}, ${esc(tl(x.best, x.best.pot))})</small>` : ''}</span><b class="sc-rc rc-${x.g.toLowerCase()}" title="As good as ${x.beat} of the ${x.of} taken after him">${x.g}</b></li>`; }).join('')}</ul>`).join('')}</div>`;
 }
 function vScouting() {
   const cls = (L.draftClass || []).map(id => L.players[id]).filter(p => p && p.tid === -2);
@@ -16962,18 +17116,20 @@ function vScouting() {
   list.sort((a, b) => estMid(b, 'pot') - estMid(a, 'pot') || (b.sp || 0) - (a.sp || 0));
   const lvl = L.scoutLevel || 2, focus = L.scoutFocus || 'ALL';
   const CS = consensus();
-  if (sub.ssort === 'cons') list.sort((a, b) => CS.rank[a.id] - CS.rank[b.id]); else if (sub.ssort === 'mine') list.sort((a, b) => CS.myRank[a.id] - CS.myRank[b.id]);
+  if (sub.ssort === 'cons') list.sort((a, b) => CS.rank[a.id] - CS.rank[b.id]); else if (sub.ssort === 'mine' || !sub.ssort) list.sort((a, b) => CS.myRank[a.id] - CS.myRank[b.id]);   // (your big board first)
+  const mv = (sub.ssort === 'mine' || !sub.ssort), slp = new Set(L.sleep && L.sleep.s === L.season ? L.sleep.ids : []), dlt = p => { const d = CS.rank[p.id] - CS.myRank[p.id]; return Math.abs(d) < 5 ? `<span class="muted">${d > 0 ? '+' : ''}${d}</span>` : `<b class="${d > 0 ? 'pos' : 'neg'}">${d > 0 ? '+' : ''}${d}</b>`; };
   const order = mockOrder(); const mock = order.slice(0, 32).map((tid, i) => [tid, CS.ranked[i]]).filter(x => x[1]);
   const tb = (k, lab) => `<button class="${f === k ? 'on' : ''}" data-act="sfilter" data-k="${k}">${lab}</button>`;
   const avg = cls.length ? Math.round(cls.reduce((s, p) => s + (p.sp || 0), 0) / cls.length) : 0;
   const dir = L.scDir(), dA = L.dirAcc(), SMK = draftMarks(CS, cls);   // (the same gems and bust risks as the draft room's)
   return `${cls.length ? scoutMapCard(cls, CS) : ''}${scoutMarketCard()}<div class="grid draft"><div class="card"><div class="cardhead"><h2>${(L.phase === 'draft' ? L.season : yr) + 1} draft class</h2><div class="tabs inline">${tb('all', 'All')}${tb('short', 'Shortlist (' + sl.length + ')')}${tb('F', 'F')}${tb('D', 'D')}${tb('G', 'G')}</div></div>
     ${classOutlook(dir)}<p class="muted small">${cls.length} prospects · average scouted ${avg}%. Every game day your scouts file reports; a prospect seen by several scouts is read more reliably, and starred players get extra eyes. Your board: ${dir ? 'Director ' + esc(scName(dir)) + ' (' + scGrade(dir.jud) + ') · ranges ×' + (1.25 - .5 * dA).toFixed(2) + ' · catches ' + Math.round(50 * dA) + '% of misreads' : '<span class="neg">no director</span>'}.${(L.cfg || {}).reveal ? ' True ratings shown; My rank still reflects your scouts.' : ''}</p>
-    ${cls.length ? `<div class="tblwrap"><table class="tbl dctbl"><thead><tr><th></th><th><button class="sort ${sub.ssort === 'mine' || !sub.ssort ? 'on' : ''}" data-act="ssort" data-k="mine" title="Your scouts' rank">My #</button></th><th><button class="sort ${sub.ssort === 'cons' ? 'on' : ''}" data-act="ssort" data-k="cons" title="The consensus rank (the public lists)">Cons #</button></th><th>Projected</th><th class="l">Prospect</th><th>Pos</th><th>Age</th><th class="l">League · club</th><th title="Estimated overall">Est OVR</th><th class="l" title="Estimated potential">Est pot</th><th class="l">Style</th><th>Scouted</th></tr></thead><tbody>${list.slice(0, 150).map(p => `<tr><td>${starBtn(p)}</td><td><b>${CS.myRank[p.id]}</b></td><td>${CS.rank[p.id]}</td><td class="small">${projLabel(CS.rank[p.id])}</td><td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${SMK(p)}</td><td>${p.pos}</td><td>${p.age}</td><td class="l nowrap">${lgPill(p)} <span class="small dc-club" title="${esc(p.club || '')}">${clubLogo(p.lg, p.club)}${esc(p.club || '')}</span></td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${(a => hidden(p) && (p.sp || 0) < 25 ? archChip(p) : `<span class="arch" title="${esc(a + ': ' + ((ARCH[a] || {}).d || ''))}">${esc(ARCH_AB[a] || a)}</span>`)(p.arch || archOf(p))}</td><td title="${esc((l => l ? 'Report: ' + scName(l.s) + ' (' + scGrade(l.s.jud) + ')' : 'No report yet')(L.scLead(p)))}">${spBar(p)}${(l => l ? ` <small class="muted">${scGrade(l.s.jud)}</small>` : '')(L.scLead(p))}${(rc => rc.length ? ' ' + recChip(rc[0][1], rc[0][0]) + (new Set(rc.map(x => x[1])).size > 1 ? '<small class="neg" title="Your scouts disagree">≠</small>' : '') : '')(L.scRecs(p))}</td></tr>`).join('')}</tbody></table></div>` : '<p>The next draft class appears when the new season starts.</p>'}</div>
+    ${cls.length ? `<div class="bb-head small"><b>Your big board</b> <span class="muted">· My # is your order: your staff's reads${L.board && L.board.k === L.season ? ', as you rearranged them' : ''}; ▲▼ to move a prospect (auto-pick and the draft room use it). ± your rank against the lists; Consensus / Mixed / Split: how much your scouts agree.</span>${L.board && L.board.k === L.season ? ' <button class="btn sm ghost" data-act="boardReset">Reset to staff order</button>' : ''}</div>` : ''}
+    ${cls.length ? `<div class="tblwrap"><table class="tbl dctbl"><thead><tr><th></th><th><button class="sort ${sub.ssort === 'mine' || !sub.ssort ? 'on' : ''}" data-act="ssort" data-k="mine" title="Your scouts' rank">My #</button></th><th><button class="sort ${sub.ssort === 'cons' ? 'on' : ''}" data-act="ssort" data-k="cons" title="The consensus rank (the public lists)">Cons #</button></th><th title="Your board against the lists: + you rate him higher">±</th><th>Projected</th><th class="l">Prospect</th><th>Pos</th><th>Age</th><th class="l">League · club</th><th title="Estimated overall">Est OVR</th><th class="l" title="Estimated potential">Est pot</th><th class="l">Style</th><th>Scouted</th></tr></thead><tbody>${list.slice(0, 150).map(p => `<tr><td class="nowrap">${starBtn(p)}${mv ? `<span class="bb-mv"><button data-act="boardMv" data-pid="${p.id}" data-d="-1" aria-label="Move up your board" title="Move up your board">▲</button><button data-act="boardMv" data-pid="${p.id}" data-d="1" aria-label="Move down your board" title="Move down your board">▼</button></span>` : ''}</td><td><b>${CS.myRank[p.id]}</b></td><td>${CS.rank[p.id]}</td><td>${dlt(p)}</td><td class="small">${projLabel(CS.rank[p.id])}</td><td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${SMK(p)}${slp.has(p.id) ? ' <span class="sc-slp" title="Sleeper alert: your staff rates him far above his spot on the lists">🔎 Sleeper</span>' : ''} ${splitChip(p)}</td><td>${p.pos}</td><td>${p.age}</td><td class="l nowrap">${lgPill(p)} <span class="small dc-club" title="${esc(p.club || '')}">${clubLogo(p.lg, p.club)}${esc(p.club || '')}</span></td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${(a => hidden(p) && (p.sp || 0) < 25 ? archChip(p) : `<span class="arch" title="${esc(a + ': ' + ((ARCH[a] || {}).d || ''))}">${esc(ARCH_AB[a] || a)}</span>`)(p.arch || archOf(p))}</td><td title="${esc((l => l ? 'Report: ' + scName(l.s) + ' (' + scGrade(l.s.jud) + ')' : 'No report yet')(L.scLead(p)))}">${spBar(p)}${(l => l ? ` <small class="muted">${scGrade(l.s.jud)}</small>` : '')(L.scLead(p))}${(rc => rc.length ? ' ' + recChip(rc[0][1], rc[0][0]) + (new Set(rc.map(x => x[1])).size > 1 ? '<small class="neg" title="Your scouts disagree">≠</small>' : '') : '')(L.scRecs(p))}</td></tr>`).join('')}</tbody></table></div>` : '<p>The next draft class appears when the new season starts.</p>'}</div>
     <div class="col">${scoutStaffCard()}<div class="card">
       ${myPicksCard(yr)}
-      <h3 class="eyebrow">What scouting reveals</h3><ul class="small plist"><li>15%: rating ranges</li><li>25%: playing style</li><li>40%: strengths and weaknesses report</li><li>100%: as sharp as your scouts can see (a weak scout can still be wrong; the truth shows after the draft)</li></ul></div>${draftRealityCard()}
-    <div class="card"><h3>Mock draft · Round 1</h3><p class="muted small">Based on consensus rankings and ${L.phase === 'draft' ? 'the actual draft order' : 'current standings (before the lottery)'}.</p><ol class="mock">${mock.map(([tid, p], i) => `<li class="${tid === L.userTid ? 'mine' : ''}"><span>${i + 1}</span>${teamBadge(L.teams[tid])}<button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button><small>${p.pos} ${natFlag(p.nat, p)}</small></li>`).join('')}</ol></div></div></div>`;
+      <h3 class="eyebrow">What scouting reveals</h3><ul class="small plist"><li>15%: rating ranges</li><li>25%: playing style</li><li>40%: strengths and weaknesses report</li><li>100%: as sharp as your scouts can see (a weak scout can still be wrong; the truth shows after the draft)</li></ul></div>${lookBackCard()}${draftRealityCard()}
+    ${L.mocks && L.mocks.s === L.season ? '' : `<div class="card"><h3>Public lists projection · Round 1</h3><p class="muted small">Based on consensus rankings and ${L.phase === 'draft' ? 'the actual draft order' : 'current standings (before the lottery)'}.</p><ol class="mock">${mock.map(([tid, p], i) => `<li class="${tid === L.userTid ? 'mine' : ''}"><span>${i + 1}</span>${teamBadge(L.teams[tid])}<button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button><small>${p.pos} ${natFlag(p.nat, p)}</small></li>`).join('')}</ol></div>`}</div></div>${combineCard(CS)}${mockCard(CS)}`;   // (the Combine and the mocks full width, under the class)
 }
 // ---------- COACHES ----------
 const coachSlug = c => (c.first + c.last).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^\p{L}]/gu, '');
@@ -19134,6 +19290,11 @@ const ACT = {
   // the scouting staff: pick, hire, release, extend, match offers, send to a region, book for events
   scoutSel: d => scoutModal(d.sid),
   scHire: d => { const s = L.scoutDB[d.sid], y = +d.y, e = L.scHireErr(s, y); if (e) return toast(e, 'bad'); L.scHire(s, y); L.addNews('You hired ' + s.first + ' ' + s.last + (s.role === 'dir' ? ' as Director of Scouting' : ' as a scout') + ' (' + regShort(s.home) + ', ' + scGrade(s.jud) + ', ' + money(s.sal) + ' through ' + s.exp + ').', L.userTid, 'front'); L.scTopUp(); save(); closeModal(); render(); toast(scName(s) + ' hired.' + (s.role === 'dir' ? ' Your board has been re-weighed by your new director.' : ''), 'good'); },
+  boardMv: d => { L.boardMove(d.pid, +d.d); save(); render(); },
+  boardReset: () => { L.boardReset(); save(); render(); toast('Your board is back to your staff\'s order.'); },
+  combIv: d => { const e = L.combIvErr(d.pid); if (e) return toast(e, 'bad'); const r = L.combIv(d.pid), p = L.players[d.pid]; save(); render(); toast('Interview with ' + p.first + ' ' + p.last + (r.red ? ': ' + r.red : ': character read settled.'), r.red ? 'bad' : 'good'); },
+  combAll: () => { sub.combAll = !sub.combAll; render(); },
+  mockI: d => { sub.mockI = +d.k; render(); },
   scJob: d => scJobModal(d.sid),
   scSendP: d => scSendModal(d.pid),
   scJobGo: d => { const s = L.scoutDB[d.sid], o = d.reg ? { k: 'league', reg: ($('#scj-reg') || {}).value } : { k: 'watch', pid: d.pid }, e = L.scJobErr(s, o); if (e) return toast(e, 'bad'); if (s.job) L.scJobEnd(s, true); L.scUnbookAll(s.id); L.scJobStart(s, o); const p = o.pid && L.players[o.pid]; save(); closeModal(); render(); toast(scName(s) + (p ? ' is off to watch ' + p.first + ' ' + p.last : ' is off to ' + regName(o.reg)) + ': back ' + scWk(L.scJobLeft(s)) + '.', 'good'); },
