@@ -492,6 +492,8 @@ td.b { font-weight: 700 }
 .sc-row { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; border-top: 1px solid var(--line); width: 100% } .sc-nm { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; font-size: 13px } .sc-nm small { width: 100% }
 .sc-open { background: none; border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); padding: 8px; justify-content: center; cursor: pointer; margin-top: 4px; font: inherit } .sc-open:hover { color: var(--ink); border-color: var(--accent) }
 .sc-grade { display: inline-block; font: 800 11px/16px system-ui, sans-serif; padding: 0 6px; border-radius: 6px; border: 1px solid currentColor; vertical-align: 1px } .sc-grade.o-elite { color: var(--good) } .sc-grade.o-good { color: var(--blue) } .sc-grade.o-avg { color: var(--warn) } .sc-grade.o-low { color: var(--bad) } .sc-home { font-size: 11px; color: var(--muted); font-weight: 700 } .sc-star { color: var(--warn); font-size: 12px }
+.sc-spec, .sc-unk, .sc-rec { font-size: 11px; border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; white-space: nowrap } .sc-spec.on { border-color: var(--good, #2a8); font-weight: 600 } .sc-unk { color: var(--muted); border-style: dashed } .sc-rec b { font-weight: 600 } .sc-ov { color: var(--bad) } .sc-un { color: var(--blue) }
+.sr-flags { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 6px 0; font-size: 12px } .sr-flags span { border: 1px solid var(--line); border-radius: 999px; padding: 0 8px } .sr-flags .pos { color: var(--good, #2a8) } .sr-flags .neg { color: var(--bad) } .sr-out { font-size: 12.5px; margin: 4px 0 }
 .sc-trait { font-size: 11px; border: 1px solid color-mix(in srgb, var(--blue) 45%, var(--line)); border-radius: 999px; padding: 0 7px; color: var(--blue); font-weight: 600 } .sc-trait.flaw { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)) }
 .sc-meter { display: inline-block; width: 70px; height: 7px; border-radius: 4px; background: var(--line); vertical-align: middle; overflow: hidden; margin-right: 4px } .sc-meter em { display: block; height: 100%; background: var(--good) } .sc-meter.bad em { background: var(--bad) }
 .sc-dir { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line) } .sc-dir small { display: block }
@@ -1649,7 +1651,7 @@ function wallInfo(x, y) {
 // facing-aware passes/shots, structured AI (zone shapes, coverage, 1-2-2 forecheck, puck protection, dekes, one-timers),
 // rating-driven physical play (poke checks, body checks, nudges, stick checks, with body weight), wrist and slap shots.
 // Same constructor and result() shape as before, so the rest of the app is unchanged.
-const TUNE = { sgate: 0.35, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 0.98, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.02, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -6062,7 +6064,7 @@ class League {
     for (const ev of SC_EVENTS) {
       if (E.done[ev.k] != null || (!final && this.sclk() < ev.d)) continue;
       const B = this.evBooked(ev.k).map(id => this.scoutDB[id]).filter(Boolean), n = B.length, ps = this.scEvField(ev);
-      const term = (s, p) => (s.home === scRegOf(p) ? 1.5 : 1) * (s.trait === 'work' ? 1.25 : 1) * (s.trait === 'rat' ? 1.3 : 1) * (s.trait === 'guru' && p.pos === 'G' ? 1.5 : 1);
+      const term = (s, p) => (s.home === scRegOf(p) ? 1.5 : 1) * (s.trait === 'work' ? 1.25 : 1) * (s.trait === 'rat' ? 1.3 : 1) * (s.trait === 'guru' && p.pos === 'G' ? 1.5 : 1) * this.scSpM(s, p);
       for (const p of ps) {
         if (!n) { p.sp = Math.min(100, (p.sp || 0) + (ev.k === 'comb' ? 6 : 2)); continue; }
         const Wp = B.reduce((t, s) => t + term(s, p), 0), gain = Math.min(32, 15 * Math.pow(Wp, .7));
@@ -6071,6 +6073,7 @@ class League {
       E.done[ev.k] = n ? ps.length : 0;
       if (n) {
         const rep = this.scReport(ev, ps, B); (E.rep = E.rep || {})[ev.k] = rep; (this.evQ = this.evQ || []).push({ k: 'scoutrep', rep });
+        for (const s of B) this.scNoteRep(s, 1 + [...rep.stand, ...rep.rise, ...rep.fall, ...rep.mine].filter(r => r[3] === s.id).length);   // (each row he's credited with: a report the director can learn him from)
         const names = B.slice(0, 3).map(scName).join(n === 2 ? ' and ' : ', ') + (n > 3 ? ' and ' + (n - 3) + ' others' : '');
         this.addNews('Scouting: ' + names + ' filed reports from the ' + ev.n + ' on ' + ps.length + ' draft prospects' + (rep.rise.length ? ', and ' + (rep.rise.length === 1 ? 'one looks better than his reputation' : rep.rise.length + ' look better than their reputations') : '') + '.', this.userTid, 'scout', rep.stand[0] && rep.stand[0][0]);
       }
@@ -6123,17 +6126,17 @@ class League {
     for (let d = 0; d < (days || 1); d++) {
       for (const id of sl) {   // the shortlist: cross-checked by everyone free, the director too (he never travels)
         const p = this.players[id], b4 = p.sp || 0, k = scRegOf(p);
-        const terms = avail.map(s => [s.id, (s.home === k ? 1.25 : .9) * (s.trait === 'work' ? 1.25 : 1) * (s.trait === 'cross' ? 1.5 : 1)]); if (dir) terms.push([dir.id, 1]);
+        const terms = avail.map(s => [s.id, (s.home === k ? 1.25 : .9) * (s.trait === 'work' ? 1.25 : 1) * (s.trait === 'cross' ? 1.5 : 1) * this.scSpM(s, p)]); if (dir) terms.push([dir.id, 1]);
         const tot = terms.reduce((t, x) => t + x[1], 0); if (!tot) continue; const per = 1.05 * tot / sl.length;
         for (const [sid, w] of terms) this.scCredit(p, sid, per * w / tot);
         const ld = (b4 < 40 && p.sp >= 40) || (b4 < 100 && p.sp >= 100) ? this.scLead(p) : null, by = ld ? scName(ld.s) + ' (' + scGrade(ld.s.jud) + ')' : 'our scouts';
-        if (b4 < 40 && p.sp >= 40) this.addNews('Scouting report filed: ' + p.first + ' ' + p.last + ' (' + p.pos + ', ' + p.nat + ') — ' + by + ' now has a full strengths and weaknesses read.', this.userTid, 'scout', p.id);
+        if (b4 < 40 && p.sp >= 40) { this.addNews('Scouting report filed: ' + p.first + ' ' + p.last + ' (' + p.pos + ', ' + p.nat + ') — ' + by + ' now has a full strengths and weaknesses read.', this.userTid, 'scout', p.id); if (ld) this.scNoteRep(ld.s, 2); }
         if (b4 < 100 && p.sp >= 100) this.addNews('Scouting complete: ' + p.first + ' ' + p.last + ' has been seen as closely as your staff can (lead report: ' + by + '; projected ceiling: ' + tierOf(p.pos, showR(estMid(p, 'pot')), p.gen).label + ').', this.userTid, 'scout', p.id);
       }
       for (const p of cls) {
         const k = scRegOf(p), G = p.pos === 'G';
-        for (const [s, w, wG] of (list[k] || [])) this.scCredit(p, s.id, 7.5 * (G ? wG : w) / Math.max(10, nReg[k]));
-        for (const [s, w, wG] of roam) this.scCredit(p, s.id, 3 * (G ? wG : w) / Math.max(60, cls.length));
+        for (const [s, w, wG] of (list[k] || [])) this.scCredit(p, s.id, 7.5 * (G ? wG : w) * this.scSpM(s, p) / Math.max(10, nReg[k]));   // (scSpM: his specialty, x1.2)
+        for (const [s, w, wG] of roam) this.scCredit(p, s.id, 3 * (G ? wG : w) * this.scSpM(s, p) / Math.max(60, cls.length));
         p.sp = Math.min(100, (p.sp || 0) + .03 + (p.scout >= 80 ? .08 : 0));   // the famous ones get looked at anyway (video, TV)
       }
     }
@@ -6145,7 +6148,7 @@ class League {
     const unc = this.scoutUnc(p); const tv = key === 'pot' ? p.pot : p.ovr; const e = (p.serr ? p.serr[key] : 0) * unc * .5;
     const c = tv + e + (p.tid === -2 ? this.scBlend(p, key) * this.sceK() : 0); return [Math.round(cl(c - unc / 2, 20, 99)), Math.round(cl(c + unc / 2, 20, 99))];
   }
-  scoutRating(p, k) { const unc = this.scoutUnc(p); if ((p.sp || 0) < 15) return null; const e = (p.serr ? p.serr.r : 0) * unc * .5 * (k.length % 2 ? 1 : -1) + (p.tid === -2 ? this.scBlend(p, 'ovr') * this.sceK() : 0); return [Math.round(cl(p.r[k] + e - unc / 2, 20, 99)), Math.round(cl(p.r[k] + e + unc / 2, 20, 99))]; }
+  scoutRating(p, k) { if ((p.sp || 0) < 15) return null; const sk = p.tid === -2 && (this.scBlend(p, 'am') & SC_ATTR_BIT[k]) ? .6 : 1, unc = Math.max(1, Math.round(this.scoutUnc(p) * sk)); const e = (p.serr ? p.serr.r : 0) * unc * .5 * (k.length % 2 ? 1 : -1) + (p.tid === -2 ? this.scBlend(p, 'ovr') * this.sceK() : 0); return [Math.round(cl(p.r[k] + e - unc / 2, 20, 99)), Math.round(cl(p.r[k] + e + unc / 2, 20, 99))]; }   // (sk: a specialist in that skill has seen him - a tighter read)
   setupDraft() {
     this.intlTick(true); this.scoutEvents(true);   // whatever's left on the calendar (the World Championship, the Memorial Cup, the Combine) happens before the draft
     let pool = (this.draftClass || []).filter(id => this.players[id] && this.players[id].tid === -2);
@@ -6199,12 +6202,23 @@ class League {
     const wsum = Object.values(SC_HOME_W).reduce((s, v) => s + v, 0); if (!home) { let r = Math.random() * wsum; for (const k in SC_HOME_W) { r -= SC_HOME_W[k]; if (r <= 0) { home = k; break; } } home = home || 'ONT'; }
     const nn = SC_HOME_NAT[home], nat = Array.isArray(nn) ? pickA(nn) : nn, [first, last] = natName(nat), age = role === 'dir' ? ri(38, 66) : ri(28, 66);
     const jud = Math.round(cl((role === 'dir' ? 62 : 57) + gauss() * 11, 40, 95));
-    return { id: 'as' + (this.nextAsid = (this.nextAsid || 0) + 1), first, last, nat, age, jud, cap: Math.min(95, jud + (age < 32 ? ri(3, 10) : age < 38 ? ri(0, 5) : 0)), home, role };
+    const s = { id: 'as' + (this.nextAsid = (this.nextAsid || 0) + 1), first, last, nat, age, jud, cap: Math.min(95, jud + (age < 32 ? ri(3, 10) : age < 38 ? ri(0, 5) : 0)), home, role };
+    scPersona(s, role); return s;   // (specialties and tendencies like yours, so their reads differ the same ways)
   }
   aiScStaff(t) {
     if (t.tid === this.userTid) return null;
-    if (!t.sc) { const regs = []; const homes = Object.keys(SC_HOME_W); for (let i = 0; i < 6; i++) regs.push(this.aiScout('reg', i < 3 ? null : pickA(homes))); t.sc = { dir: this.aiScout('dir'), regs }; }
+    if (!t.sc) { const regs = []; const homes = Object.keys(SC_HOME_W); for (let i = 0; i < 6; i++) regs.push(this.aiScout('reg', i < 3 ? null : pickA(homes))); t.sc = { dir: this.aiScout('dir'), regs, v: 2 }; }
+    if (t.sc.v !== 2) { for (const s of [t.sc.dir, ...t.sc.regs]) if (s && !s.spec) scPersona(s, s.role); t.sc.v = 2; }   // (an older save's staffs)
     return t.sc;
+  }
+  // a staff's specialties and tendencies as one club-wide lean (cached per staff and season: teamRead runs for every
+  // prospect at every AI pick): m, the specialty bits anyone has; b, each tendency's weight (the director's counts double)
+  aiScLean(S) {
+    const key = (S.dir ? S.dir.id : '') + S.regs.map(x => x.id).join();
+    if (S._l && S._l.k === key) return S._l;
+    const o = { k: key, m: 0, b: {} };
+    for (const s of [S.dir, ...S.regs]) if (s) { o.m |= scSB(s); if (s.bias) o.b[s.bias] = (o.b[s.bias] || 0) + (s === S.dir ? 2 : 1) / 8; }
+    Object.defineProperty(S, '_l', { value: o, writable: true, configurable: true, enumerable: false }); return o;
   }
   scqOf(t) {
     const S = this.aiScStaff(t); if (!S) return .5;
@@ -6214,8 +6228,9 @@ class League {
   teamRead(p, t) {
     if (!t) return p.scout;
     const S = this.aiScStaff(t), reg = scRegOf(p), cov = !S || !reg || S.regs.some(x => x.home === reg) || (S.dir && S.dir.home === reg);
-    const q = this.scqOf(t) * (cov ? 1 : .7), truth = p.pot + (p.bloom ? p.bloom * .5 : 0), base = p.scout ?? p.pot;
-    return base + (truth - base) * (.15 + .45 * q) + hgauss(t.abbr + ':' + p.id) * (3 - 2 * q);
+    const lean = S ? this.aiScLean(S) : null, q = Math.min(1, this.scqOf(t) * (cov ? 1 : .7) + (lean && (lean.m & scTag(p)) ? .08 : 0)), truth = p.pot + (p.bloom ? p.bloom * .5 : 0), base = p.scout ?? p.pot;
+    let tilt = 0; if (lean) for (const b in lean.b) tilt += lean.b[b] * scTilt(b, p, this);   // (their specialists read their lanes better; their scouts' tendencies tilt the club's read)
+    return base + (truth - base) * (.15 + .45 * q) + hgauss(t.abbr + ':' + p.id) * (3 - 2 * q) + tilt * (1.2 - q);
   }
   // the summer for every AI club's scouts: a year older, the young grow toward their ceiling, the old retire (30% from
   // 65, 70% from 70), about one in twelve moves on, and each empty chair is filled
@@ -6234,6 +6249,7 @@ class League {
     const p = this.players[pid]; s.pid = pid; D.pool = D.pool.filter(x => x !== pid);
     const t = this.teams[s.owner];
     if (t.tid === this.userTid) { const ld = this.scLead(p); p.scSnap = { by: ld ? ld.id : null, n: ld ? scName(ld.s) : null, g: ld ? scGrade(ld.s.jud) : null, pot: estMid(p, 'pot'), ovr: estMid(p, 'ovr'), cons: p.scout, pk: D.cur + 1, s: this.season }; }   // what our scouts said, to judge later
+    if (p.scW) { const ld = this.scLead(p); if (ld && ld.s.role === 'reg' && (p.scW[ld.id] || 0) >= 3) { p.scC = [ld.id, Math.round(this.scOwnRead(ld.s, p) * 10) / 10, this.season]; this.scNoteRep(ld.s, .5); } }   // (our lead scout's call on him, whoever drafts him: scored in three summers - scTrkScore; his file on him counts toward the director learning him)
     delete p.scW;
     p.tid = t.tid; p.prospect = true; t.prospects.push(pid); if (t.tid === this.userTid) p.sp = 100; p.draft = { season: this.season + 1, round: s.round, pick: D.cur + 1, tid: t.tid };   // (the NHL's year: this season's draft is next June's)
     if (s.round === 1 && D.cur < 5) this.addNews('#' + (D.cur + 1) + ' overall: the ' + t.name + ' select ' + p.pos + ' ' + p.first + ' ' + p.last + '.', t.tid);
@@ -8136,7 +8152,79 @@ const SC_TRAITS = {
   gem: ['💎', 'Diamond Finder', 'Reads lightly-regarded prospects (the later rounds) much more accurately.'],
   size: ['📏', 'Loves size', 'A flaw: rates big players higher and small ones lower than they are.'],
 };
-const SC_TRAIT_POOL = ['guru', 'work', 'globe', 'cross', 'rat', 'gem', 'size', 'size'];
+const SC_TRAIT_POOL = ['guru', 'work', 'globe', 'cross', 'rat', 'gem'];   // ('Loves size' moved to the biases, SC_BIAS)
+// ---- the department's people (scouting phase 1): specialties, tendencies, track records ----
+// SPECIALTIES (s.spec, one or two): [icon, name, what it does, bit]. A skill specialty matches a skater whose game is
+// built on that skill (his best tool: scTag) and sharpens the matching skill reads; a league focus matches a prospect
+// playing there. A match reads sharper (scAcc +.12) and covers him faster (x1.2); a specialist out of his lane a little
+// duller (-.04). A scout with no specialty (old AI staffs) neither.
+const SC_SPEC = {
+  ska: ['⛸️', 'Skating', 'Reads skating, pace and edges: sharper on skaters whose game is their feet.', 1],
+  iq: ['🧠', 'Hockey sense', 'Reads vision and decisions: sharper on playmakers and on the hockey-sense read.', 2],
+  sht: ['🎯', 'Scoring', 'Reads shot and hands: sharper on shooters and finishers.', 4],
+  def: ['🛡️', 'Defence', 'Reads gaps, reads and physical play: sharper on defenders.', 8],
+  g: ['🥅', 'Goaltending', 'A goalie man: sharper and faster on goalies.', 16],
+  chl: ['🍁', 'CHL', 'Knows the WHL, OHL and QMJHL inside out: sharper and faster on CHL players.', 32],
+  us: ['🎓', 'NCAA/USHL', 'Knows the U.S. junior and college game: sharper and faster there.', 64],
+  eur: ['🏰', 'Europe', 'Knows the Swedish, Finnish, Czech, Swiss and German leagues: sharper and faster there.', 128],
+  rus: ['🐻', 'Russia', 'Knows the KHL, MHL and VHL: sharper and faster on Russian players.', 256],
+};
+const SC_SPEC_SK = ['ska', 'iq', 'sht', 'def', 'g'], SC_SPEC_LG = ['chl', 'us', 'eur', 'rus'];
+const SC_REG_BIT = { WCAN: 32, ONT: 32, QUE: 32, USA: 64, NCAA: 64, SWE: 128, FIN: 128, CZE: 128, CEU: 128, RUS: 256 };
+const SC_ATTR_BIT = { ska: 1, pas: 2, sht: 4, hnd: 4, def: 8, chk: 8, ref: 16, pos: 16, reb: 16, end: 16 };
+const scSB = s => { let m = 0; for (const k of (s && s.spec) || []) m |= SC_SPEC[k] ? SC_SPEC[k][3] : 0; return m; };
+const SCT = new WeakMap();   // prospect -> {s: season, m: his tag bits (league group, goalie or his best skill)}
+function scTag(p) {
+  const c = SCT.get(p), sn = typeof L !== 'undefined' && L ? L.season : 0; if (c && c.s === sn) return c.m;
+  let m = SC_REG_BIT[scRegOf(p)] || 0; const r = p.r || {};
+  if (p.pos === 'G') m |= 16; else { const t = [[1, r.ska], [2, r.pas], [4, Math.max(r.sht || 0, r.hnd || 0)], [8, (r.def || 0) + (p.pos === 'D' ? 3 : -3)]].sort((a, b) => b[1] - a[1]); m |= t[0][0]; }
+  SCT.set(p, { s: sn, m }); return m;
+}
+// TENDENCIES (s.bias, some scouts): a consistent tilt in his reads of a ceiling, hidden until the director works him out
+// (s.brev: after enough reports, or a summer's look) - learning your scouts is part of the job. [icon, name, the tell, lean]
+// lean: the average over/under it leaves in his track record (the seeded history uses it, so it hints before the reveal).
+const SC_BIAS = {
+  size: ['📏', 'Loves size', 'Rates big players higher and small ones lower than they are.', 1],
+  flash: ['✨', 'Sold on skill', 'Overrates flashy hands and shots; undersells the plain, useful players.', 1.5],
+  cons: ['🧊', 'Conservative', 'Pulls every read toward the middle: undersells the best, oversells the long shots.', -1.5],
+  opt: ['🌞', 'Optimist', 'Sees the best in everyone: his ceilings run high.', 3],
+  dour: ['🌧️', 'Hard to impress', 'His ceilings run low across the board.', -3],
+  grit: ['💪', 'Sold on character', 'Rates hard workers and smart kids higher, and coasters lower, than they are.', 1],
+};
+const SC_BIAS_POOL = ['size', 'size', 'flash', 'flash', 'cons', 'cons', 'opt', 'opt', 'dour', 'grit', 'grit'];
+// a tendency's tilt on one prospect's ceiling read (internal points, before his accuracy damps it)
+function scTilt(b, p, lg) {
+  if (b === 'opt') return 2.5; if (b === 'dour') return -2.5;
+  if (b === 'size') return 3 * cl((lg.bodyOf(p)[0] - 73.5) / 2.5, -1, 1);
+  if (b === 'cons') return cl(-.3 * (p.pot - 60), -4, 4);   // (60: about a mid-round ceiling - a class's median is ~57, its top ten ~75-95)
+  if (b === 'grit') { const T = traitsOf(p); return 1.6 * T.work + 1 * T.iq; }
+  if (b === 'flash') { const r = p.r || {}; return p.pos === 'G' ? 0 : 3 * cl(((r.hnd + r.sht) / 2 - (r.ska + r.pas + r.def + r.chk) / 4 - 2) / 6, -1, 1); }
+  return 0;
+}
+// a new scout's specialties and maybe a tendency (rng: Math.random for the user's scouts; AI staffs' are just as random)
+function scPersona(s, role) {
+  const sk = SC_SPEC_SK.filter(k => !(k === 'g' && s.trait === 'guru')), lgk = { WCAN: 'chl', ONT: 'chl', QUE: 'chl', USA: 'us', NCAA: 'us', RUS: 'rus' }[s.home] || 'eur';
+  const a = Math.random() < .5 ? pickA(sk) : (Math.random() < .6 ? lgk : pickA(SC_SPEC_LG));
+  s.spec = [a]; if (role !== 'dir' && Math.random() < .4) { const b = SC_SPEC_SK.includes(a) ? (Math.random() < .6 ? lgk : pickA(SC_SPEC_LG)) : pickA(sk); if (b !== a) s.spec.push(b); }
+  s.bias = role !== 'dir' && Math.random() < .45 ? pickA(SC_BIAS_POOL) : null; s.brev = 0;
+}
+// a scout's track record (s.trk: n calls scored, h hits, o over, u under, sd the summed misses, l the latest scored calls,
+// seed how many of n are INVENTED). A new scout (a new league, the market) comes with a short made-up history from
+// before he joined - a call a year or two of his career, missed by his real judgment and tilted by his real tendency -
+// so a card isn't empty and his record already hints at what he is; real calls (scored three seasons after each draft,
+// scTrkScore) pile on top.
+function scTrkSeed(s) {
+  const a = cl((s.jud - 40) / 55, 0, 1), n = cl(Math.round((s.age - 26) / 2.5) * 2, 6, 16), lean = s.bias ? SC_BIAS[s.bias][3] : 0, T = { n: 0, h: 0, o: 0, u: 0, sd: 0, ss: 0, l: [], seed: 0 };
+  for (let i = 0; i < n; i++) scTrkAdd(T, lean + gauss() * (1.5 + 6 * (1 - a)));
+  T.seed = T.n; s.trk = T; return T;
+}
+function scTrkAdd(T, d) { T.n++; T.sd = Math.round((T.sd + d) * 10) / 10; T.ss = Math.round(((T.ss || 0) + d * d) * 10) / 10; if (Math.abs(d) <= 4) T.h++; else if (d > 0) T.o++; else T.u++; }
+// his record in words: [hit rate text, lean text, lean class]. A lean is called only when it stands out from his misses'
+// own scatter (1.6 standard errors), so a short record of a few wild calls doesn't brand him
+function scRecTxt(s) {
+  const T = s && s.trk; if (!T || !T.n) return null; const m = T.sd / T.n, se = Math.sqrt(Math.max(1, (T.ss || 25 * T.n) / T.n - m * m) / T.n), ln = Math.abs(m) >= 1.5 && Math.abs(m) >= 2 * se;
+  return [Math.round(100 * T.h / T.n) + '% hits (' + T.h + ' of ' + T.n + ')', ln && m > 0 ? 'tends to overrate' : ln ? 'tends to underrate' : 'even-handed', ln && m > 0 ? 'sc-ov' : ln ? 'sc-un' : ''];
+}
 const SC_HOME_NAT = { WCAN: 'CAN', ONT: 'CAN', QUE: 'CAN', USA: 'USA', NCAA: 'USA', SWE: 'SWE', FIN: 'FIN', RUS: 'RUS', CZE: ['CZE', 'CZE', 'SVK'], CEU: ['SUI', 'GER', 'SVK', 'LAT', 'DEN'] };
 const SC_HOME_W = { WCAN: 12, ONT: 12, QUE: 8, USA: 10, NCAA: 6, SWE: 9, FIN: 7, RUS: 8, CZE: 5, CEU: 5 };
 const scGrade = j => j >= 86 ? 'A' : j >= 78 ? 'B+' : j >= 70 ? 'B' : j >= 62 ? 'C+' : j >= 54 ? 'C' : 'D';
@@ -10085,15 +10173,25 @@ Object.assign(League.prototype, {
     const nn = SC_HOME_NAT[home];
     const snat = Array.isArray(nn) ? pickA(nn) : nn, [sf, sl] = natName(snat);
     const s = { id, first: sf, last: sl, nat: snat, age, jud, cap: Math.min(95, jud + (age < 32 ? ri(3, 10) : age < 38 ? ri(0, 5) : 0)), home, role,
-      trait: role === 'dir' ? null : (Math.random() < .4 ? pickA(SC_TRAIT_POOL) : null), st: 'pool', at: null, sal: 0, exp: 0, since: this.season, poolS: 0 };
-    s.sal = this.scoutAsk(s, 2); (this.scoutDB || (this.scoutDB = {}))[id] = s; return s;
+      trait: role === 'dir' ? null : (Math.random() < .35 ? pickA(SC_TRAIT_POOL) : null), st: 'pool', at: null, sal: 0, exp: 0, since: this.season, poolS: 0 };
+    scPersona(s, role); scTrkSeed(s); s.sal = this.scoutAsk(s, 2); (this.scoutDB || (this.scoutDB = {}))[id] = s; return s;
   },
   scoutAsk(s, yrs) {
     yrs = yrs || 2; const x = cl((s.jud - 40) / 55, 0, 1);
     const base = s.role === 'dir' ? .15 + .85 * x * x : .08 + .42 * x * x, ageK = s.age < 32 ? .75 : s.age < 40 ? .9 : 1, tk = { 1: 1.08, 2: 1, 3: .96 }[yrs] || 1;
     return Math.round(Math.max(.05, base * ageK * tk * (s.trait && s.trait !== 'size' ? 1.12 : 1)) * 100) / 100;   // an ability costs a little more
   },
-  scStaff() { if (!this.scoutV) this.migrateScouts(); return this.scEmp(); },
+  scStaff() { if (!this.scoutV) this.migrateScouts(); if (this.scoutV < 2) this.scoutV2(); return this.scEmp(); },
+  // (scouting phase 1) an older save's scouts get specialties, maybe a tendency and a seeded record; the old 'Loves
+  // size' ability becomes his (already known) tendency; calls on picks made before now are scored like new ones
+  scoutV2() {
+    for (const s of Object.values(this.scoutDB || {})) {
+      if (s.trait === 'size') { s.trait = null; if (!s.spec) scPersona(s, s.role); s.bias = 'size'; s.brev = 1; }
+      if (!s.spec) scPersona(s, s.role); if (!s.trk) scTrkSeed(s);
+    }
+    for (const p of Object.values(this.players)) if (p.scSnap && p.scSnap.by && !p.scC && !p.scSnap.sc && this.season - p.scSnap.s < 3) p.scC = [p.scSnap.by, p.scSnap.pot, p.scSnap.s];
+    this.scoutV = 2; SCREV++;
+  },
   scEmp() { return Object.values(this.scoutDB || {}).filter(s => s.st === 'emp' && s.role === 'reg'); },
   scDir() { const d = this.scDirId && this.scoutDB && this.scoutDB[this.scDirId]; return d && d.st === 'emp' ? d : null; },
   scUsed() { return Math.round(Object.values(this.scoutDB || {}).filter(s => s.st === 'emp').reduce((t, s) => t + s.sal, 0) * 100) / 100; },
@@ -10130,13 +10228,37 @@ Object.assign(League.prototype, {
     if (this.scRefd(s.id)) s.st = 'gone'; else delete this.scoutDB[s.id];
     SCREV++;
   },
+  // ---- (scouting phase 1) learning a scout: his tendency comes out after enough reports, his calls get scored ----
+  scBiasNeed() { return Math.round(30 - 16 * this.dirAcc()); },   // (reports before the director has him worked out: 30 with a poor one, 14 with the best)
+  scNoteRep(s, n) {
+    if (!s || s.role !== 'reg') return; s.nrep = (s.nrep || 0) + (n || 1);
+    if (s.bias && !s.brev && s.st === 'emp' && this.scDir() && s.nrep >= this.scBiasNeed()) this.scReveal(s);
+  },
+  scReveal(s) {
+    s.brev = 1; SCREV++; const d = this.scDir(), l = s.last;
+    const q = { size: `watch ${l} on the big kids. He falls for a frame every time: his ceilings on the 6'3" types run high, on the small ones low.`, flash: `${l} gets carried away by hands and highlight goals. Discount his reads on the flashy ones; he undersells the plain, useful players.`, cons: `${l} never sticks his neck out. His best prospects are better than he says and his long shots worse.`, opt: `${l} likes everybody. His ceilings run a few points high.`, dour: `${l} is hard to impress. His ceilings run a few points low across the board.`, grit: `${l} is sold on character. The hard workers get a bump from him and the coasters a knock.` }[s.bias];
+    this.addNews((d ? 'Director of Scouting ' + d.first + ' ' + d.last : 'Your staff') + ' on scout ' + s.first + ' ' + s.last + ': "' + q + '" (tendency: ' + SC_BIAS[s.bias][1] + ')', this.userTid, 'scout');
+  },
+  scOwnRead(s, p) { return p.pot + this.scRead(s, p, 'pot', true) * this.sceK(); },   // (one scout's own read of a ceiling: his call, scored later)
+  scTrkScore() {   // the summer: calls three drafts old are judged against what the player became
+    for (const p of Object.values(this.players)) {
+      const c = p.scC; if (!c || this.season - c[2] < 3) continue; delete p.scC;
+      const s = this.scoutDB && this.scoutDB[c[0]]; if (!s) continue;
+      const T = s.trk || scTrkSeed(s), d = Math.round((c[1] - p.pot) * 10) / 10; scTrkAdd(T, d);
+      T.l.unshift([p.id, p.first + ' ' + p.last, c[2], d]); if (T.l.length > 8) T.l.length = 8;
+    }
+    const dA = this.dirAcc(), dir = this.scDir();
+    for (const s of this.scEmp()) if (s.bias && !s.brev && Math.random() < (dir ? .1 + .35 * dA : 0) + (s.trk && s.trk.n - s.trk.seed >= 6 ? .25 : 0)) this.scReveal(s);
+  },
   // ---- how a scout covers and reads prospects ----
   dirAcc() { if (SCDA[0] === SCREV) return SCDA[1]; const d = this.scDir(); const v = d ? cl((d.jud - 40) / 55, 0, 1) : 0; SCDA = [SCREV, v]; return v; },
   scAcc(s, p) {
     if (!s) return .4;
     return cl((s.jud - 40) / 55 + (s.home === scRegOf(p) ? .2 : s.trait === 'globe' ? .1 : 0) + (s.trait === 'guru' && p.pos === 'G' ? .25 : 0)
-      + (s.trait === 'gem' && p.scout < 70 ? .2 : 0) + (s.trait === 'cross' && (this.shortlist || []).includes(p.id) ? .12 : 0), 0, 1);
+      + (s.trait === 'gem' && p.scout < 70 ? .2 : 0) + (s.trait === 'cross' && (this.shortlist || []).includes(p.id) ? .12 : 0) + this.scSpA(s, p), 0, 1);
   },
+  scSpA(s, p) { const b = scSB(s); return !b ? 0 : (b & scTag(p)) ? .12 : -.04; },   // (his specialty: in his lane sharper, out of it a little duller)
+  scSpM(s, p) { return scSB(s) & scTag(p) ? 1.2 : 1; },   // (and faster in it)
   scSpd(s, k) { return (s.home === k || s.trait === 'globe' ? 1.25 : .85) * (s.trait === 'work' ? 1.25 : 1); },
   scAwaySet() {
     const E = this.scEvState(), out = new Set();
@@ -10146,16 +10268,17 @@ Object.assign(League.prototype, {
   scCredit(p, sid, g) { if (!(g > 0)) return; const W = p.scW || (p.scW = p.sp ? { '~': r3(p.sp) } : {}); W[sid] = r3((W[sid] || 0) + g); p.sp = Math.min(100, (p.sp || 0) + g); SCREV++; },
   // one scout's misread of a prospect (internal points): a share everyone has (groupthink) and his own, fixed per
   // scout and player, sized by his accuracy; it doesn't fade with more viewing, so a weak scout stays wrong about him
-  scRead(s, p, key) {
+  scRead(s, p, key, raw) {   // (raw: his own call, before the director's correction for a known tendency)
     const A = key === 'pot' ? 12 : 7, a = this.scAcc(s, p), id = s ? s.id : 'gone';
     const blind = faceRng(id + '|' + p.id + '|bl')() < (1 - a) * .1 ? 2 : 1;
     let b = A * (1 - a) * (.55 * scH('crowd', p.id + key) + .85 * scH(id, p.id + key) * blind);
-    if (key === 'pot' && s && s.trait === 'size') b += 3 * (1 - .5 * a) * cl((this.bodyOf(p)[0] - 73.5) / 2.5, -1, 1);
+    if (s && s.bias) b += (key === 'pot' ? 1 : .4) * scTilt(s.bias, p, this) * (1 - .5 * a) * (s.brev && !raw ? 1 - .6 * this.dirAcc() : 1);   // (his tendency; once the director knows it, he discounts it)
     return b;
   },
   scBlend(p, key) {
     let c = SCB.get(p); if (c && c.st === SCREV) return c[key];
-    const dA = this.dirAcc(), W = p.scW || { '~': p.sp || 0 }, out = { st: SCREV };
+    const dA = this.dirAcc(), W = p.scW || { '~': p.sp || 0 }, out = { st: SCREV, am: 0 };
+    for (const id in W) if (W[id] >= 3 && id !== '~' && this.scoutDB && this.scoutDB[id]) out.am |= scSB(this.scoutDB[id]) & 31;   // (skill specialists who've seen him: their skill reads are sharper - scoutRating)
     for (const k of ['ovr', 'pot']) {
       let qs = 0, bs = 0;
       for (const id in W) { const w = W[id]; if (!(w > 0)) continue; if (id === '~') { qs += w; continue; } const s = this.scoutDB && this.scoutDB[id]; const q = w * ((1 - dA) + dA * (.2 + 1.6 * this.scAcc(s, p))); qs += q; bs += q * this.scRead(s, p, k); }
@@ -10225,6 +10348,7 @@ Object.assign(League.prototype, {
     for (const s of Object.values(this.scoutDB)) { s.age++; if (s.age < 35 && s.jud < s.cap) s.jud = Math.min(s.cap, s.jud + ri(0, 2)); }
     for (const s of Object.values(this.scoutDB)) if (s.st === 'emp' && (s.age >= 70 ? Math.random() < .7 : s.age >= 65 && Math.random() < .3)) { news((s.role === 'dir' ? 'Director of Scouting ' : 'Scout ') + s.first + ' ' + s.last + ' retires.'); this.scDrop(s); }
     for (const s of Object.values(this.scoutDB)) if (s.st === 'pool' && s.age >= 68) this.scDrop(s);
+    try { this.scTrkScore(); } catch (e) { if (typeof console !== 'undefined') console.warn('sctrk', e); }
     this.scOffers = this.scOffers || []; let made = 0;
     const cand = Object.values(this.scoutDB).filter(s => s.st === 'emp' && !this.scOffers.some(o => o.sid === s.id)).map(s => [s, cl(.012 * Math.max(0, s.jud - 72), 0, .3) * (s.exp > this.capSeason() ? .5 : 1) * (s.sal >= 1.2 * this.scoutAsk(s, 2) ? .5 : 1) * (s.role === 'dir' ? 1.2 : 1)]).sort((a, b) => b[1] - a[1]);
     for (const [s, pp] of cand) { if (made >= 2 || Math.random() >= pp) continue; const t = pickA(this.teams.filter(x => x.tid !== ut)); const o = { sid: s.id, tid: t.tid, sal: Math.round(Math.max(s.sal * 1.3, this.scoutAsk(s, 2) * 1.15) * 100) / 100, yrs: ri(2, 3) }; this.scOffers.push(o); made++; news('The ' + this.tname(t.tid) + ' have offered ' + (s.role === 'dir' ? 'your Director of Scouting ' : 'scout ') + s.first + ' ' + s.last + ' (' + scGrade(s.jud) + ') ' + money(o.sal) + ' a year for ' + o.yrs + ' years. Match it before the season starts or he leaves.'); }
@@ -10235,7 +10359,7 @@ Object.assign(League.prototype, {
   scMatchErr(s, o) { return this.scUsed() - s.sal + o.sal > this.scPot() + 1e-9 ? 'Not enough room in the scouting budget (' + money(this.scUsed() - s.sal + o.sal - this.scPot()) + ' short)' : ''; },
   scMatch(o) { const s = this.scoutDB[o.sid]; if (s) { s.sal = o.sal; s.exp = this.capSeason() + o.yrs - 1; } this.scOffers = this.scOffers.filter(x => x !== o); SCREV++; },
   scLetGo(o) { const s = this.scoutDB[o.sid]; if (s) { s.to = o.tid;
-      { const T = this.teams[o.tid], S = T && this.aiScStaff(T); if (S) { const c = { id: 'as' + (this.nextAsid = (this.nextAsid || 0) + 1), first: s.first, last: s.last, nat: s.nat, age: s.age, jud: s.jud, cap: s.cap, home: s.home, role: 'reg', cf: s.cf }; if (s.role === 'dir' || !S.dir || (S.dir && s.jud > S.dir.jud + 4)) { c.role = 'dir'; S.dir = c; } else { const w = S.regs.reduce((a, x, i) => x.jud < S.regs[a].jud ? i : a, 0); S.regs[w] = c; } } }   /* (he joins their staff: their scouting gets him) */ this.addNews(s.first + ' ' + s.last + ' leaves for the ' + this.tname(o.tid) + (s.role === 'dir' ? ' to become their assistant GM.' : '\' scouting staff.'), this.userTid, 'front'); this.scDrop(s); } this.scOffers = this.scOffers.filter(x => x !== o); },
+      { const T = this.teams[o.tid], S = T && this.aiScStaff(T); if (S) { const c = { id: 'as' + (this.nextAsid = (this.nextAsid || 0) + 1), first: s.first, last: s.last, nat: s.nat, age: s.age, jud: s.jud, cap: s.cap, home: s.home, role: 'reg', cf: s.cf, spec: s.spec, bias: s.bias }; if (s.role === 'dir' || !S.dir || (S.dir && s.jud > S.dir.jud + 4)) { c.role = 'dir'; S.dir = c; } else { const w = S.regs.reduce((a, x, i) => x.jud < S.regs[a].jud ? i : a, 0); S.regs[w] = c; } } }   /* (he joins their staff: their scouting gets him) */ this.addNews(s.first + ' ' + s.last + ' leaves for the ' + this.tname(o.tid) + (s.role === 'dir' ? ' to become their assistant GM.' : '\' scouting staff.'), this.userTid, 'front'); this.scDrop(s); } this.scOffers = this.scOffers.filter(x => x !== o); },
   scoutSeason() {   // the new season: offers not matched and deals not extended take effect; the staff fills jobs if it's on auto
     if (!this.scoutV) this.migrateScouts();
     const auto = this.isAuto('staff'), ut = this.userTid;
@@ -16437,6 +16561,10 @@ const scFace = (s, size) => `<span class="sc-face" style="width:${size}px;height
 const gradePill = s => `<span class="sc-grade ${scGradeCls(s.jud)}" title="Judgment ${scGrade(s.jud)}: how close his reads are to the truth">${scGrade(s.jud)}</span>`;
 const traitPill = s => s && s.trait && SC_TRAITS[s.trait] ? `<span class="sc-trait${s.trait === 'size' ? ' flaw' : ''}" title="${esc(SC_TRAITS[s.trait][2])}">${SC_TRAITS[s.trait][0]} ${esc(SC_TRAITS[s.trait][1])}</span>` : '';
 const scLink = s => `<button class="link" data-act="scoutSel" data-sid="${s.id}">${esc(scName(s))}</button>`;
+// (scouting phase 1) his specialties, his tendency (once the director has him worked out) and his record, as pills
+const specPills = (s, p) => ((s && s.spec) || []).filter(k => SC_SPEC[k]).map(k => `<span class="sc-spec${p && (SC_SPEC[k][3] & scTag(p)) ? ' on' : ''}" title="Specialty: ${esc(SC_SPEC[k][2])}${p && (SC_SPEC[k][3] & scTag(p)) ? ' This prospect is in his lane.' : ''}">${SC_SPEC[k][0]} ${esc(SC_SPEC[k][1])}</span>`).join('');
+const biasPill = s => !s || s.role !== 'reg' ? '' : s.bias && s.brev ? `<span class="sc-trait flaw" title="Tendency: ${esc(SC_BIAS[s.bias][2])} Your director discounts it.">${SC_BIAS[s.bias][0]} ${esc(SC_BIAS[s.bias][1])}</span>` : s.st === 'emp' && !(!s.bias && (s.nrep || 0) >= L.scBiasNeed() && L.scDir()) ? `<span class="sc-unk" title="Tendency not known yet: your director learns a scout from his reports (or his track record shows it)">? Tendency</span>` : '';
+const recPill = s => { const r = scRecTxt(s); return r ? `<span class="sc-rec" title="Track record: his calls on prospects judged a few seasons later (a hit: within about four points of how the player turned out)${s.trk.seed ? '. ' + s.trk.seed + ' of them are from before he joined you' : ''}">📈 ${esc(r[0].replace(/ \(.*/, ''))} · <b class="${r[2]}">${esc(r[1])}</b></span>` : ''; };
 function scStatus(s, away) {
   if (s.role === 'dir') return 'Director';
   if (away && away.has(s.id)) { const E = L.scEvState(), ev = SC_EVENTS.find(e => (E.b && E.b[e.k] || []).includes(s.id) && E.done[e.k] == null); return 'Away: ' + (ev ? ev.n : 'event'); }
@@ -16545,7 +16673,7 @@ function scoutStaffCard() {
   const dA = L.dirAcc(), dk = (1.25 - .5 * dA).toFixed(2);
   const extBtns = s => s.exp <= cs ? `<div class="sc-ext"><span class="pill bad">Expiring</span>${[1, 2, 3].map(y => { const e = L.scExtendErr(s, y); return `<button class="btn sm" data-act="scExtend" data-sid="${s.id}" data-y="${y}" ${e ? `disabled title="${esc(e)}"` : ''}>${y}y ${money(L.scoutAsk(s, y))}</button>`; }).join('')}</div>` : '';
   const offers = (L.scOffers || []).map(o => { const s = L.scoutDB[o.sid]; if (!s) return ''; return `<div class="sc-offer">${scFace(s, 26)}<span>The <b>${esc(L.tname(o.tid))}</b> want ${esc(scName(s))}: ${money(o.sal)} × ${o.yrs} yrs (now ${money(s.sal)})</span><button class="btn sm primary" data-act="scMatch" data-sid="${s.id}">Match</button><button class="btn sm ghost" data-act="scLetGo" data-sid="${s.id}">Let him go</button></div>`; }).join('');
-  const row = s => `<div class="sc-row">${scFace(s, 28)}<span class="sc-nm">${scLink(s)} ${gradePill(s)} <span class="sc-home" title="Home region: ${esc(regName(s.home))}">${esc(regShort(s.home))}${s.at === s.home ? ' ★' : ''}</span>${traitPill(s)}<small class="muted">${esc(scStatus(s, away))} · ${dealTxt(s.sal, s.exp)}</small>${extBtns(s)}</span><button class="btn sm ghost" data-act="scFire" data-sid="${s.id}" title="Release">×</button></div>`;
+  const row = s => `<div class="sc-row">${scFace(s, 28)}<span class="sc-nm">${scLink(s)} ${gradePill(s)} <span class="sc-home" title="Home region: ${esc(regName(s.home))}">${esc(regShort(s.home))}${s.at === s.home ? ' ★' : ''}</span>${traitPill(s)}${specPills(s)}${biasPill(s)}${recPill(s)}<small class="muted">${esc(scStatus(s, away))} · ${dealTxt(s.sal, s.exp)}</small>${extBtns(s)}</span><button class="btn sm ghost" data-act="scFire" data-sid="${s.id}" title="Release">×</button></div>`;
   const open = Math.max(0, jobs - emp.length);
   return `<div class="card" id="sc-staff"><h3>Scouting staff</h3>
     <label class="small muted" for="scout-level">Budget</label>
@@ -16555,7 +16683,7 @@ function scoutStaffCard() {
     <div class="sc-dir">${dir ? `${scFace(dir, 40)}<div><small class="eyebrow">Director of Scouting</small><div>${scLink(dir)} ${gradePill(dir)} <button class="link small" data-act="scFire" data-sid="${dir.id}">Release</button></div><small class="muted">Ranges ×${dk} · catches ${Math.round(50 * dA)}% of misreads · ${dA < .3 ? 'weighs reports by volume' : 'trusts his best scouts most'} · ${dealTxt(dir.sal, dir.exp)}</small>${extBtns(dir)}</div>` : `<div><small class="eyebrow">Director of Scouting</small><p class="small neg">No director: ranges ×1.25, nobody double-checks reports.</p><button class="btn sm primary" data-act="scMkt" data-k="1">Hire a director</button></div>`}</div>
     ${emp.sort((a, b) => b.jud - a.jud).map(row).join('')}${Array.from({ length: open }, () => `<button class="sc-row sc-open" data-act="scMkt" data-k="0">Open job · Find a scout</button>`).join('')}
     <div class="btnrow"><button class="btn sm" data-act="scMkt">${scMktOpen() ? 'Close market' : 'Hire scouts'}</button></div>
-    <p class="muted small">Your budget pays the director and scouts. A scout works about 1.5× faster and reads sharper in his home region (★). A prospect seen by several scouts is read more reliably; your director decides whose reports to trust. Good scouts draw offers from other clubs each summer: longer deals or a raise keep them.</p></div>`;
+    <p class="muted small">Your budget pays the director and scouts. A scout works about 1.5× faster and reads sharper in his home region (★). A prospect seen by several scouts is read more reliably; your director decides whose reports to trust. A specialty makes a scout sharper and about 20% faster in his lane (a skill or a league), a little duller outside it. Some scouts have a tendency, a steady tilt in their reads: your director works it out from their reports, and their track record (calls scored three drafts later) hints at it. Good scouts draw offers from other clubs each summer: longer deals or a raise keep them.</p></div>`;
 }
 const scMktOpen = () => sub.scMkt ?? ['resign', 'freeagency'].includes(L.phase);
 function scoutMarketCard() {
@@ -16564,7 +16692,7 @@ function scoutMarketCard() {
   const inReg = k => cls.filter(p => scRegOf(p) === k).length;
   return `<div class="card" id="scout-market"><div class="cardhead"><h2>Scout market</h2><div class="tabs inline"><button class="${dirTab ? '' : 'on'}" data-act="scMktTab" data-k="0">Regional scouts</button><button class="${dirTab ? 'on' : ''}" data-act="scMktTab" data-k="1">Directors</button></div></div>
     <p class="muted small">Room: ${money(L.scRoom())} and ${open} open job${open === 1 ? '' : 's'}. Young scouts come cheap and can still improve.</p>
-    <div class="tblwrap"><table class="tbl"><thead><tr><th class="l">Scout</th><th>Age</th><th>Judgment</th><th class="l">Home</th><th class="l">Ability</th><th class="l">Asks</th></tr></thead><tbody>${pool.map(s => `<tr><td class="l">${scFace(s, 26)} ${scLink(s)} ${natFlag(s.nat)}${s.yours ? ' <span class="pill">yours</span>' : ''}</td><td>${s.age}</td><td>${gradePill(s)}</td><td class="l" title="${cls.length ? inReg(s.home) + ' prospects in this class play here' : ''}">${esc(regShort(s.home))}</td><td class="l">${traitPill(s) || '<span class="muted small">—</span>'}</td><td class="l nowrap">${[1, 2, 3].map(y => { const e = L.scHireErr(s, y); return `<button class="btn sm" data-act="scHire" data-sid="${s.id}" data-y="${y}" ${e ? `disabled title="${esc(e)}"` : ''}>${dirTab && hasDir ? 'Replace · ' : ''}${y}y ${money(L.scoutAsk(s, y))}</button>`; }).join(' ')}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">Nobody available right now.</td></tr>'}</tbody></table></div></div>`;
+    <div class="tblwrap"><table class="tbl"><thead><tr><th class="l">Scout</th><th>Age</th><th>Judgment</th><th class="l">Home</th><th class="l">Specialty · ability</th><th class="l">Record</th><th class="l">Asks</th></tr></thead><tbody>${pool.map(s => `<tr><td class="l">${scFace(s, 26)} ${scLink(s)} ${natFlag(s.nat)}${s.yours ? ' <span class="pill">yours</span>' : ''}</td><td>${s.age}</td><td>${gradePill(s)}</td><td class="l" title="${cls.length ? inReg(s.home) + ' prospects in this class play here' : ''}">${esc(regShort(s.home))}</td><td class="l">${specPills(s)} ${traitPill(s)}${s.brev ? ' ' + biasPill(s) : ''}</td><td class="l">${recPill(s) || '<span class="muted small">—</span>'}</td><td class="l nowrap">${[1, 2, 3].map(y => { const e = L.scHireErr(s, y); return `<button class="btn sm" data-act="scHire" data-sid="${s.id}" data-y="${y}" ${e ? `disabled title="${esc(e)}"` : ''}>${dirTab && hasDir ? 'Replace · ' : ''}${y}y ${money(L.scoutAsk(s, y))}</button>`; }).join(' ')}</td></tr>`).join('') || '<tr><td colspan="7" class="muted">Nobody available right now.</td></tr>'}</tbody></table></div></div>`;
 }
 function scoutModal(sid) {
   const s = L.scoutDB && L.scoutDB[sid]; if (!s) return;
@@ -16578,6 +16706,15 @@ function scoutModal(sid) {
     <p>${gradePill(s)} Judgment ${scGrade(s.jud)}: his read of a ceiling is usually within ±${pm}${s.role === 'reg' ? ' (sharper in his home region)' : ''}.</p>
     <p class="small">Home: <b>${esc(regName(s.home))}</b>${s.role === 'reg' ? ' (★ about 1.5× faster and sharper there)' : ''}</p>
     ${s.trait ? `<p class="small">${traitPill(s)} ${esc(SC_TRAITS[s.trait][2])}</p>` : ''}
+    ${(s.spec || []).length ? `<p class="small">Specialt${s.spec.length > 1 ? 'ies' : 'y'}: ${specPills(s)}<br><span class="muted">${esc(s.spec.map(k => SC_SPEC[k][2]).join(' '))}</span></p>` : ''}
+    ${s.role === 'reg' ? (() => { const need = L.scBiasNeed(), n = s.nrep || 0;
+      if (s.bias && s.brev) return `<p class="small">Tendency: ${biasPill(s)} ${esc(SC_BIAS[s.bias][2])} <span class="muted">Your director now discounts it in the board's reads.</span></p>`;
+      if (s.st !== 'emp') return `<p class="small muted">Tendency: unknown (not on your staff).</p>`;
+      if (!s.bias && n >= need && L.scDir()) return `<p class="small">Tendency: <b>plays it straight</b> <span class="muted">· your director finds no tilt in his reads.</span></p>`;
+      return `<p class="small muted">Tendency: not known yet. ${L.scDir() ? `Your director is learning him from his reports (${Math.floor(Math.min(n, need))} of about ${need}).` : 'Without a director nobody studies his reports: his track record is your only guide.'}</p>`; })() : ''}
+    ${(() => { const T = s.trk, r = scRecTxt(s); if (!r) return ''; const m = T.sd / T.n;
+      return `<h4 class="srep-h">Track record</h4><p class="small">${esc(r[0])} · <b class="${r[2]}">${esc(r[1])}</b> · ${T.o} overrated, ${T.u} underrated · average call ${m >= 0 ? '+' : ''}${m.toFixed(1)} vs. how they turned out${T.seed ? ` <span class="muted">· ${T.seed} of the calls are from his career before he joined you</span>` : ''}</p>`
+        + (T.l.length ? `<ul class="pf-inj">${T.l.map(([pid, n, sn, d]) => `<li><span>${sn + 1}</span>${L.players[pid] ? `<button class="link" data-act="player" data-pid="${pid}">${esc(n)}</button>` : esc(n)}<b class="${d > 4 ? 'sc-ov' : d < -4 ? 'sc-un' : 'pos'}">${d > 4 ? 'Overrated' : d < -4 ? 'Underrated' : 'Hit'}</b></li>`).join('')}</ul>` : ''); })()}
     <p class="small">${s.st === 'emp' ? 'Contract: ' + money(s.sal) + ' through ' + s.exp + ' · ' + esc(scStatus(s, L.scAwaySet())) : s.st === 'pool' ? 'Available · asks ' + money(L.scoutAsk(s, 2)) + ' a year' : s.to != null ? 'Now with the ' + esc(L.tname(s.to)) : 'Retired'}</p>
     ${s.role === 'reg' && s.st === 'emp' ? `<p class="small">This class: lead report on ${leads} prospect${leads === 1 ? '' : 's'} · <label>Works in <select data-act="scMove" data-sid="${sid}"><option value="">Roaming</option>${SC_REG.map(([k, n]) => `<option value="${k}" ${s.at === k ? 'selected' : ''}>${esc(n)}${k === s.home ? ' ★' : ''}</option>`).join('')}</select></label></p>` : ''}
     ${calls.length ? `<h4 class="srep-h">His calls on your picks</h4><ul class="pf-inj">${calls.map(p => { const v = L.scVerdict(p); return `<li><span>${p.scSnap.s + 1}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">#${p.scSnap.pk} · our read ${esc(tierL(p, p.scSnap.pot))} · lists ${esc(tierL(p, p.scSnap.cons))} · now ${esc(tierL(p, p.pot))}</small><b class="${v[1]}">${v[0]}</b></li>`; }).join('')}</ul>` : ''}
@@ -16600,18 +16737,39 @@ function scoutReportCard(p, rep) {
   const risk = sp < 40 || a < .45 || lift >= 22 ? ['High', 'neg'] : sp < 70 || a < .65 || lift >= 14 ? ['Medium', ''] : ['Low', 'pos'];
   const tier = tierOf(p.pos, ep), READY = 78;   // NHL-ready: 4th-line / 7th-D level
   const yrsLeft = Math.max(1, Math.min(potAge(p), 24) - p.age), eta = eo >= READY ? 'Now' : ep < READY ? 'Unlikely' : (() => { const y = Math.ceil((READY - eo) / (lift / yrsLeft)); return y <= 1 ? '1 year' : y > 5 ? '5+ years' : y + ' years'; })();   // most growth comes by about 24
-  const cmp = Object.values(L.players).filter(q => q.tid >= 0 && q.pos === p.pos && L.where(q) === 'roster' && q.arch === (p.arch || archOf(p)) && Math.abs(showR(q.ovr) - ep) <= 2).sort((x, y) => Math.abs(showR(x.ovr) - ep) - Math.abs(showR(y.ovr) - ep) || y.ovr - x.ovr)[0];
+  // (scouting phase 1) "plays like": a current NHL player of his position group and style at the level he projects to,
+  // closest in level and frame - a style comparison, never a claim he is that player
+  const pg = q => q.pos === 'G' ? 'G' : q.pos === 'D' ? 'D' : 'F', arch = p.arch || archOf(p), ht = L.bodyOf(p)[0];
+  const cmp = sp < 40 ? null : Object.values(L.players).filter(q => q.tid >= 0 && pg(q) === pg(p) && q.arch === arch && q.age >= 21 && Math.abs(showR(q.ovr) - ep) <= 3 && L.where(q) === 'roster').map(q => [q, Math.abs(showR(q.ovr) - ep) + .6 * Math.abs(L.bodyOf(q)[0] - ht)]).sort((x, y) => x[1] - y[1] || y[0].ovr - x[0].ovr).map(x => x[0])[0];
+  // boom or bust: how wide the board's range of his ceiling still is, the odds of reaching it, how far he has to climb
+  const rng = L.scoutRange(p, 'pot').map(showR), lk = potLike(p), boom = (rng[1] - rng[0]) / 2 + (lk && lk.c === 'Low' ? 3 : lk && lk.c === 'Medium' ? 1.5 : 0) + (lift >= 18 ? 2 : lift >= 12 ? 1 : 0);
+  const bb = boom >= 7 ? ['Boom or bust', 'neg'] : boom >= 4 ? ['Some volatility', ''] : ['Predictable', 'pos'], tLo = tierOf(p.pos, Math.max(eo, rng[0])), tHi = tierOf(p.pos, Math.max(eo, rng[1]));
+  // character and medicals, as his scout reads them (a weak one misses some; one sold on character never does)
+  const T = traitsOf(p), miss = k => s.bias !== 'grit' && faceRng(s.id + '|' + p.id + '|' + k)() < .35 * (1 - a);
+  const flags = sp < 40 ? [] : [['work', 'Hard worker', 'Questions about his work ethic'], ['iq', 'High hockey IQ', 'Questions about his hockey sense'], ['lead', 'Leader in the room', '']].filter(([k]) => T[k] && !miss(k)).map(([k, hi, lo]) => T[k] > 0 ? [hi, 'pos'] : lo ? [lo, 'neg'] : null).filter(Boolean);
+  const med = p.ih && p.ih.length ? 'Medical: ' + p.ih.slice(-2).map(([sn, ty, g, end]) => ty + (end ? ' (career-ending)' : ' (' + g + ' games, ' + sn + ')')).join('; ') : p.r && p.r.dur != null && p.r.dur < 55 ? 'Medical: durability questions' : 'Medical: clean';
   const word = v => v >= 89 ? 'elite' : v >= 82 ? 'strong' : v >= 76 ? 'solid' : v >= 69 ? 'average' : 'limited';
   const he = G ? 'goalie' : p.pos === 'D' ? 'defenseman' : 'forward', tl = tier.label;
   const proj = ep >= 93 ? 'Has the tools to be a face of the franchise.' : ep >= 88 ? 'Projects as an elite NHL player if it comes together.' : ep >= 84 || (G && ep >= 83) ? `Projects as a ${G ? 'starting goalie' : p.pos === 'D' ? 'top-four defenseman' : 'top-six forward'}.` : G && ep >= 76 ? 'Projects as an NHL backup.' : ep >= 81 ? `Projects as a ${p.pos === 'D' ? 'top-six defenseman' : 'middle-six forward'}.` : ep >= 75 ? 'Has a shot at a depth role.' : 'A long shot to play in the NHL.';
-  const summary = `${p.age === 18 || p.age === 11 ? 'An' : 'A'} ${p.age}-year-old ${he} who projects to ${word(best[0][2])} ${best[0][0].toLowerCase()} and ${word(best[1][2])} ${best[1][0].toLowerCase()}${worst[2] < 75 ? '; his ' + worst[0].toLowerCase() + ' needs work' : ''}. ${proj}${s.trait === 'size' && (L.bodyOf(p)[0] >= 75) ? ' Loves his frame.' : ''}`;
+  // the scout's own words: built from his read of the player's tools, varied per scout and player (hr), with his
+  // specialty's confidence and his tendency's tell in it - the way a careful GM learns what a scout's words are worth
+  const hr = faceRng(s.id + '|' + p.id + '|sum'), pk2 = arr => arr[Math.floor(hr() * arr.length)], t0 = best[0][0].toLowerCase(), t1 = best[1][0].toLowerCase(), an = n => /^[aeiou8]|^11|^18/.test(String(n)) ? 'An' : 'A';
+  const SAYT = { skating: ['He wins races and creates space with his feet.', 'Gets to top speed in a couple of strides.'], shot: ['He can score from distance; the release is quick and hard to read.', 'A shooter first: he finds the soft spots and lets it go.'], hands: ['Handles the puck in a phone booth.', 'Soft, quick hands in traffic.'], 'hockey sense': ['Makes the right play more often than not; sees it a beat early.', 'Thinks the game well: rarely in the wrong spot, rarely forcing it.'], defence: ['Kills plays early with his reads and his stick.', 'Defends with his head: good gaps, good angles.'], physical: ['Finishes his checks and wins the battles along the wall.', 'Plays heavy and makes people pay for the puck.'], reflexes: ['Quick enough to steal a game on his own.', 'The reflexes are top-end: the second save is often the best one.'], positioning: ['Square to the shooter, rarely scrambling.', 'Reads the play and gets there early; makes it look easy.'], 'rebound control': ['Smothers pucks and kills second chances.', 'Steers rebounds out of danger.'], endurance: ['Can handle a starter\'s workload.', 'Stays sharp deep into games and stretches.'] };
+  const open = pk2([`${an(p.age)} ${p.age}-year-old ${he} whose game is built on ${t0}.`, `${p.last}'s calling card is his ${t0}, backed by ${word(best[1][2])} ${t1}.`, `What stands out first is the ${t0}: ${word(best[0][2])} by the time he's done.`, `${(aw => an(aw) + ' ' + aw)(arch.toLowerCase().replace(/ (f|d|defenseman|forward)$/, ''))} ${he} with ${word(best[0][2])} ${t0} and ${word(best[1][2])} ${t1}.`]);
+  const why = pk2(SAYT[t0] || ['']), weak = worst[2] < 75 ? ' ' + pk2([`The ${worst[0].toLowerCase()} needs work.`, `The question is his ${worst[0].toLowerCase()}.`, `He'll have to get better ${({ Physical: 'physically', Hands: 'with his hands', Shot: 'with his shot', 'Hockey sense': 'at reading the play', Defence: 'defensively', Endurance: 'on endurance' })[worst[0]] || 'at ' + worst[0].toLowerCase()} to stick.`]) : '';
+  const spk = (s.spec || []).find(k => SC_SPEC[k] && (SC_SPEC[k][3] & scTag(p)) && SC_SPEC_SK.includes(k)), spTxt = spk ? ` (${SC_SPEC[spk][1].toLowerCase()} is his specialty: ${s.last} trusts this read.)` : '';
+  const tell = { size: ht >= 75 ? ' Love the frame.' : ht <= 71 ? ' The size worries me.' : '', flash: scTilt('flash', p, L) > 1 ? ' The skill level is special.' : scTilt('flash', p, L) < -1 ? ' Not much flash to him.' : '', cons: ep >= 86 ? ' Let\'s not get ahead of ourselves.' : ep <= 76 ? ' Could surprise some people.' : '', opt: ' I think there\'s more in there.', dour: ' I\'d want to see more before I bought in.', grit: T.work > 0 ? ' A character kid: he\'ll get everything out of it.' : T.work < 0 ? ' I worry about the compete.' : '' }[s.bias] || '';
+  const summary = `${open} ${why}${weak} ${proj}${tell}`;
   const second = (ld.others || []).map(id => L.scoutDB[id]).filter(x => x && x.st !== 'gone' && x.id !== s.id && x.role === 'reg')[0];
   const ep2 = second ? showR(p.pot + (p.serr ? p.serr.pot : 0) * L.scoutUnc(p) * .5 + L.scRead(second, p, 'pot') * (1 - .5 * L.dirAcc())) : null, t2 = second ? tierOf(p.pos, ep2) : null;
   return `<div class="pf-card sr-card"><h3>Scouting report</h3>${head}
-    <div class="sr-by">${scFace(s, 30)}<span>Report by ${scLink(s)} ${gradePill(s)}${s.home === scRegOf(p) ? ' <span class="sc-star" title="His home region">★</span>' : ''}${s.st === 'gone' ? ` <small class="muted">(${s.to != null ? 'left for ' + esc(L.teams[s.to].abbr) : 'retired'})</small>` : ''}</span></div>
+    <div class="sr-by">${scFace(s, 30)}<span>Report by ${scLink(s)} ${gradePill(s)}${s.home === scRegOf(p) ? ' <span class="sc-star" title="His home region">★</span>' : ''}${s.st === 'gone' ? ` <small class="muted">(${s.to != null ? 'left for ' + esc(L.teams[s.to].abbr) : 'retired'})</small>` : ''} ${specPills(s, p)}${s.brev ? ' ' + biasPill(s) : ''} ${recPill(s)}</span></div>
     <div class="sr-grades"><div><b>${esc(estTxt(p, 'ovr'))}</b><span>Overall now</span></div><div class="sr-role"><b><span class="tier ${tier.cls}">${esc(tl)}</span></b><span>Ceiling</span></div><div><b>${eta}</b><span>NHL ready</span></div><div><b class="${risk[1]}">${risk[0]}</b><span>Risk</span></div></div>
     ${sp >= 25 ? `<div class="sr-tools">${tv.map(([n, now, pk]) => `<div><span>${n}</span><i class="pf-v ${srCls(now)}">${now}</i><i class="sr-ar">→</i><i class="pf-v ${srCls(pk)}" title="Projected at his peak">${pk}</i></div>`).join('')}</div><p class="small muted sr-key">Now → projected peak</p>` : '<p class="small muted">Skill projections come with more viewing (25%).</p>'}
-    <p class="small sr-sum">${esc(summary)}${cmp && sp >= 40 ? ` Comparable: ${esc(cmp.first + ' ' + cmp.last)} (${esc(L.teams[cmp.tid].abbr)}).` : ''}</p>
+    <p class="small sr-sum">“${esc(summary)}”${esc(spTxt)} <span class="muted">— ${esc(scName(s))}</span></p>
+    <p class="sr-out">Outcomes: <b class="${bb[1]}">${bb[0]}</b> · floor <span class="tier ${tLo.cls}">${esc(tLo.label)}</span> → ceiling <span class="tier ${tHi.cls}">${esc(tHi.label)}</span>${lk ? ` · <span class="muted">${esc(lk.c.toLowerCase())} odds of reaching it</span>` : ''}</p>
+    ${cmp ? `<p class="sr-out">Plays like: <b>a ${esc(cmp.first + ' ' + cmp.last)} type</b> <span class="muted">(${esc(L.teams[cmp.tid].abbr)} · ${esc(arch)} style, similar build, at the level he projects to: a style comparison, not a promise)</span></p>` : ''}
+    ${sp >= 40 ? `<div class="sr-flags">${flags.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).join('') || '<span>No character flags</span>'}<span class="${/clean/.test(med) ? '' : 'neg'}">${esc(med)}</span></div>` : '<p class="small muted">Character and medical reads come with more viewing (40%).</p>'}
     ${rep || ''}${second ? `<p class="small muted">Second opinion: ${scLink(second)} ${gradePill(second)} sees a <b>${esc(t2.label)}</b> ceiling${ep2 > ep + 3 ? ', higher' : ep2 < ep - 3 ? ', lower' : ''}.</p>` : ''}${star}</div>`;
 }
 function draftRealityCard() {
