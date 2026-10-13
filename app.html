@@ -1649,7 +1649,7 @@ function wallInfo(x, y) {
 // facing-aware passes/shots, structured AI (zone shapes, coverage, 1-2-2 forecheck, puck protection, dekes, one-timers),
 // rating-driven physical play (poke checks, body checks, nudges, stick checks, with body weight), wrist and slap shots.
 // Same constructor and result() shape as before, so the rest of the app is unchanged.
-const TUNE = { sgate: 0.35,entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.03, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.35, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 0.98, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -1719,7 +1719,7 @@ class HockeyGame {
   mkTeam(data, side, d) {
     const tac = data.tactics && typeof data.tactics === 'object' ? data.tactics : { aggr: 50, shoot: 50, phys: 50, depth: 50 };
     return { data, side, d, cx: data.cx || {}, st: data.st || {}, pen: [], fIdx: 0, dIdx: 0, fShift: 0, dShift: 0, sit: 'ev', on: [], g: null, tac, pp: 0, ppg: 0, en: {}, pressIds: [], chaseId: '', att: 0, box: [],   // box: offsetting fighting majors (no power play)
-      pulled: false, xa: null, iced: false, dump_t: -99 };   // goalie pulled for an extra attacker (xa); iced: no change at the next faceoff; dump_t: when it last dumped it in (its forwards go hard after it)
+      pulled: false, xa: null, iced: false, dump_t: -99, lost_t: -99 };   // goalie pulled for an extra attacker (xa); iced: no change at the next faceoff; dump_t: when it last dumped it in (its forwards go hard after it)
   }
   tac(t, k) {
     const v = t.tac[k]; let b = v == null ? 50 : +v;
@@ -2499,7 +2499,9 @@ class HockeyGame {
     // penalty killers sit in their end passing it around while the clock ran), two on it through the neutral zone too
     const ppUp = t.sit === 'pp' && t.on.length > o.on.length;
     const aggr = ppUp ? Math.max(this.tac(t, 'aggr'), 72) : this.tac(t, 'aggr');
-    const nPress = (cu > 25 && aggr >= 65) || (ppUp && cu > -25) ? 2 : 1;   // the 2-1-2 forecheck (below)
+    // counter-pressure (engine.gd): having just lost it in their end, the two nearest of ours go straight at the man who won it
+    const counter = cu > 25 && t.sit === 'ev' && this.clock + this.period * 1200 - t.lost_t < (TUNE.cpress != null ? TUNE.cpress : 2.5) && byDist.length > 1 && dC(byDist[1]) < 25;
+    const nPress = (cu > 25 && aggr >= 65) || (ppUp && cu > -25) || counter ? 2 : 1;   // the 2-1-2 forecheck (below)
     // (a carrier coming at us with speed keeps the gap man on him until the top of the circles; a short-handed box never
     // runs the gap-man rule in its own zone - engine.gd defense)
     const rush = car.vx * d < -12, pkBox = t.sit === 'pk' && t.on.length <= 4;
@@ -2600,13 +2602,16 @@ class HockeyGame {
       // him coming up the ice with speed: the D give ground; and never with one of theirs already behind them - they stay 6 ft
       // goal-side of a forward who leaks out (held at the far blue line, they were caught up ice on the breakout)
       const deep = atk.reduce((m, a) => Math.min(m, a.x * d), 1e9);
-      const dret = Math.max(clamp((-car.vx * d - 8) * 1.2, 0, 40), 30 - (deep - 6));
+      // holding the line (engine.gd, TUNE.dhold): while he's still deep in his end the D stay up at the blue line - the strong-side
+      // one on the wall, where the breakout and the rims go, the other in the middle - and give ground as he comes up past the dots
+      const dh = (TUNE.dhold == null || TUNE.dhold > 0) && t.sit === 'ev', wall = dh && Math.abs(car.y) > 12;
+      const dret = Math.max(clamp((-car.vx * d - 8) * 1.2, 0, 40) * (dh ? clamp((70 - cu) / 25, 0, 1) : 1), 30 - (deep - 6));
       if (aggr >= 65) {   // 2-1-2: both wingers in on the puck (two pressers), the centre high in the middle, the strong-side D pinching down the wall
         this.fillSpots(t, fw2, [[clamp(cu - 26, 30, 62), -sv2 * 4]], tm);
-        this.fillSpots(t, dm2, [[30 - dret * 1.2, sv2 * 30], [20 - dret, -sv2 * 8]], tm);
+        this.fillSpots(t, dm2, [[30 - dret * 1.2, sv2 * (wall ? 37 : 30)], [20 - dret, -sv2 * 8]], tm);
       } else if (aggr > 40) {   // 1-2-2: F2 shades the strong-side wall, F3 high, D hold the blue line
         this.fillSpots(t, fw2, [[cu - 16, sv2 * 22], [clamp(cu - 34, 12, 60), -sv2 * 10]], tm);
-        this.fillSpots(t, dm2, [[21 - dret, sv2 * 14], [19 - dret, -sv2 * 14]], tm);
+        this.fillSpots(t, dm2, wall ? [[28 - dret, sv2 * 37], [22 - dret, -sv2 * 6]] : [[21 - dret, sv2 * 14], [19 - dret, -sv2 * 14]], tm);
       } else {   // 1-3-1 trap: the first man steers him toward the wall from the top of their zone, three across the red line, the last D back at our blue line
         if (cu > 40) { for (const e of pressers) { e.press = false; e.poff = null; this.setT(e, this.toXY(t, 36, clamp(car.y * d * 0.6, -18, 18))); } t.pressIds = []; }
         this.fillSpots(t, fw2, [[6, sv2 * 22], [6, -sv2 * 20]], tm);
@@ -2917,7 +2922,7 @@ class HockeyGame {
       const inZ = u > 25;
       if (best && bestV > -0.05 && pV >= sV - 0.1) { this.bump('bl_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
       if (inZ && isD(e) && shootV > 0 && !laneBlocked && !farPt && rnd() < (atPoint ? 0.6 : 0.4)) { this.bump('bl_shot'); this.play(e, t, { k: 'shot' }); return; }
-      if (atPoint && best && bestV > -0.3) { this.bump('bl_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
+      if (atPoint && best && bestV > (sit === 'ev' ? (TUNE.ptout != null ? TUNE.ptout : -0.6) : -0.3)) { this.bump('bl_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
       if (atPoint && pr < 5 && rnd() < 0.3) { this.bump('bl_rim'); this.play(e, t, { k: 'chip', kind: 'dump' }); return; }   // around the boards, deep: it stays in
       if (u > 0 && ahead >= 1 && (gassed || this.chaser(e, t)) && rnd() < (inZ ? 0.12 : 0.18) && rnd() > clamp((r.hnd - 62) / 45, 0, 0.4)) { this.bump('bl_dump'); this.play(e, t, { k: 'chip', kind: 'dump' }); return; }
     }
@@ -3741,6 +3746,7 @@ class HockeyGame {
   gain(e) {
     const p = this.puck;
     const wasPass = !!(p.pass_info && p.pass_info.team === e.team);
+    if (p.touchTeam >= 0 && p.touchTeam !== e.team && e.x * this.T[e.team].d < -25) this.T[1 - e.team].lost_t = this.clock + this.period * 1200;   // won it off them in his end
     if (p.pass_info && p.pass_info.from && p.pass_info.from.team === p.pass_info.team) this.bump(wasPass ? 'pass_ok' : 'pass_int');
     if (p.owner) { this.endBattle(p.owner); p.owner.wind = 0; p.owner.wind_k = ''; }   // (taken off him mid-wind-up)
     Object.assign(p, { owner: e, pass_info: null, vx: 0, vy: 0, vz: 0, z: 0, idle: 0, ice_team: -1 }); e.pend = null; e.deke = 0; e.bkw = false; e.bkw_dk = false; e.go_t = 0; e.office = 0; e.wind = 0; e.wind_k = '';
@@ -4797,7 +4803,8 @@ function ratingAdj(p) {
   const adj = p.hlm != null && RATING_ADJ[p.first + ' ' + p.last];
   // (no entry: nothing of his is hand-set - a likelihood left by an override since removed goes, the formula's reads)
   if (!adj) { if (p.likeAdj) { delete p.likeAdj; delete p.pcf; delete p.pcfT; } return; }
-  const o = Array.isArray(adj) ? { ovr: adj[0], pot: adj[1], like: adj[2] } : typeof adj === 'object' ? adj : { ovr: adj };
+  const o0 = Array.isArray(adj) ? { ovr: adj[0], pot: adj[1], like: adj[2] } : typeof adj === 'object' ? adj : { ovr: adj };
+  const o = p.rsb ? { cEnd: o0.cEnd } : o0;   // (an RSB-rated player keeps RSB's ratings: only career facts apply - rsbApply)
   const want = o.ovr, potW = o.pot, like = o.like, keys = p.pos === 'G' ? GKR : SKR;
   if (o.shift) for (const k in o.shift) if (p.r[k] != null) p.r[k] = cl(p.r[k] + o.shift[k], 20, 99);
   // (shape: each skill set at his average across them plus its offset - the same result however often it's applied, so
@@ -13225,6 +13232,7 @@ function nhlRerate(D) {
   for (const p of Object.values(L.players)) {
     if (p.hlm != null && X[p.hlm]) { const md = realMedals(X[p.hlm], p.nat); if (md.length) p.rmed = md; }   // (real medals: added with the model that brought them)
     const m = p.hlm != null && M[p.hlm]; if (!m || m.r.ref != null && p.pos !== 'G' || m.r.ref == null && p.pos === 'G') continue;
+    if (p.rsb) { if (m.prd) p.prd = m.prd; delete p.pcf; delete p.pcfT; continue; }   // (RSB-rated: his ratings stay RSB's, only his production read for the likelihood is new - rsbApply)
     p.r = Object.assign({}, m.r); if (m.pos2) p.pos2 = m.pos2; else delete p.pos2; if (m.rx) p.rx = m.rx; else delete p.rx; p.ovr = ovrOf(p); p.pot = Math.max(p.ovr, m.pot); p.gen = dispR(p.ovr) >= 97; potFix(p); if (m.prd) p.prd = m.prd; else delete p.prd; delete p.certP; delete p.pcf; delete p.pcfT; p.arch = archOf(p); p.xf = xfOf(p); if (m.dur != null) { p.dur = m.dur; p.durK = 1; } n++;
     if (m.gMx) p.gMx = m.gMx; else delete p.gMx;   // (D10: a goalie's measured detail ratings)
     ratingAdj(p);   // (the user's own overrides go back on over the new model's numbers: re-rated without them, a model update erased every one)
@@ -13241,7 +13249,92 @@ function realPickMoves(L, D) {
   const out = []; for (const k of D.picks || []) { const o = nm[k.orig], w = ab[k.owner]; if (o == null || w == null || o === w || !(+k.y > 0)) continue; out.push([+k.y - 1, k.r, o, w]); }
   return out;
 }
-League.fromNHL = function (D, userTid) {
+// ---------- RSB ratings (2026-10, the user's ask: "RSB ratings, real rosters") ----------
+// An opt-in at a real league's setup (Ratings: RSB roster): each real player the newest RSB roster for Hockey Legacy
+// Manager has (read from its Steam install - BlueLineGM.cs RsbRoster, /api/rsb) takes RSB's ratings in place of the
+// formula's. His overall is RSB's (its own weighting: a forward .75 offence + .25 defence, a D .6 / .4, a goalie his
+// goaltending value), his shooting, passing, puck skills (RSB's offensive awareness), checking (hitting), defence (2/3
+// defensive awareness, 1/3 shot blocking; both also shown as they are - rsbDet), faceoffs and discipline from its numbers,
+// and his ceiling from its potential stars (rsbPotD) with our likelihood on top (potLike). Skating and endurance stay ours
+// (NHL EDGE: RSB has none); a goalie keeps our shape at RSB's level; players RSB doesn't have keep the formula's. They're
+// marked p.rsb: the stats refreshes and re-rates leave them be (nhlRerate, syncReal, ratingAdj); development and aging
+// run as for anyone. L.rsb: the roster's name and date, and how many matched
+let RSBX = null, rsbAt = 0;   // the program's RSB roster (null: none found, or the phone version)
+const RSB_POS = ['LW', 'C', 'RW', 'D', 'D', 'G'];
+const rsbNorm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/ø/g, 'o').replace(/æ/g, 'ae').replace(/œ/g, 'oe').replace(/ł/g, 'l').replace(/ß/g, 'ss').replace(/đ/g, 'd').replace(/\b(jr|sr|ii|iii|iv)\b/g, '').replace(/[^a-z]/g, '');
+// the slimmed roster (RsbRoster: per line first, last, birth y/m/d, stars, team id, position, ratings; teams: id, league, abbreviation)
+function rsbParse(X) {
+  const tm = {}; for (const ln of String(X.teams || '').split('\n')) { const f = ln.split(','); if (f.length >= 3) tm[f[0]] = { lg: f[1], ab: f[2] }; }
+  const out = [];
+  for (const ln of String(X.players || '').split('\n')) {
+    const f = ln.split(','); if (f.length < 9) continue;
+    const pos = RSB_POS[+f[7]], rv = f[8].split('.').map(Number); if (!pos || rv.length < (pos === 'G' ? 2 : 9) || rv.some(v => !isFinite(v))) continue;
+    const t = tm[f[6]] || {};
+    out.push({ first: f[0], last: f[1], by: +f[2], bm: +f[3], bd: +f[4], st: +f[5] || 0, lg: t.lg, ab: t.ab, pos, rv });
+  }
+  return out;
+}
+const rsbOvr = h => { const v = h.rv; if (h.pos === 'G') return v[0]; const dw = h.pos === 'D' ? .4 : .25; return (1 - dw) * (v[0] + v[1] + v[2]) / 3 + dw * (v[3] + v[4] + 2 * v[5]) / 4; };
+// potential stars -> a ceiling (shown scale) in our tiers: 5 Franchise, 4.5 Elite, 4 Top 6 F / Top 4 D / starter, 3.5 Top 9
+// F / bottom pair / backup, 3 4th line / 7th D / backup, 2.5 and under the AHL
+function rsbPotD(pos, st) { const g = pos === 'G' ? 2 : pos === 'D' ? 1 : 0; return st >= 5 ? 95 : st >= 4.5 ? 91 : st >= 4 ? [86, 85, 85][g] : st >= 3.5 ? [82, 81, 80][g] : st >= 3 ? 78 : st >= 2.5 ? 75 : st >= 2 ? 72 : 70; }
+// player -> RSB row: name and birth date, else last name and birth date (Matt / Matthew), else name and birth year; his club
+// breaks a tie (then the NHL copy)
+function rsbMatch(players, H, abOf) {
+  const nm = (f, l) => rsbNorm(f) + '|' + rsbNorm(l), idx = new Map(), out = new Map(), used = new Set();
+  const add = (k, h) => { const a = idx.get(k); if (a) a.push(h); else idx.set(k, [h]); };
+  for (const h of H) { const b = h.by + '-' + h.bm + '-' + h.bd; add('n' + nm(h.first, h.last) + '|' + b, h); add('l' + rsbNorm(h.last) + '|' + b, h); add('y' + nm(h.first, h.last) + '|' + h.by, h); if (h.ab) add('t' + rsbNorm(h.last) + '|' + h.ab, h); }
+  for (const p of players) {
+    if (!p.born || !p.born[0]) continue;
+    const b = p.born.join('-'), ab = abOf(p), G = p.pos === 'G', f0 = rsbNorm(p.first)[0];
+    // (last: same club, last name and initial, born within a year - RSB's own slips: Johnny Kovacevic July 2, Lilleberg 2002)
+    for (const k of ['n' + nm(p.first, p.last) + '|' + b, 'l' + rsbNorm(p.last) + '|' + b, 'y' + nm(p.first, p.last) + '|' + p.born[0]].concat(ab ? ['t' + rsbNorm(p.last) + '|' + ab] : [])) {
+      let c = (idx.get(k) || []).filter(h => (h.pos === 'G') === G && !used.has(h));
+      if ((c.length > 1 && k[0] === 'l') || k[0] === 't') c =c.filter(h => rsbNorm(h.first)[0] === f0 && (k[0] !== 't' || Math.abs(h.by - p.born[0]) <= 1));
+      if (k[0] === 't' && c.length > 1) continue;
+      if (!c.length) continue;
+      const h = c.length === 1 ? c[0] : c.find(h => ab && h.ab === ab) || (k[0] === 'y' ? null : c.find(h => h.lg === '0') || c[0]);
+      if (h) { out.set(p, h); used.add(h); break; }
+    }
+  }
+  return out;
+}
+function rsbApply(L, X, abOf) {
+  const H = rsbParse(X), M = rsbMatch(Object.values(L.players), H, abOf || (p => p.tid >= 0 && L.teams[p.tid] ? L.teams[p.tid].abbr : null));
+  const iv = v => Math.round(cl(invShowR(v), 20, 99));
+  for (const [p, h] of M) {
+    const v = h.rv, G = p.pos === 'G', tgt = Math.round(rsbOvr(h));
+    let keys = ['ref', 'pos', 'reb'];
+    if (!G) {
+      Object.assign(p.r, { sht: iv(v[0]), pas: iv(v[1]), hnd: iv(v[2]), def: iv((v[3] + 2 * v[5]) / 3), chk: iv(v[4]), fo: iv(v[6]), dis: iv(v[7]) });
+      // (the game's own bounds, as loadFrom sets them: his frame caps his hitting - chkCap, worked out here on the league
+      // being built, as the global one isn't it yet - and draws are a center's)
+      { const [ht, wt] = L.bodyOf(p); p.r.chk = Math.max(20, Math.min(p.r.chk, Math.round(62 + (wt - 200) * .5 + (ht - 73) * 1.2 + 22))); }
+      if (p.pos === 'D') p.r.fo = Math.min(p.r.fo, 34); else if (p.pos !== 'C' && !plays(p, 'C')) p.r.fo = Math.min(p.r.fo, 50);
+      keys = ['sht', 'pas', 'hnd', 'def', 'dis'];
+    }
+    const d0 = p.r.def;
+    for (let k = 0; k < 60 && R(ovrOf(p)) !== tgt; k++) { const d = R(ovrOf(p)) < tgt ? 1 : -1; for (const q of keys) p.r[q] = cl(p.r[q] + d, 20, 99); }   // (his overall onto RSB's, the RSB-rated skills together)
+    if (!G) { const s = p.r.def - d0; p.rsbD = { blk: iv(v[3]) + s, diq: iv(v[5]) + s, d0: p.r.def }; }
+    if (p.rx) { const x = p.rx; p.rx = { b: x.b, s: x.s, c0: x.c0 }; for (const k of ['spdZ', 'brZ', 'spd', 'brst']) if (x[k] != null) p.rx[k] = x[k]; }   // (only his skating readings are still ours)
+    delete p.gMx; delete p.pcf; delete p.pcfT; delete p.certP; delete p.potO;
+    const pd = rsbPotD(p.pos, h.st); let pt = Math.floor(invShowR(pd)); while (R(pt) < pd) pt++;   // (shown as the tier's number, not one under it)
+    p.ovr = ovrOf(p); p.pot = Math.max(p.ovr, pt); potFix(p);
+    if (dispR(p.ovr) >= 97) p.gen = true; else delete p.gen;
+    if (!G) { const m = SHP_K.reduce((s, k) => s + p.r[k], 0) / 5; p.shp = Object.fromEntries(SHP_K.map(k => [k, Math.round((p.r[k] - m) * 10) / 10])); }
+    p.arch = archOf(p); p.xf = xfOf(p); p.rsb = 1;
+  }
+  const nhl = H.filter(h => h.lg === '0').length, nhlM = [...M.values()].filter(h => h.lg === '0').length;
+  return { name: X.name || 'RSB roster', date: X.date || '', n: M.size, nhl, nhlM };
+}
+// RSB's detail ratings that ours don't hold as a core rating: shot blocking and defensive awareness, moving with his defence since
+function rsbDet(p, o) {
+  const D = p.rsbD; if (!D) return o;
+  o['Shot Blocking'] = r => D.blk + (r.def - D.d0); o['Defensive IQ'] = r => D.diq + (r.def - D.d0);
+  delete o['Slap Shot Accuracy'];   // (read from shooting, not pulled toward the league's average)
+  return o;
+}
+League.fromNHL = function (D, userTid, rsb) {
   const S = D.season, born = s => (String(s || '').match(/(\d{4})-(\d{2})-(\d{2})/) || []).slice(1).map(Number);
   const teams = D.teams;   // already in picker order (nhlRead)
   const L = new League({ version: 1, season: S, day: 0, phase: 'regular', userTid, teams: [], players: {}, nextPid: 1, schedule: [], playoffs: null, draft: null, picks: [], news: [], history: [], dayLog: [], tradeDeadline: 60, lastResults: [], pos2V: 1, pos2R: 1, fakeFix: 1, dyV: 1, potGV: 1, potDV: 1, potD27: 1, prdV: 2, cap: D.cap && D.cap.upper || capFor(S), real: { updated: D.updated, source: 'NHL.com and CapWages' } });
@@ -13303,6 +13396,8 @@ League.fromNHL = function (D, userTid) {
     if (dispR(p.ovr) >= 97) p.gen = true;
     L.players[p.id] = p; L.resetStats(p); x.p = p;
   }
+  // (RSB ratings, the setup's option: before clubs and contracts, so rosters, asks and lines are set on them - rsbApply)
+  if (rsb) { const ab = new Map(list.filter(x => x.p).map(x => [x.p, x.team || null])); L.rsb = rsbApply(L, rsb, p => ab.get(p) || null); console.info('RSB ratings', L.rsb); }
   // 3. clubs and contracts: the deal covering this season, and an extension that starts after it
   const clauseOf = (p, s) => !s ? null : /M-?NTC|Modified/i.test(s) ? L.makeClause(p, 'MNTC', 10) : /NMC/.test(s) ? L.makeClause(p, 'NMC') : /NTC/.test(s) ? L.makeClause(p, 'NTC') : null;
   for (const x of list) {
@@ -13965,7 +14060,7 @@ League.prototype.syncReal = function (R, keepMine, stats) {
     if (list === 'prospects' && !p.draft) this.fakeDraft(p, t);
   }
   if (stats) {   // every matched player, your club's included: this changes ratings, not rosters
-    const list = []; for (const e of R.players || []) { const p = e.st && (byId[String(e.hlm)] || byId[String(e.nhl)]); if (p && !list.some(x => x.p === p)) list.push({ p, st: e.st }); }
+    const list = []; for (const e of R.players || []) { const p = e.st && (byId[String(e.hlm)] || byId[String(e.nhl)]); if (p && !p.rsb && !list.some(x => x.p === p)) list.push({ p, st: e.st }); }   // (not the RSB-rated: rsbApply)
     const moved = statBlend(list, R.season || this.season); for (const x of list) ratingAdj(x.p);
     this.statV = R.updated; this.statAlg = STAT_ALG; out.rated = moved.length; statNews(this, moved, 'Ratings adjusted to recent NHL stats');
   }
@@ -14238,7 +14333,7 @@ function cfgForm(c, inLeague) {
       ${row('Trade deadline', sel('st-dl', CFG_OPTS.dl, c.dl))}
       ${chk('st-lot', c.lottery, 'Draft lottery', 'Off: the worst record picks first')}
       ${row('Job security', sel('st-job', CFG_OPTS.job, c.job || 'off'), 'The owner judges each season against the points pace he expects (Home). Miss it too many years in a row and you\'re fired')}
-      ${!inLeague && c.real ? chk('st-stats', c.stats, 'Adjust ratings to recent NHL stats', 'Shooting, passing, puck skills and goalies move toward their real production') : ''}${!inLeague && c.nhl ? liveRow() : ''}</div>
+      ${!inLeague && c.real ? chk('st-stats', c.stats, 'Adjust ratings to recent NHL stats', 'Shooting, passing, puck skills and goalies move toward their real production') : ''}${!inLeague && c.nhl ? liveRow() : ''}${!inLeague && c.nhl && DESK && !MOBILE ? rsbRow() : ''}</div>
     ${inLeague ? '' : `<div class="card st-wide"><h3>Your staff handles</h3><p class="muted small">Switch on the jobs you'd rather not do yourself. You can change these any time under League → Settings.</p><div class="duties">${AUTO_DUTIES.map(([k, n, d]) => `<label class="duty"><input type="checkbox" class="st-auto" data-k="${k}"><span><b>${esc(n)}</b><small>${esc(d)}</small></span></label>`).join('')}</div></div>`}</div>`;
 }
 function readCfg() {
@@ -14246,7 +14341,7 @@ function readCfg() {
   document.querySelectorAll('.st-auto').forEach(x => { if (x.checked) auto[x.dataset.k] = true; });
   return { trade: v('st-trade').value, inj: v('st-inj').value, dev: v('st-dev').value, dl: +v('st-dl').value, lottery: v('st-lot').checked, reveal: v('st-reveal').checked,
     stats: v('st-stats') ? v('st-stats').checked : true, cap: Math.max(50, Math.min(500, +v('st-cap').value || 104)), auto,   /* (500: the cap grows ~4% a year - by the 2040s it is past 200, where saving the rules used to cut it) */
-    mood: v('st-mood') ? v('st-mood').checked : true, start: v('st-start') && v('st-start').value === 'live' ? 'live' : 'open',
+    mood: v('st-mood') ? v('st-mood').checked : true, start: v('st-start') && v('st-start').value === 'live' ? 'live' : 'open', rsb: !!(v('st-rsb') && v('st-rsb').value === 'rsb' && RSBX),
     diff: v('st-diff').value, ai: v('st-ai').value, con: v('st-con').value, fa: v('st-fa').value, sce: v('st-sce').value, job: v('st-job').value,
     gm: v('st-gm') ? v('st-gm').value.trim().replace(/\s+/g, ' ').slice(0, 32) : undefined, gmPh: v('st-gmph') ? gmPhRead(v('st-gmph').value) : undefined, gmNat: v('st-gmnat') && NAT_NAME[v('st-gmnat').value] ? v('st-gmnat').value : undefined };
 }
@@ -14325,6 +14420,18 @@ function liveRow() {
   return `<label class="st-row" id="st-start-row"><span><b>Season start</b><small>${esc(help)}</small></span><select id="st-start">${opts.map(([k, l]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
 }
 function liveRowUpd() { const el = $('#st-start-row'); if (el) el.outerHTML = liveRow(); }
+// the Ratings row (rsbApply): only on a PC that has an RSB roster (rsbLoad, once a visit, again after ten minutes)
+function rsbRow() {
+  if (!RSBX) return '<span id="st-rsb-row" hidden></span>';
+  const was = $('#st-rsb'), on = !!(was && was.value === 'rsb');
+  return `<label class="st-row" id="st-rsb-row"><span><b>Ratings</b><small>RSB: its players take its ratings and potential (skating from NHL EDGE data); anyone it lacks is rated from his real stats. Rosters and contracts stay real</small></span><select id="st-rsb"><option value="blgm" ${on ? '' : 'selected'}>Blue Line GM (from real stats)</option><option value="rsb" ${on ? 'selected' : ''}>${esc('RSB roster · ' + RSBX.name + (RSBX.date ? ', ' + RSBX.date : ''))}</option></select></label>`;
+}
+async function rsbLoad() {
+  rsbAt = Date.now(); let X = null;
+  try { const r = await fetch('/api/rsb', { cache: 'no-store' }); if (r.ok) X = await r.json(); } catch (e) { X = null; }
+  RSBX = X && typeof X.players === 'string' && X.players.length ? X : null;
+  const el = $('#st-rsb-row'); if (el) el.outerHTML = rsbRow();
+}
 async function liveLoad() {
   if (liveOn) return; liveOn = true; liveRowUpd();
   let X = null, st = null;
@@ -14384,6 +14491,7 @@ function renderSetup() {
     ${cfgForm(c, false)}
     <div class="btnrow st-go"><button class="btn ghost" data-act="setupBack">← Pick a different team</button><button class="btn primary" data-act="setupGo">Start the league</button></div>`;
   // (the live start's row loads its data once a visit, again after ten minutes - liveLoad)
+  if (c.nhl && DESK && !MOBILE && (!rsbAt || Date.now() - rsbAt > 6e5)) rsbLoad();
   if (c.nhl && !liveOn && (!liveAt || Date.now() - liveAt > 6e5)) liveLoad();
   else if (c.nhl && !liveOn && liveSt && liveSt.refreshing && !livePolling) { livePolling = true; livePoll(); }
 }
@@ -16704,7 +16812,7 @@ function vLeague(only) {
     const saveC = `<div class="card"><h2>Save</h2><p class="muted small">Your league saves automatically ${DESK ? 'on this PC' : 'in this browser'}. Copy a save code to back it up or move it to another device.</p>
       <div class="btnrow">${DESK ? '<button class="btn primary" data-act="mainMenu">Main menu</button>' : ''}<button class="btn" data-act="exportSave">Copy save code</button><button class="btn" data-act="exportFile">Save to a file</button>${DESK ? '' : '<button class="btn" data-act="importOpen">Import a league</button><button class="btn danger" data-act="newConfirm">Start a new league</button>'}</div><div id="settings-msg"></div></div>`;
     const c = Object.assign({}, CFG_DEF, L.cfg || {}, { cap: L.cap || CAP, dl: L.dlG ?? L.tradeDeadline, gm: L.gmName || '', gmPh: L.gmPh || null, gmT: L.teams[L.userTid], gmNat: L.gmNat });
-    const rules = `<div class="card"><h2>League rules</h2>${cfgForm(c, true)}<div class="btnrow"><button class="btn primary" data-act="lgRules">Save rules</button></div></div>`;
+    const rules = `<div class="card"><h2>League rules</h2>${L.rsb ? `<p class="muted small">Ratings: RSB roster · ${esc(L.rsb.name)}${L.rsb.date ? ', ' + esc(L.rsb.date) : ''} (${L.rsb.n} players; the rest rated from their real stats)</p>` : ''}${cfgForm(c, true)}<div class="btnrow"><button class="btn primary" data-act="lgRules">Save rules</button></div></div>`;
     setTimeout(rdStatus, 0);
     body = `<div class="lgwrap">${rules}<div class="lgv">${deleg}<div class="col">${real}${saveC}</div></div></div>`;
   }
@@ -17357,7 +17465,7 @@ const rxC0 = r => ({ ska: r.ska, sht: r.sht, pas: r.pas, hnd: r.hnd, def: r.def,
 function rxOverrides(p) {
   // (a goalie's measured ones, p.gMx - D10: the same values, his core ratings, now marked as read from his numbers)
   if (p.pos === 'G') { if (!p.gMx) return null; const o = {}, lab = { ref: 'Reflexes', pos: 'Positioning', reb: 'Rebound Control', end: 'Endurance' }; for (const k of p.gMx) if (lab[k]) o[lab[k]] = r => r[k]; return o; }
-  const x = p.rx; if (!x) return null; const o = {}, D = p.pos === 'D';
+  const x = p.rx; if (!x) return p.rsbD ? rsbDet(p, {}) : null; const o = {}, D = p.pos === 'D';
   const dv = (r, k) => x.c0 && x.c0[k] != null ? r[k] - x.c0[k] : 0;
   // (2026-10 audit) every anchor sits on the regulars' own average level, x.b (a fixed 60-62 put the average player's
   // detail ratings 2-4 below his core ones), and reads z-scores of the raw numbers (x.spdZ etc. from nhlRate); older
@@ -17393,7 +17501,7 @@ function rxOverrides(p) {
   const Mz = (v, r, k) => r[k] + (v + dv(r, k) - r[k]) * fd;
   if (x.dmd != null) o['Defensive IQ'] = r => .3 * r.def + .7 * Mz(x.dmd, r, 'def');
   if (x.dmi != null) o['Discipline'] = r => .3 * r.dis + .7 * Mz(x.dmi, r, 'dis');
-  return o;
+  return rsbDet(p, o);
 }
 // size and injury history for the bodily detail ratings, for anyone whose height and weight are known
 function bodyOverrides(p, o) {
@@ -17684,7 +17792,7 @@ function playerModal(pid) {
       <h3>${esc(p.first + ' ' + p.last)}${capB(p)} ${p.nat ? natLink(p.nat) : ''}</h3>
       <p class="muted">Age ${p.age}${born ? ' (' + born + ')' : ''}</p>${p.bc ? `<p class="muted small">Born in ${esc(birthStr(p))}</p>` : (setTimeout(() => bioFetch(p), 0), `<p class="muted small" data-bio="${p.id}" hidden></p>`)}
       <p class="muted">${posLab(p)} | ${p.sh === 'L' ? 'Left' : 'Right'} | ${Math.floor(ht / 12)}'${ht % 12}" | ${wt}lbs</p>
-      <p class="muted">${archChip(p)}${p.contract && p.tid >= 0 ? ' ' + (L.waiverExempt(p) ? 'Waiver exempt' : 'Waiver eligible') : ''}</p></div></div>
+      <p class="muted">${archChip(p)}${p.contract && p.tid >= 0 ? ' ' + (L.waiverExempt(p) ? 'Waiver exempt' : 'Waiver eligible') : ''}${p.rsb && L.rsb ? ` <span class="pill" title="${esc('Ratings and potential from the RSB roster (' + L.rsb.name + '); skating from NHL EDGE data')}">RSB</span>` : ''}</p></div></div>
       <div class="pf-trio"><div>${tierChip(p, 'pot')}<span>Potential</span></div><div><b>${c ? (c.ext && L.capSeason() > c.exp ? (c.ext.exp - L.capSeason() + 1) + 'x' + money(c.ext.sal) : (c.exp - L.capSeason() + 1) + 'x' + money(c.sal)) : p.ask ? 'Asks ' + money(p.ask.sal) : '—'}</b><span>Contract</span></div><div>${posRank ? `<button class="pf-rank" data-act="posRank" data-pid="${p.id}" title="League rankings at his position"><b>#${posRank} ${posName}</b></button>` : `<b>${expRoleLab(p)}</b>`}<span>${posRank ? 'Position rank' : 'Expected role'}</span></div></div>
       <div class="pf-pers"><span class="muted small">Personality</span>${(!H || (p.sp || 0) >= 40) ? (() => { const T = traitsOf(p), sh = TRAITS.filter(([k]) => T[k] !== 0); return sh.length ? `<span class="traits">${sh.map(([k, n, d]) => { const x = TRAIT_TXT[k], good = (T[k] > 0) === !!x[2]; return `<span class="trait tr${good ? 1 : -1}" title="${esc(n + ' ' + (T[k] > 0 ? 'high' : 'low') + '. ' + d)}">${esc(T[k] > 0 ? x[0] : x[1])}</span>`; }).join('')}</span>` : '<span class="small">Even-keeled: nothing stands out</span>'; })() : '<span class="small muted">Unknown until he\'s scouted</span>'}${durShown(p) || p.conc >= 2 ? `<span class="small">${durShown(p) ? `<span class="dur d${durOf(p)}" title="${esc(DUR_TXT[durOf(p)])}">${DUR[durOf(p)]}</span>` : ''}${p.conc >= 2 ? `${durShown(p) ? '· ' : ''}${p.conc} concussions` : ''}</span>` : ''}</div>
       ${moodOn() && mine && !p.prospect ? (() => { const ml = L.moodLab(p); return `<p class="small">Mood: <span class="pill ${ml.cls}" title="${esc(moodWhy(p))}">${ml.lab}</span>${p.prom ? ' <span class="small muted">· you promised him a bigger role</span>' : ''}</p>`; })() : ''}
@@ -18292,7 +18400,7 @@ async function nhlBackfill() {
     for (const p of Object.values(L.players)) {
       if (p.hlm == null) continue; const x = X[p.hlm], m = M[p.hlm];
       if (x) { const md = realMedals(x, p.nat); if (md.length) p.rmed = md; }
-      if (!m || p.pos === 'G' || m.r.ref != null || !p.r) continue;
+      if (!m || p.pos === 'G' || m.r.ref != null || !p.r || p.rsb) continue;
       if (m.rx) p.rx = m.rx;
       p.r.chk = Math.round(cl(m.r.chk + (p.ovr - m.ovr), 30, 95)); if (p.pos === 'D') p.r.sht = Math.round(cl(m.r.sht + (p.ovr - m.ovr), 30, 95));
       p.ovr = ovrOf(p); p.pot = Math.max(p.pot, p.ovr); potFix(p);
@@ -18532,13 +18640,14 @@ const ACT = {
     setTimeout(() => {
       try {
         const D0 = hlmData;
-        if (ps.kind === 'hlm') { hlmData.noStats = !c.stats; L = hlmData.kind === 'nhl' ? League.fromNHL(hlmData, ps.i) : League.fromHLM(hlmData, ps.i); hlmData = null; } else L = League.create(ps.tid);
+        const rsb = c.rsb ? RSBX : null;   // (Ratings: RSB roster - rsbApply)
+        if (ps.kind === 'hlm') { hlmData.noStats = !c.stats; L = hlmData.kind === 'nhl' ? League.fromNHL(hlmData, ps.i, rsb) : League.fromHLM(hlmData, ps.i); hlmData = null; } else L = League.create(ps.tid);
         applyCfg(L, c);
         // a live start (2026-10, the user's ask): the real season so far, played in by League.liveStart. If it can't be set
         // up the league opens on opening night, rebuilt from the same data (liveStart may have changed the first one)
         if (c.start === 'live' && ps.kind === 'hlm' && D0 && D0.kind === 'nhl') {
           try { const r = L.liveStart(liveX, D0); console.info('live start', r); }
-          catch (e) { console.error(e); L = League.fromNHL(D0, ps.i); applyCfg(L, c); toast('The live start couldn\'t be set up (' + (e.message || e) + '), so the league opens on opening night.', 'bad'); }
+          catch (e) { console.error(e); L = League.fromNHL(D0, ps.i, rsb); applyCfg(L, c); toast('The live start couldn\'t be set up (' + (e.message || e) + '), so the league opens on opening night.', 'bad'); }
         }
         pendingStart = null; view = 'home'; sub = {}; save();
       } catch (e) { L = null; toast('Could not build the league: ' + (e.message || e), 'bad'); console.error(e); }
