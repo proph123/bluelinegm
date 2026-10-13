@@ -1664,7 +1664,7 @@ function wallInfo(x, y) {
 // facing-aware passes/shots, structured AI (zone shapes, coverage, 1-2-2 forecheck, puck protection, dekes, one-timers),
 // rating-driven physical play (poke checks, body checks, nudges, stick checks, with body weight), wrist and slap shots.
 // Same constructor and result() shape as before, so the rest of the app is unchanged.
-const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.02, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.02, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -3871,7 +3871,7 @@ class HockeyGame {
       // skating backward (backing off the carrier): no faster than a man can skate it - past that he pivots and skates
       // forward (backskate keeps that state, at the end of each tick)
       const wsp = hyp(tvx, tvy); e.bkws = wsp;
-      if (e.bkg && !e.bkp && !dead && !e.isG && (TUNE.bkcap || 0) > 0) {
+      if (e.bkg && !e.bkp && !dead && !e.isG && (TUNE.bkcap || 0) > 0 && tvx * (p.x - e.x) + tvy * (p.y - e.y) < 0) {
         const bkc = TUNE.bkcap; maxS = Math.min(maxS, bkc);
         if (wsp > bkc) { tvx *= bkc / wsp; tvy *= bkc / wsp; }
       }
@@ -3887,7 +3887,7 @@ class HockeyGame {
         //            a wider arc or scrubs speed to tighten it
         //  brake   - snowplough / hockey stop; strongest when he wants to go back the way he came
         //  glide   - ice friction and air drag: coasting slowly bleeds speed
-        const A0 = (16 + r.ska * 0.3) * wk * ('jets' in e.X ? xs(e.X.jets, 1.08) : 1) * (0.75 + 0.25 * en);   // tired legs push off slower
+        const A0 = (16 + r.ska * 0.3) * wk * ('jets' in e.X ? xs(e.X.jets, 1.08) : 1) * (0.75 + 0.25 * en) * (e.bkp > 0 && e.bkp < 0.35 ? (TUNE.bkpc != null ? TUNE.bkpc : 1) : 1);   // tired legs push off slower; turning his hips in a pivot, no push for a moment
         const grip = (30 + r.ska * 0.22) * TUNE.grip, brake = (30 + r.ska * 0.24) * TUNE.brake;
         let ax = (tvx - e.vx) / 0.3, ay = (tvy - e.vy) / 0.3;   // what he'd like to do over the next ~0.3 s
         if (sp0 > 3) {
@@ -3952,25 +3952,47 @@ class HockeyGame {
     }
   }
   // Backing off the carrier (goal-side of him, above our hash marks, moving away: what the 3D viewer draws as skating
-  // backward): backward skating tops out near 15-16 ft/s (TUNE.bkcap), so moveAll holds him to that. A man who needs more
-  // (a rush coming at him with speed, a long way back to his spot) pivots after a moment of it and skates forward
-  // (bkp > 0); he turns back once he's been under the cap a little while. Entering it already faster than that (or
-  // wanting to be), he's skating forward from the start. (engine.gd _backskate; audit D6/SK8)
+  // backward): backward skating tops out near 15-16 ft/s (TUNE.bkcap), so moveAll holds him to that - coming into it
+  // faster, he slows to it. He pivots and skates forward (bkp > 0) only when the carrier is actually beating him: coming at
+  // our net faster than he can skate backward and about to reach him or pass him (under ~1.5 s, TUNE.bktc) or level with
+  // him. Skating forward, he turns back once a backward pace will do. Each switch needs its reason for 0.2 s (forward at
+  // least 0.8 s), and a moment off the test (0.3 s; 0.6 s for a pass between them; 1 s once forward) doesn't end it.
+  // (engine.gd _backskate; audit D6/SK8)
   backskate(e, dt, dead) {
     const bkc = TUNE.bkcap || 0, p = this.puck, pc = p.owner;
-    if (bkc <= 0 || dead || !pc || pc === e || pc.team === e.team || e.bat || e.leaving) { e.bkp = 0; e.bkn = 0; e.bkg = false; return; }
-    const tox = p.x - e.x, toy = p.y - e.y, dpk = hyp(tox, toy), dsg = this.T[e.team].d, bsp = hyp(e.vx, e.vy), pv = TUNE.bkpv != null ? TUNE.bkpv : 1.5;
-    if (!(bsp > 3 && dpk < 60 && e.vx * tox + e.vy * toy < -0.35 * bsp * dpk && e.x * dsg > -66 && hyp(e.x + dsg * 89, e.y) < hyp(pc.x + dsg * 89, pc.y) - 3)) { e.bkp = 0; e.bkn = 0; e.bkg = false; return; }
-    if (!e.bkg) { e.bkn = 0; e.bkp = bsp > bkc + 1 || (e.bkws || 0) > bkc + pv ? 0.001 : 0; }
-    else if (e.bkp > 0) {
+    if (bkc <= 0 || dead || e.bat || e.leaving || (pc && (pc === e || pc.team === e.team))) { e.bkp = 0; e.bkn = 0; e.bkl = 0; e.bkg = false; return; }
+    if (!pc) {   // a pass between them (or a loose puck): he keeps on as he was for a moment
+      if (e.bkg) { e.bkl = (e.bkl || 0) + dt; if (e.bkl < (e.bkp > 0 ? 1 : 0.6)) return; }
+      e.bkp = 0; e.bkn = 0; e.bkl = 0; e.bkg = false; return;
+    }
+    const tox = p.x - e.x, toy = p.y - e.y, dpk = hyp(tox, toy), dsg = this.T[e.team].d, bsp = hyp(e.vx, e.vy);
+    const ownM = hyp(pc.x + dsg * 89, pc.y) - hyp(e.x + dsg * 89, e.y);   // how far nearer our net he is than the carrier
+    if (!(bsp > 3 && dpk < 60 && e.vx * tox + e.vy * toy < -0.35 * bsp * dpk && e.x * dsg > -66 && ownM > 3)) {
+      if (e.bkg) { e.bkl = (e.bkl || 0) + dt; if (e.bkl < (e.bkp > 0 ? 1 : 0.3)) return; }   // off it for a moment: keeps the state
+      e.bkp = 0; e.bkn = 0; e.bkl = 0; e.bkg = false; return;
+    }
+    e.bkl = 0;
+    const gap = Math.max(hyp(pc.x - e.x, pc.y - e.y), 0.5);
+    const cl = ((pc.vx - e.vx) * (e.x - pc.x) + (pc.vy - e.vy) * (e.y - pc.y)) / gap;   // how fast the carrier is closing on him
+    if (!e.bkg) { e.bkg = true; e.bkn = 0; e.bkp = this.bkBeaten(e, pc, gap, cl, ownM, bkc, dsg) ? 0.35 : 0; return; }   // (0.35: already forward, no pivot to make)
+    if (e.bkp > 0) {   // pivoted, skating forward: turns back once a backward pace will do
       e.bkp += dt;
-      if ((e.bkws || 0) < bkc - 1 && bsp < bkc + 1) e.bkn = (e.bkn || 0) + dt; else e.bkn = 0;
-      if (e.bkp > 1 && e.bkn >= 0.4) { e.bkp = 0; e.bkn = 0; }
-    } else if ((e.bkws || 0) > bkc + pv) {
+      if ((e.bkws || 0) < bkc + 0.5 && bsp < bkc + 2 && cl < 1) e.bkn = (e.bkn || 0) + dt; else e.bkn = 0;
+      if (e.bkp >= 0.8 && e.bkn >= 0.2) { e.bkp = 0; e.bkn = 0; }
+    } else if (this.bkBeaten(e, pc, gap, cl, ownM, bkc, dsg)) {   // he's being beaten: pivots
       e.bkn = (e.bkn || 0) + dt;
-      if (e.bkn >= (TUNE.bkpt != null ? TUNE.bkpt : 0.2)) { e.bkp = 0.001; e.bkn = 0; this.bump('bk_pivot'); }
-    } else e.bkn = Math.max(0, (e.bkn || 0) - dt);
-    e.bkg = true;
+      if (e.bkn >= 0.2) { e.bkp = 0.001; e.bkn = 0; this.bump('bk_pivot'); if (isD(e)) this.bump('bk_pivot_D'); }
+    } else e.bkn = 0;
+  }
+  // ...beaten: the carrier is coming at our net faster than he can skate backward, and is about to get to him, about to pass
+  // him on the way to our net (a man off to the side too), or is nearly level with him (a slow carrier closing on him
+  // isn't: he stands up to him)
+  bkBeaten(e, pc, gap, cl, ownM, bkc, dsg) {
+    const nx = -dsg * 89 - pc.x, ny = -pc.y, nl = Math.max(hyp(nx, ny), 1);
+    if ((pc.vx * nx + pc.vy * ny) / nl < bkc + (TUNE.bkpv != null ? TUNE.bkpv : 1.5)) return false;
+    const tc = TUNE.bktc != null ? TUNE.bktc : 1.5, rn = -dsg * (pc.vx - e.vx);   // rn: how fast the carrier gains on him toward our net (a man off to the side gets passed too)
+    if (rn > 2 && ownM / rn < tc) return true;
+    return (cl > 2 && gap / cl < tc) || (ownM < 6 && cl > 1);
   }
   puckPhys(dt, dead) {
     const p = this.puck;

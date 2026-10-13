@@ -1,1 +1,1 @@
-{"ver": "2026.10.13.9", "notes": "Match engine: defensemen skate backward at realistic speeds (capped around 15 ft/s) and turn to skate forward when a rush needs more speed.", "mb": 1, "data": "2026-10-12T14:03:27"}
+{"ver": "2026.10.13.10", "notes": "Match engine: defensemen back off skating backward again (capped near 15.5 ft/s) and only turn to skate forward when the carrier is beating them.", "mb": 1, "data": "2026-10-12T14:03:27"}
