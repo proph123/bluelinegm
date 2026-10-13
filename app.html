@@ -497,6 +497,9 @@ td.b { font-weight: 700 }
 .sr-quote { margin: 10px 0; padding: 8px 12px; border-left: 3px solid var(--blue); background: color-mix(in srgb, var(--blue) 7%, transparent); border-radius: 0 8px 8px 0 } .sr-quote p { margin: 0; font-size: 13px; line-height: 1.45 } .sr-quote footer { margin-top: 5px; font-size: 11.5px; color: var(--muted) } .sr-quote footer::before { content: '— ' }
 .sr-info { margin: 8px 0; gap: 6px } .sr-info div { grid-template-columns: 84px 1fr; align-items: baseline } .sr-info dd { font-size: 13px; font-weight: 400 } .sr-info .sr-flags { margin: 0 }
 .sr-second { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 7px 0 2px; border-top: 1px solid var(--line); margin-top: 6px } .sr-lk-h { color: var(--blue); font-weight: 600 } .sr-lk-m { color: var(--good); font-weight: 600 } .sr-lk-l { color: var(--bad); font-weight: 600 }
+.sc-rc { display: inline-block; min-width: 18px; text-align: center; font-weight: 700; font-size: 11px; line-height: 17px; border-radius: 4px; padding: 0 4px; color: #fff; vertical-align: middle } .rc-a { background: var(--good) } .rc-b { background: var(--warn); color: #1a1a1a } .rc-c { background: var(--bad) }
+.sc-job { font-size: 11.5px; color: var(--muted) } .sc-job .btn { margin-left: 6px } .sc-jl li { align-items: center; flex-wrap: wrap } .sc-jl li .btn { margin-left: auto } .sc-jl small { color: var(--muted) } .sc-sug { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 7px 9px; margin: 8px 0; border: 1px dashed var(--line); border-radius: 8px; font-size: 12.5px } .sc-sug .btn { margin-left: auto }
+.sc-notes li { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 6px } .sc-notes em { font-style: normal; font-weight: 600 }
 .sr-grades.sc-nums { grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 12px 0 4px } .sc-nums b { font-size: 18px } .sr-info dd { min-width: 0 } .sr-info select { max-width: 100% }
 .sr-flags { display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 6px 0; font-size: 12px } .sr-flags span { border: 1px solid var(--line); border-radius: 999px; padding: 0 8px } .sr-flags .pos { color: var(--good, #2a8) } .sr-flags .neg { color: var(--bad) } .sr-out { font-size: 12.5px; margin: 4px 0 }
 .sc-trait { font-size: 11px; border: 1px solid color-mix(in srgb, var(--blue) 45%, var(--line)); border-radius: 999px; padding: 0 7px; color: var(--blue); font-weight: 600 } .sc-trait.flaw { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, var(--line)) }
@@ -6127,9 +6130,14 @@ class League {
     const cls = this.draftClass.map(id => this.players[id]).filter(p => p && p.tid === -2), nReg = {};
     for (const p of cls) { const k = scRegOf(p); nReg[k] = (nReg[k] || 0) + 1; }
     const list = {}, roam = [];
-    for (const s of emp) { if (away.has(s.id)) continue; const w = this.scSpd(s, s.at), wG = w * (s.trait === 'guru' ? 1.5 : 1); if (s.at) (list[s.at] = list[s.at] || []).push([s, w, wG]); else roam.push([s, this.scSpd(s, null), this.scSpd(s, null) * (s.trait === 'guru' ? 1.5 : 1)]); }
-    const avail = emp.filter(s => !away.has(s.id));
+    for (const s of emp) {
+      if (away.has(s.id)) continue; const j = s.job;
+      if (j) { if (j.k === 'league' && j.wait <= 0) { const w = this.scSpd(s, j.reg) * 2.2; (list[j.reg] = list[j.reg] || []).push([s, w, w * (s.trait === 'guru' ? 1.5 : 1)]); } continue; }   // (on a job: a league job is deep coverage there, a watch job covers nothing else)
+      const w = this.scSpd(s, s.at), wG = w * (s.trait === 'guru' ? 1.5 : 1); if (s.at) (list[s.at] = list[s.at] || []).push([s, w, wG]); else roam.push([s, this.scSpd(s, null), this.scSpd(s, null) * (s.trait === 'guru' ? 1.5 : 1)]);
+    }
+    const avail = emp.filter(s => !away.has(s.id) && !s.job);
     for (let d = 0; d < (days || 1); d++) {
+      for (const s of emp) if (s.job && !away.has(s.id)) this.scJobDay(s);   // (assignments: travel, viewings, the end of the job)
       for (const id of sl) {   // the shortlist: cross-checked by everyone free, the director too (he never travels)
         const p = this.players[id], b4 = p.sp || 0, k = scRegOf(p);
         const terms = avail.map(s => [s.id, (s.home === k ? 1.25 : .9) * (s.trait === 'work' ? 1.25 : 1) * (s.trait === 'cross' ? 1.5 : 1) * this.scSpM(s, p)]); if (dir) terms.push([dir.id, 1]);
@@ -8197,6 +8205,8 @@ const SC_BIAS = {
   dour: ['🌧️', 'Hard to impress', 'His ceilings run low across the board.', -3],
   grit: ['💪', 'Sold on character', 'Rates hard workers and smart kids higher, and coasters lower, than they are.', 1],
 };
+// (phase 2) a scout's call on a player he has seen enough of: what each letter means
+const SC_RECT = { A: 'must target: worth taking early or paying up for', B: 'worth it at the right slot or price', C: 'pass' };
 const SC_BIAS_POOL = ['size', 'size', 'flash', 'flash', 'cons', 'cons', 'opt', 'opt', 'dour', 'grit', 'grit'];
 // a tendency's tilt on one prospect's ceiling read (internal points, before his accuracy damps it)
 function scTilt(b, p, lg) {
@@ -10221,7 +10231,7 @@ Object.assign(League.prototype, {
   },
   scUnbookAll(id) { const E = this.scEv; if (E && E.b) for (const k in E.b) E.b[k] = E.b[k].filter(x => x !== id); },
   scRelease(s, quiet) {
-    s.st = 'pool'; s.at = null; s.yours = 1; s.poolS = 0; s.sal = this.scoutAsk(s, 2); this.scUnbookAll(s.id);
+    s.st = 'pool'; s.at = null; s.job = null; s.yours = 1; s.poolS = 0; s.sal = this.scoutAsk(s, 2); this.scUnbookAll(s.id);
     if (this.scDirId === s.id) this.scDirId = null;
     if (!quiet) this.addNews('You released ' + (s.role === 'dir' ? 'Director of Scouting ' : 'scout ') + s.first + ' ' + s.last + '.', this.userTid, 'front');
     SCREV++;
@@ -10230,7 +10240,7 @@ Object.assign(League.prototype, {
   scExtend(s, yrs) { s.sal = this.scoutAsk(s, yrs); s.exp = this.capSeason() + yrs - 1; SCREV++; },
   scRefd(id) { for (const pid of this.draftClass || []) { const p = this.players[pid]; if (p && p.scW && p.scW[id]) return true; } return false; },
   scDrop(s) {   // out of the game (retired, hired away, gone from the market): kept while live prospects carry his reads
-    this.scUnbookAll(s.id); if (this.scDirId === s.id) this.scDirId = null; s.at = null;
+    this.scUnbookAll(s.id); if (this.scDirId === s.id) this.scDirId = null; s.at = null; s.job = null;
     if (this.scRefd(s.id)) s.st = 'gone'; else delete this.scoutDB[s.id];
     SCREV++;
   },
@@ -10244,6 +10254,94 @@ Object.assign(League.prototype, {
     s.brev = 1; SCREV++; const d = this.scDir(), l = s.last;
     const q = { size: `watch ${l} on the big kids. He falls for a frame every time: his ceilings on the 6'3" types run high, on the small ones low.`, flash: `${l} gets carried away by hands and highlight goals. Discount his reads on the flashy ones; he undersells the plain, useful players.`, cons: `${l} never sticks his neck out. His best prospects are better than he says and his long shots worse.`, opt: `${l} likes everybody. His ceilings run a few points high.`, dour: `${l} is hard to impress. His ceilings run a few points low across the board.`, grit: `${l} is sold on character. The hard workers get a bump from him and the coasters a knock.` }[s.bias];
     this.addNews((d ? 'Director of Scouting ' + d.first + ' ' + d.last : 'Your staff') + ' on scout ' + s.first + ' ' + s.last + ': "' + q + '" (tendency: ' + SC_BIAS[s.bias][1] + ')', this.userTid, 'scout');
+  },
+  // ---- (scouting phase 2) assignments and viewings ----
+  // On top of his region and the calendar's events a scout takes one job at a time (s.job): watch a player (a few
+  // viewings a couple of games apart, after the trip), scout a league for a few weeks (deep coverage there in place of
+  // his region), or pro-scout an NHL/AHL player or free agent (character, injuries and a fit report: no rating fog).
+  // Days are scouting-clock days, about one team game each; while on a job he covers nothing else and can't be booked.
+  // Each viewing files a dated note (p.scN) and, once he's seen enough, his A/B/C call (p.scV[sid].rec; scRecOf).
+  scTravel(s, k) { const NA = ['WCAN', 'ONT', 'QUE', 'USA', 'NCAA', 'PRO']; return k === s.home ? 0 : NA.includes(k) === NA.includes(s.home) ? 1 : 3; },   // (days on the road before the first look: a flight across the Atlantic costs three)
+  scPlace(p) { return p.tid === -2 ? scRegOf(p) : 'PRO'; },
+  scJobErr(s, o) {
+    if (!s || s.st !== 'emp' || s.role !== 'reg') return 'Only your regional scouts take assignments';
+    if (o.k === 'league') return SC_REG.some(r => r[0] === o.reg) ? '' : 'No such region';
+    const p = this.players[o.pid]; if (!p) return 'No such player';
+    if (p.tid === this.userTid) return 'He plays for you';
+    if (p.tid !== -2 && !(p.tid >= 0 || p.tid === -1)) return 'He isn\'t playing anywhere you can see';
+    return Object.values(this.scoutDB).some(x => x !== s && x.st === 'emp' && x.job && x.job.pid === p.id) ? 'Another scout is already on him' : '';
+  },
+  scJobStart(s, o) {
+    const p = o.pid ? this.players[o.pid] : null, tr = this.scTravel(s, p ? this.scPlace(p) : o.reg);
+    s.job = p ? { k: p.tid === -2 ? 'watch' : 'pro', pid: p.id, n: p.tid === -2 ? 4 : 3, done: 0, wait: tr + 1, gap: 2 } : { k: 'league', reg: o.reg, wait: tr, left: tr + 10 };
+    SCREV++; return s.job;
+  },
+  scJobLeft(s) { const j = s && s.job; return !j ? 0 : j.k === 'league' ? Math.max(0, j.left) : Math.max(0, j.wait) + Math.max(0, j.n - j.done - 1) * j.gap; },
+  scJobEnd(s, quiet) {
+    const j = s.job; if (!j) return; s.job = null; SCREV++;
+    if (quiet) return; const p = j.pid ? this.players[j.pid] : null, V = p && p.scV && p.scV[s.id];
+    if (p) this.addNews('Scouting: ' + s.first + ' ' + s.last + ' is back from watching ' + p.first + ' ' + p.last + ' (' + (V ? V.n : 0) + ' viewings)' + (V && V.rec ? ' and grades him ' + V.rec + ': ' + SC_RECT[V.rec] + '.' : '.'), this.userTid, 'scout', p.id);
+    else this.addNews('Scouting: ' + s.first + ' ' + s.last + ' is back from three weeks in ' + regName(j.reg) + '.', this.userTid, 'scout');
+  },
+  scJobDay(s) {
+    const j = s.job; if (!j) return; j.wait--;
+    if (j.k === 'league') { if (--j.left <= 0) this.scJobEnd(s); return; }
+    const p = this.players[j.pid]; if (!p || p.tid === this.userTid || p.retired) { this.scJobEnd(s, true); return; }
+    if (j.wait > 0) return;
+    this.scView(s, p); j.done++; j.wait = j.gap;
+    if (j.done >= j.n) this.scJobEnd(s);
+  },
+  // one viewing: knowledge (a draft prospect's: home region and specialty count, phase 1), the note, his call
+  scView(s, p) {
+    const V = (p.scV || (p.scV = {}))[s.id] || (p.scV[s.id] = { n: 0 }); V.n++; V.s = this.season;
+    if (p.tid === -2) this.scCredit(p, s.id, 7 * (s.home === scRegOf(p) ? 1.25 : 1) * this.scSpM(s, p) * (s.trait === 'work' ? 1.1 : 1));
+    const dt = typeof gameDate === 'function' ? gameDate(this.clkDay(this.sclk())).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    (p.scN || (p.scN = [])).push([this.season, dt, s.id, this.scNoteTxt(s, p)]); if (p.scN.length > 8) p.scN.shift();
+    const r = this.scRecOf(s, p); if (r) V.rec = r;
+    this.scNoteRep(s, .5); SCREV++;
+  },
+  // what he saw that night, in his voice: the opponent, the line, the night (better players have more good ones), a tool
+  // that stood out or got exposed, now and then a word on the character he read
+  scNoteTxt(s, p) {
+    const G = p.pos === 'G', r = p.r || {}, a = this.scAcc(s, p), T = traitsOf(p);
+    const opp = p.tid === -2 ? pickA((CLUBS[p.lg] || []).filter(c => c !== p.club)) || 'a league rival' : 'vs ' + pickA(this.teams.filter(t => t.tid !== p.tid)).abbr;
+    const lvl = cl((showR(p.ovr) - (p.tid === -2 ? 68 : 78)) / 14, 0, 1), x = Math.random(), night = x < .22 + .25 * lvl ? 'good' : x < .78 ? 'quiet' : 'bad';
+    const TK = G ? [['ref', 'reflexes'], ['pos', 'positioning'], ['reb', 'rebound control']] : [['ska', 'skating'], ['sht', 'shot'], ['hnd', 'hands'], ['pas', 'vision'], ['def', 'defensive play'], ['chk', 'physical game']];
+    const srt = TK.slice().sort((u, v) => (r[v[0]] || 0) - (r[u[0]] || 0)), top = srt[0][1], low = srt[srt.length - 1][1];
+    let line;
+    if (G) { const sa = ri(24, 36), sv = cl(.905 + .03 * lvl + (night === 'good' ? .03 : night === 'bad' ? -.05 : 0) + gauss() * .012, .8, 1), ga = Math.round(sa * (1 - sv)); line = (sa - ga) + ' saves on ' + sa; }
+    else { const k = night === 'good' ? 1.6 : night === 'bad' ? .4 : .8, pts = (night === 'good' && Math.random() < .6 ? 1 : 0) + poisson(Math.max(.1, (.35 + .9 * lvl) * (p.pos === 'D' ? .6 : 1) * k)), g = Math.min(pts, poisson(pts * (p.pos === 'D' ? .25 : .45))); line = pts ? (g ? g + 'G ' : '') + (pts - g ? (pts - g) + 'A' : '').trim() : 'no points'; }
+    const is = t => /hands|reflexes/.test(t) ? 'are' : 'is';
+    const mine = (s.spec || []).some(k2 => SC_SPEC[k2] && (SC_SPEC[k2][3] & SC_ATTR_BIT[srt[0][0]])) ? ' Right in my wheelhouse.' : '';
+    const say = night === 'good' ? pickA([`A strong night. The ${top} stood out.`, `Dominant stretches; the ${top} ${is(top)} the real thing.`, `He drove play; the ${top} jumped off the ice.`]) + mine
+      : night === 'quiet' ? pickA([`A quiet one. Did the little things; the ${top} showed in flashes.`, `Steady, not spectacular. Saw the ${top}, wanted more of it.`, `Middle of the road. The ${low} ${is(low)} still a work in progress.`])
+      : pickA([`A rough night. The ${low} got exposed.`, `Struggled with the pace; the ${low} let him down.`, `Off night. Forced things and paid for it; the ${low} ${is(low)} a concern.`]);
+    const ch = Math.random() < .3 && faceRng(s.id + '|' + p.id + '|work')() >= .35 * (1 - a) ? (T.work > 0 ? ' Last one off the ice after warm-ups.' : T.work < 0 ? ' Coasted through some shifts.' : '') : '';
+    return (p.tid === -2 ? 'vs ' + opp : opp) + ' · ' + line + '. ' + say + ch;
+  },
+  // his call: a draft prospect against where the lists have him (A: take him early or above his slot, B: right at his slot,
+  // C: pass); a pro on his fit with your club and his deal. Needs enough of a look: 20 points of his own viewing or two games.
+  scRecOf(s, p) {
+    const V = p.scV && p.scV[s.id];
+    if (p.tid === -2) { const W = (p.scW || {})[s.id] || 0; if (W < 20 && !(V && V.n >= 2)) return V && V.rec || null; const sv = showR(this.scOwnRead(s, p)), d = sv - showR(p.scout ?? p.pot); return sv >= 91 || (d >= 2 && sv >= 84) ? 'A' : sv < 79 || d <= -4 ? 'C' : 'B'; }   // (C: not an NHL regular in his eyes, or well short of his billing)
+    return V && V.n >= 2 ? this.scFit(p).rec : null;
+  },
+  scFit(p) {   // where a pro would slot in on your club, and what his deal is worth
+    const t = this.teams[this.userTid], grp = q => q.pos === 'G' ? 'G' : q.pos === 'D' ? 'D' : 'F', g = grp(p);
+    const mates = this.rosterOf(t).filter(q => grp(q) === g && q.id !== p.id), rank = mates.filter(q => q.ovr > p.ovr).length;
+    const slot = g === 'G' ? (rank < 1 ? 'your starter' : rank < 2 ? 'your backup' : 'a third goalie') : g === 'D' ? (rank < 2 ? 'top pair' : rank < 4 ? 'second pair' : rank < 6 ? 'third pair' : 'a spare D') : (rank < 3 ? 'top line' : rank < 6 ? 'top six' : rank < 9 ? 'middle six' : rank < 12 ? 'fourth line' : 'a spare forward');
+    const c = p.contract, fair = this.fairSal(p), ratio = c && fair > 0 ? c.sal / fair : 1, deal = ratio <= .8 ? 'a bargain' : ratio <= 1.15 ? 'fair' : 'overpaid';
+    const good = g === 'G' ? rank < 1 : g === 'D' ? rank < 4 : rank < 6, poor = (g === 'G' ? rank >= 2 : g === 'D' ? rank >= 6 : rank >= 12) || ratio > 1.35;
+    return { slot, rank, deal, ratio, rec: good && ratio <= 1.15 ? 'A' : poor ? 'C' : 'B' };
+  },
+  scRecs(p) { const out = []; for (const id in (p.scV || {})) { const s = this.scoutDB[id]; if (s) { const r = this.scRecOf(s, p); if (r) out.push([s, r]); } } for (const id in (p.scW || {})) { if (id === '~' || (p.scV && p.scV[id])) continue; const s = this.scoutDB[id]; if (s && s.role === 'reg') { const r = this.scRecOf(s, p); if (r) out.push([s, r]); } } return out; },   // (every scout who's seen enough of him, each his own call - phase 3's disagreement)
+  // the director's nudge: a prospect the lists rank high that your staff has barely seen, and the free scout best placed
+  scSuggest() {
+    const free = this.scEmp().filter(s => !s.job && !this.scAwaySet().has(s.id)); if (!free.length || !this.scDir()) return null;
+    const on = new Set(this.scEmp().filter(s => s.job && s.job.pid).map(s => s.job.pid));
+    const p = (this.draftClass || []).map(id => this.players[id]).filter(q => q && q.tid === -2 && !on.has(q.id)).sort((a, b) => b.scout - a.scout).slice(0, 40).find(q => (q.sp || 0) < 35);
+    if (!p) return null; const s = free.slice().sort((a, b) => this.scAcc(b, p) - this.scAcc(a, p) || this.scTravel(a, scRegOf(p)) - this.scTravel(b, scRegOf(p)))[0];
+    return { s, p };
   },
   scOwnRead(s, p) { return p.pot + this.scRead(s, p, 'pot', true) * this.sceK(); },   // (one scout's own read of a ceiling: his call, scored later)
   scTrkScore() {   // the summer: calls three drafts old are judged against what the player became
@@ -10310,7 +10408,7 @@ Object.assign(League.prototype, {
     const field = this.scEvField(ev);
     let best = null, bs = -1e9;
     for (const s of this.scEmp()) {
-      if (booked.has(s.id) || busy.has(s.id)) continue;
+      if (booked.has(s.id) || busy.has(s.id) || s.job) continue;   // (one job at a time: a scout on an assignment isn't booked)
       const sc = field.filter(p => scRegOf(p) === s.home).length + 5 * cl((s.jud - 40) / 55, 0, 1) + (s.trait === 'rat' ? 4 : 0) - (s.at && field.length && [...sl].some(id => this.players[id] && scRegOf(this.players[id]) === s.at) ? 3 : 0);
       if (sc > bs) { bs = sc; best = s; }
     }
@@ -10355,6 +10453,7 @@ Object.assign(League.prototype, {
     for (const s of Object.values(this.scoutDB)) if (s.st === 'emp' && (s.age >= 70 ? Math.random() < .7 : s.age >= 65 && Math.random() < .3)) { news((s.role === 'dir' ? 'Director of Scouting ' : 'Scout ') + s.first + ' ' + s.last + ' retires.'); this.scDrop(s); }
     for (const s of Object.values(this.scoutDB)) if (s.st === 'pool' && s.age >= 68) this.scDrop(s);
     try { this.scTrkScore(); } catch (e) { if (typeof console !== 'undefined') console.warn('sctrk', e); }
+    for (const s of Object.values(this.scoutDB)) if (s.job) s.job = null;   // (the season's assignments end with it)
     this.scOffers = this.scOffers || []; let made = 0;
     const cand = Object.values(this.scoutDB).filter(s => s.st === 'emp' && !this.scOffers.some(o => o.sid === s.id)).map(s => [s, cl(.012 * Math.max(0, s.jud - 72), 0, .3) * (s.exp > this.capSeason() ? .5 : 1) * (s.sal >= 1.2 * this.scoutAsk(s, 2) ? .5 : 1) * (s.role === 'dir' ? 1.2 : 1)]).sort((a, b) => b[1] - a[1]);
     for (const [s, pp] of cand) { if (made >= 2 || Math.random() >= pp) continue; const t = pickA(this.teams.filter(x => x.tid !== ut)); const o = { sid: s.id, tid: t.tid, sal: Math.round(Math.max(s.sal * 1.3, this.scoutAsk(s, 2) * 1.15) * 100) / 100, yrs: ri(2, 3) }; this.scOffers.push(o); made++; news('The ' + this.tname(t.tid) + ' have offered ' + (s.role === 'dir' ? 'your Director of Scouting ' : 'scout ') + s.first + ' ' + s.last + ' (' + scGrade(s.jud) + ') ' + money(o.sal) + ' a year for ' + o.yrs + ' years. Match it before the season starts or he leaves.'); }
@@ -16570,6 +16669,16 @@ const scLink = s => `<button class="link" data-act="scoutSel" data-sid="${s.id}"
 // (scouting phase 1) his specialties, his tendency (once the director has him worked out) and his record, as pills
 const specPills = (s, p) => ((s && s.spec) || []).filter(k => SC_SPEC[k]).map(k => `<span class="sc-spec${p && (SC_SPEC[k][3] & scTag(p)) ? ' on' : ''}" title="Specialty: ${esc(SC_SPEC[k][2])}${p && (SC_SPEC[k][3] & scTag(p)) ? ' This prospect is in his lane.' : ''}">${SC_SPEC[k][0]} ${esc(SC_SPEC[k][1])}</span>`).join('');
 const biasPill = s => !s || s.role !== 'reg' ? '' : s.bias && s.brev ? `<span class="sc-trait flaw" title="Tendency: ${esc(SC_BIAS[s.bias][2])} Your director discounts it.">${SC_BIAS[s.bias][0]} ${esc(SC_BIAS[s.bias][1])}</span>` : s.st === 'emp' && !(!s.bias && (s.nrep || 0) >= L.scBiasNeed() && L.scDir()) ? `<span class="sc-unk" title="Tendency not known yet: your director learns a scout from his reports (or his track record shows it)">? Tendency</span>` : '';
+// (phase 2) a scout's A/B/C call as a chip, and his current assignment in words
+const recChip = (r, s) => r ? `<span class="sc-rc rc-${r.toLowerCase()}" title="${esc((s ? scName(s) + ': ' : '') + r + ', ' + SC_RECT[r])}">${r}</span>` : '';
+const scWk = d => d <= 1 ? 'in a day or two' : 'in ~' + Math.max(1, Math.round(d * 2.2 / 7)) + ' wk';   // (a scouting day is about one team game, ~2.2 calendar days)
+function scJobTxt(s) {
+  const j = s.job;
+  if (j && j.pid) { const p = L.players[j.pid]; return `👁 ${j.k === 'pro' ? 'Pro-scouting' : 'Watching'} ${p ? esc(p.first[0] + '. ' + p.last) : '—'} · ${j.done}/${j.n}${j.done === 0 && j.wait > 1 ? ' · travelling' : ''} · free ${scWk(L.scJobLeft(s))}`; }
+  if (j) return `🗺️ Scouting ${esc(regShort(j.reg))}${j.wait > 0 ? ' · travelling' : ''} · free ${scWk(L.scJobLeft(s))}`;
+  const E = L.scEvState(), ev = SC_EVENTS.find(e => E.done[e.k] == null && ((E.b || {})[e.k] || []).includes(s.id));
+  return ev ? `🏟️ Booked: ${esc(ev.n)}` : 'Free for an assignment';
+}
 const recPill = s => { const r = scRecTxt(s); return r ? `<span class="sc-rec" title="Track record: his calls on prospects judged a few seasons later (a hit: within about four points of how the player turned out)${s.trk.seed ? '. ' + s.trk.seed + ' of them are from before he joined you' : ''}">📈 ${esc(r[0].replace(/ \(.*/, ''))} · <b class="${r[2]}">${esc(r[1])}</b></span>` : ''; };
 function scStatus(s, away) {
   if (s.role === 'dir') return 'Director';
@@ -16679,7 +16788,7 @@ function scoutStaffCard() {
   const dA = L.dirAcc(), dk = (1.25 - .5 * dA).toFixed(2);
   const extBtns = s => s.exp <= cs ? `<div class="sc-ext"><span class="pill bad">Expiring</span>${[1, 2, 3].map(y => { const e = L.scExtendErr(s, y); return `<button class="btn sm" data-act="scExtend" data-sid="${s.id}" data-y="${y}" ${e ? `disabled title="${esc(e)}"` : ''}>${y}y ${money(L.scoutAsk(s, y))}</button>`; }).join('')}</div>` : '';
   const offers = (L.scOffers || []).map(o => { const s = L.scoutDB[o.sid]; if (!s) return ''; return `<div class="sc-offer">${scFace(s, 26)}<span>The <b>${esc(L.tname(o.tid))}</b> want ${esc(scName(s))}: ${money(o.sal)} × ${o.yrs} yrs (now ${money(s.sal)})</span><button class="btn sm primary" data-act="scMatch" data-sid="${s.id}">Match</button><button class="btn sm ghost" data-act="scLetGo" data-sid="${s.id}">Let him go</button></div>`; }).join('');
-  const row = s => `<div class="sc-row">${scFace(s, 28)}<span class="sc-nm">${scLink(s)} ${gradePill(s)} <span class="sc-home" title="Home region: ${esc(regName(s.home))}">${esc(regShort(s.home))}${s.at === s.home ? ' ★' : ''}</span>${traitPill(s)}${specPills(s)}${biasPill(s)}${recPill(s)}<small class="muted">${esc(scStatus(s, away))} · ${dealTxt(s.sal, s.exp)}</small>${extBtns(s)}</span><button class="btn sm ghost" data-act="scFire" data-sid="${s.id}" title="Release">×</button></div>`;
+  const row = s => `<div class="sc-row">${scFace(s, 28)}<span class="sc-nm">${scLink(s)} ${gradePill(s)} <span class="sc-home" title="Home region: ${esc(regName(s.home))}">${esc(regShort(s.home))}${s.at === s.home ? ' ★' : ''}</span>${traitPill(s)}${specPills(s)}${biasPill(s)}${recPill(s)}<small class="muted">${esc(scStatus(s, away))} · ${dealTxt(s.sal, s.exp)}</small><small class="sc-job">${scJobTxt(s)}<button class="btn sm" data-act="scJob" data-sid="${s.id}">${s.job ? 'Job' : 'Assign'}</button></small>${extBtns(s)}</span><button class="btn sm ghost" data-act="scFire" data-sid="${s.id}" title="Release">×</button></div>`;
   const open = Math.max(0, jobs - emp.length);
   return `<div class="card" id="sc-staff"><h3>Scouting staff</h3>
     <label class="small muted" for="scout-level">Budget</label>
@@ -16687,6 +16796,7 @@ function scoutStaffCard() {
     <p class="small"><i class="sc-meter${used > pot + 1e-9 ? ' bad' : ''}"><em style="width:${Math.min(100, used / pot * 100)}%"></em></i> Salaries ${money(used)} of ${money(pot)} · ${emp.length} of ${jobs} scout jobs filled</p>
     ${offers}
     <div class="sc-dir">${dir ? `${scFace(dir, 40)}<div><small class="eyebrow">Director of Scouting</small><div>${scLink(dir)} ${gradePill(dir)} <button class="link small" data-act="scFire" data-sid="${dir.id}">Release</button></div><small class="muted">Ranges ×${dk} · catches ${Math.round(50 * dA)}% of misreads · ${dA < .3 ? 'weighs reports by volume' : 'trusts his best scouts most'} · ${dealTxt(dir.sal, dir.exp)}</small>${extBtns(dir)}</div>` : `<div><small class="eyebrow">Director of Scouting</small><p class="small neg">No director: ranges ×1.25, nobody double-checks reports.</p><button class="btn sm primary" data-act="scMkt" data-k="1">Hire a director</button></div>`}</div>
+    ${(g => g ? `<div class="sc-sug">${scFace(dir, 20)}<span><b>${esc(dir.last)}</b> suggests sending ${scLink(g.s)} to watch <button class="link" data-act="player" data-pid="${g.p.id}">${esc(nm(g.p))}</button> <span class="muted">(high on the lists, ${Math.round(g.p.sp || 0)}% scouted)</span></span><button class="btn sm primary" data-act="scJobGo" data-sid="${g.s.id}" data-pid="${g.p.id}">Send him</button></div>` : '')(dir && (L.phase === 'regular' || L.phase === 'playoffs') ? L.scSuggest() : null)}
     ${emp.sort((a, b) => b.jud - a.jud).map(row).join('')}${Array.from({ length: open }, () => `<button class="sc-row sc-open" data-act="scMkt" data-k="0">Open job · Find a scout</button>`).join('')}
     <div class="btnrow"><button class="btn sm" data-act="scMkt">${scMktOpen() ? 'Close market' : 'Hire scouts'}</button></div>
     <p class="muted small">Your budget pays the director and scouts. A scout works about 1.5× faster and reads sharper in his home region (★). A prospect seen by several scouts is read more reliably; your director decides whose reports to trust. A specialty makes a scout sharper and about 20% faster in his lane (a skill or a league), a little duller outside it. Some scouts have a tendency, a steady tilt in their reads: your director works it out from their reports, and their track record (calls scored three drafts later) hints at it. Good scouts draw offers from other clubs each summer: longer deals or a raise keep them.</p></div>`;
@@ -16731,13 +16841,58 @@ function scoutModal(sid) {
     ${calls.length ? `<h4 class="pf-sub">His calls on your picks</h4><ul class="pf-inj">${calls.map(p => { const v = L.scVerdict(p); return `<li><span>${p.scSnap.s + 1}</span><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> <small class="muted">#${p.scSnap.pk} · our read ${esc(tierL(p, p.scSnap.pot))} · lists ${esc(tierL(p, p.scSnap.cons))} · now ${esc(tierL(p, p.pot))}</small><b class="${v[1]}">${v[0]}</b></li>`; }).join('')}</ul>` : ''}
     <div class="btnrow">${btns}</div></div>`, 'wide');
 }
+// (phase 2) a scout's assignment: his current job, or a new one - watch a prospect (the shortlist and the poorly
+// scouted names high on the lists), scout a league for three weeks, cover one of the calendar's events; pro scouting
+// starts from a player's profile
+function scJobModal(sid) {
+  const s = L.scoutDB && L.scoutDB[sid]; if (!s) return;
+  const E = L.scEvState(), sl = (L.shortlist || []).map(id => L.players[id]).filter(p => p && p.tid === -2);
+  const top = (L.draftClass || []).map(id => L.players[id]).filter(p => p && p.tid === -2 && (p.sp || 0) < 50 && !sl.includes(p)).sort((a, b) => b.scout - a.scout).slice(0, 12 - Math.min(8, sl.length));
+  const cand = [...sl.slice(0, 8), ...top], fit = p => (s.spec || []).some(k => SC_SPEC[k] && (SC_SPEC[k][3] & scTag(p))), on = id => Object.values(L.scoutDB).find(x => x !== s && x.st === 'emp' && x.job && x.job.pid === id);
+  const cur = s.job ? `<p class="sc-sug">${scJobTxt(s)}<button class="btn sm ghost" data-act="scJobStop" data-sid="${sid}">End the job</button></p><p class="small muted">A new assignment replaces it.</p>` : '';
+  const evs = SC_EVENTS.filter(ev => E.done[ev.k] == null && ev.d < 999);
+  modal(`<div class="sc-modal"><div class="sc-mhead">${scFace(s, 48)}<div><h2>Assign ${esc(s.first + ' ' + s.last)}</h2><p class="muted small">${gradePill(s)} ${specPills(s)} · home ${esc(regShort(s.home))}</p></div></div>${cur}
+    <h4 class="pf-sub">Watch a prospect</h4><p class="small muted">Four viewings a couple of games apart, after the trip there (a day or so in North America, three across the Atlantic). Each one adds to what you know and files a note; after two he gives his call: A, B or C.</p>
+    <ul class="pf-inj sc-jl">${cand.map(p => { const o = on(p.id), tr = L.scTravel(s, scRegOf(p)); return `<li><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button><small>${p.pos} · ${esc(regShort(scRegOf(p)))} · ${Math.round(p.sp || 0)}% known${fit(p) ? ' · <b class="pos">his lane</b>' : ''}${tr ? ' · ' + tr + 'd travel' : ''}${o ? ' · ' + esc(o.last) + ' is on him' : ''}</small><button class="btn sm" data-act="scJobGo" data-sid="${sid}" data-pid="${p.id}" ${o || (s.job && s.job.pid === p.id) ? 'disabled' : ''}>${s.job && s.job.pid === p.id ? 'On him' : 'Watch'}</button></li>`; }).join('') || '<li class="muted">No draft class yet.</li>'}</ul>
+    <h4 class="pf-sub">Scout a league</h4><p class="small muted">About three weeks there, covering its prospects twice as deeply as region work.</p>
+    <div class="btnrow"><select id="scj-reg" aria-label="League">${SC_REG.map(([k, n]) => `<option value="${k}" ${k === s.home ? 'selected' : ''}>${esc(n)}${k === s.home ? ' ★' : ''}</option>`).join('')}</select><button class="btn sm" data-act="scJobGo" data-sid="${sid}" data-reg="1">Send him</button></div>
+    <h4 class="pf-sub">Cover an event</h4><ul class="pf-inj sc-jl">${evs.map(ev => { const bk = L.evBooked(ev.k).includes(sid); return `<li>${esc(ev.n)} <small>${esc(ev.when)}</small>${bk ? `<button class="btn sm ghost" data-act="scUnbook" data-k="${ev.k}" data-sid="${sid}">Booked · unbook</button>` : `<button class="btn sm" data-act="scJobBook" data-k="${ev.k}" data-sid="${sid}" ${s.job ? 'disabled title="He is on another job"' : ''}>Book</button>`}</li>`; }).join('') || '<li class="muted">Nothing left on the calendar.</li>'}</ul>
+    <h4 class="pf-sub">Pro scouting</h4><p class="small muted">To watch an NHL or AHL player or a free agent you might trade for or sign, open his profile and use <b>Send a scout</b>.</p></div>`, 'wide');
+}
+// the other way round: from a player's profile, which scout to send (his fit, his trip, how long, what he's doing now)
+function scSendModal(pid) {
+  const p = L.players[pid]; if (!p) return; const place = L.scPlace(p), pro = p.tid !== -2;
+  const emp = L.scEmp().slice().sort((a, b) => (!!a.job - !!b.job) || (pro ? L.scTravel(a, place) - L.scTravel(b, place) : L.scAcc(b, p) - L.scAcc(a, p)));
+  modal(`<div class="sc-modal"><h2>Send a scout</h2><p class="muted small">to ${pro ? 'pro-scout' : 'watch'} <b>${esc(p.first + ' ' + p.last)}</b> · ${pro ? 'three viewings: character, health and how he fits your club' : 'four viewings: knowledge, notes and his A/B/C call'}</p>
+    <ul class="pf-inj sc-jl">${emp.map(s => { const tr = L.scTravel(s, place), e = L.scJobErr(s, { k: 'watch', pid }), days = tr + 1 + (pro ? 2 : 3) * 2;
+      return `<li>${scFace(s, 22)} ${scLink(s)} ${gradePill(s)} ${pro ? '' : specPills(s, p)}<small>${s.job ? 'busy: ' + scJobTxt(s) : 'free'} · ${tr ? tr + 'd travel · ' : ''}done ${scWk(days)}</small><button class="btn sm${s.job ? ' ghost' : ''}" data-act="scJobGo" data-sid="${s.id}" data-pid="${pid}" ${e ? `disabled title="${esc(e)}"` : ''}>${s.job ? 'Reassign' : 'Send'}</button></li>`; }).join('') || '<li class="muted">No regional scouts on staff.</li>'}</ul></div>`);
+}
+// pro scouting on a profile (an NHL/AHL player or free agent not yours): the scouts' notes, his character and health
+// as they read them, how he'd fit your club, and their calls - no rating fog, just the report
+function proScoutCard(p) {
+  const V = p.scV || {}, ids = Object.keys(V).filter(id => L.scoutDB[id]), n = ids.reduce((t, id) => t + V[id].n, 0), on = Object.values(L.scoutDB || {}).find(x => x.st === 'emp' && x.job && x.job.pid === p.id);
+  const send = `<div class="btnrow"><button class="btn sm" data-act="scSendP" data-pid="${p.id}">Send a scout</button>${on ? ` <span class="small muted">${esc(on.last)} is on him (${on.job.done}/${on.job.n})</span>` : ''}</div>`;
+  if (!n) return `<div class="pf-card"><h3>Pro scouting</h3><p class="small muted">None of your scouts has watched him. Send one for a read on his character, his health and how he'd fit your club.</p>${send}</div>`;
+  const s = L.scoutDB[ids.sort((a, b) => V[b].n - V[a].n)[0]], a = L.scAcc(s, p), T = traitsOf(p), miss = k => s.bias !== 'grit' && faceRng(s.id + '|' + p.id + '|' + k)() < .35 * (1 - a), f = L.scFit(p);
+  const flags = n < 2 ? null : [['work', 'Hard worker', 'Questions about his work ethic'], ['iq', 'High hockey IQ', 'Questions about his hockey sense'], ['lead', 'Leader in the room', '']].filter(([k]) => T[k] && !miss(k)).map(([k, hi, lo]) => T[k] > 0 ? [hi, 'pos'] : lo ? [lo, 'neg'] : null).filter(Boolean);
+  const med = p.ih && p.ih.length ? p.ih.slice(-2).map(([sn, ty, g, end]) => ty + (end ? ' (career-ending)' : ' (' + g + ' games, ' + sn + ')')).join('; ') : 'Clean';
+  const recs = L.scRecs(p), row = (k, v) => v ? `<div><dt>${k}</dt><dd>${v}</dd></div>` : '';
+  return `<div class="pf-card sr-card"><h3>Pro scouting</h3>
+    <div class="sr-by">${scFace(s, 34)}<div class="sr-byt"><div class="sr-byn">${scLink(s)} ${gradePill(s)}<span class="sr-sp small muted">${n} viewing${n === 1 ? '' : 's'}</span></div></div></div>
+    <dl class="pinfo sr-info">
+      ${row('Recommend', recs.length ? recs.map(([x, r]) => recChip(r, x) + ' <span class="small">' + esc(x.last) + '</span>').join(' ') + ` <span class="small muted">· ${esc(SC_RECT[recs[0][1]])}</span>` : '<span class="small muted">After a second viewing</span>')}
+      ${row('Fit', `Would slot in as <b>${esc(f.slot)}</b> <span class="small muted">· his deal looks ${esc(f.deal)}${p.contract ? ' (' + money(p.contract.sal) + ' through ' + p.contract.exp + ')' : ''}</span>`)}
+      ${flags ? row('Character', `<span class="sr-flags">${flags.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).join('') || '<span>No flags</span>'}</span>`) + row('Medical', `<span class="${med === 'Clean' ? '' : 'neg'}">${esc(med)}</span>`) : row('Character', '<span class="small muted">Character and medical reads after a second viewing</span>')}
+    </dl>${scNotesHtml(p)}${send}</div>`;
+}
+const scNotesHtml = p => (p.scN || []).length ? `<h4 class="pf-sub">Viewing notes</h4><ul class="pf-inj sc-notes">${p.scN.slice(-4).reverse().map(([sn, dt, sid, t]) => { const s = L.scoutDB && L.scoutDB[sid]; return `<li><span>${esc(dt || String(sn))}</span><span><em>${esc(s ? s.last : 'Scout')}:</em> ${esc(t)}</span></li>`; }).join('')}</ul>` : '';
 // a prospect's scouting report in the game's own terms: his overall now, the ceiling tier, when he'd be NHL-ready,
 // the risk, each skill now and at his projected peak (same scale and colours as the attributes), a comparison and a
 // written summary, all from the lead scout's read (so a weak scout can be confidently wrong), plus a second opinion
 const srCls = v => v >= 89 ? 'v1' : v >= 82 ? 'v2' : v >= 76 ? 'v3' : 'v4';   // (on the shown scale, a point up from the rules' one)
 function scoutReportCard(p, rep) {
   const sp = Math.round(p.sp || 0), ld = L.scLead(p), s = ld && ld.s, regL = regName(scRegOf(p));
-  const head = `<div class="small">${spBar(p)} ${sp}% scouted · ${esc(regL)}</div>`, star = `<div class="btnrow">${starBtn(p)} <span class="small muted">Shortlist</span></div>`;
+  const head = `<div class="small">${spBar(p)} ${sp}% scouted · ${esc(regL)}</div>`, onJ = Object.values(L.scoutDB || {}).find(x => x.st === 'emp' && x.job && x.job.pid === p.id), star = `<div class="btnrow">${starBtn(p)} <span class="small muted">Shortlist</span> <button class="btn sm" data-act="scSendP" data-pid="${p.id}">Send a scout</button>${onJ ? ` <span class="small muted">${esc(onJ.last)} is watching him (${onJ.job.done}/${onJ.job.n})</span>` : ''}</div>`;
   if (sp < 15 || !s) return `<div class="pf-card"><h3>Scouting report</h3>${head}<p class="small muted">${sp < 15 ? 'No scout has filed on him yet: ranges come from video and the public lists. Send a scout to his region or star him.' : 'Only video so far: no scout has seen him in person.'}</p>${star}</div>`;
   const eo = showR(estMid(p, 'ovr')), ep = Math.max(eo, showR(estMid(p, 'pot'))), a = L.scAcc(s, p), lift = ep - eo;
   const G = p.pos === 'G', mid = k => { const r = L.scoutRating(p, k); return r ? (r[0] + r[1]) / 2 : p.r[k]; };
@@ -16786,10 +16941,11 @@ function scoutReportCard(p, rep) {
     <dl class="pinfo sr-info">
       ${tLo.label !== tHi.label ? row('Range', `<span class="tier ${tLo.cls}">${esc(tLo.label)}</span> <span class="muted">→</span> <span class="tier ${tHi.cls}">${esc(tHi.label)}</span>`) : ''}
       ${lk && LKP[lk.c] ? row('To reach it', `<span class="${LKP[lk.c][1]}">${LKP[lk.c][0]}</span> <span class="small muted">chance of reaching that ceiling</span>`) : ''}
+      ${(rc => row('Recommend', rc.length ? rc.map(([x, r]) => recChip(r, x) + ' <span class="small">' + esc(x.last) + '</span>').join(' ') + (new Set(rc.map(x => x[1])).size > 1 ? ' <span class="small neg">· they disagree</span>' : ` <span class="small muted">· ${esc(SC_RECT[rc[0][1]])}</span>`) : ''))(L.scRecs(p))}
       ${row('Plays like', cmp ? `${an(cmp.first.toLowerCase()).toLowerCase()} <b>${esc(cmp.first + ' ' + cmp.last)}</b> type <span class="small muted">· ${esc(L.teams[cmp.tid].abbr)} · ${esc(arch)}, similar build, at his projected level (a style comparison, not a promise)</span>` : '')}
       ${sp >= 40 ? row('Character', `<span class="sr-flags">${flags.map(([t, c]) => `<span class="${c}">${esc(t)}</span>`).join('') || '<span>No flags</span>'}</span>`) + row('Medical', `<span class="${/clean/.test(med) ? '' : 'neg'}">${esc(med.replace(/^Medical: /, '').replace(/^clean$/, 'Clean'))}</span>`) : row('Character', '<span class="small muted">Character and medical reads come with more viewing (40%).</span>')}
     </dl>
-    ${rep || ''}${second ? `<div class="sr-second">${scFace(second, 24)}<span class="small"><span class="muted">Second opinion</span> ${scLink(second)} ${gradePill(second)}</span><span class="tier ${t2.cls}">${esc(t2.label)}</span><span class="small muted">${t2.label === tl ? 'agrees' : ep2 > ep ? 'sees more' : 'sees less'} · has seen ${kn2}% of him</span></div>` : ''}${star}</div>`;
+    ${scNotesHtml(p)}${rep || ''}${second ? `<div class="sr-second">${scFace(second, 24)}<span class="small"><span class="muted">Second opinion</span> ${scLink(second)} ${gradePill(second)}</span><span class="tier ${t2.cls}">${esc(t2.label)}</span><span class="small muted">${t2.label === tl ? 'agrees' : ep2 > ep ? 'sees more' : 'sees less'} · has seen ${kn2}% of him</span></div>` : ''}${star}</div>`;
 }
 function draftRealityCard() {
   const ps = Object.values(L.players).filter(p => p.scSnap && p.scSnap.s >= L.season - 3).sort((a, b) => b.scSnap.s - a.scSnap.s || a.scSnap.pk - b.scSnap.pk).slice(0, 21);
@@ -16813,7 +16969,7 @@ function vScouting() {
   const dir = L.scDir(), dA = L.dirAcc(), SMK = draftMarks(CS, cls);   // (the same gems and bust risks as the draft room's)
   return `${cls.length ? scoutMapCard(cls, CS) : ''}${scoutMarketCard()}<div class="grid draft"><div class="card"><div class="cardhead"><h2>${(L.phase === 'draft' ? L.season : yr) + 1} draft class</h2><div class="tabs inline">${tb('all', 'All')}${tb('short', 'Shortlist (' + sl.length + ')')}${tb('F', 'F')}${tb('D', 'D')}${tb('G', 'G')}</div></div>
     ${classOutlook(dir)}<p class="muted small">${cls.length} prospects · average scouted ${avg}%. Every game day your scouts file reports; a prospect seen by several scouts is read more reliably, and starred players get extra eyes. Your board: ${dir ? 'Director ' + esc(scName(dir)) + ' (' + scGrade(dir.jud) + ') · ranges ×' + (1.25 - .5 * dA).toFixed(2) + ' · catches ' + Math.round(50 * dA) + '% of misreads' : '<span class="neg">no director</span>'}.${(L.cfg || {}).reveal ? ' True ratings shown; My rank still reflects your scouts.' : ''}</p>
-    ${cls.length ? `<div class="tblwrap"><table class="tbl dctbl"><thead><tr><th></th><th><button class="sort ${sub.ssort === 'mine' || !sub.ssort ? 'on' : ''}" data-act="ssort" data-k="mine" title="Your scouts' rank">My #</button></th><th><button class="sort ${sub.ssort === 'cons' ? 'on' : ''}" data-act="ssort" data-k="cons" title="The consensus rank (the public lists)">Cons #</button></th><th>Projected</th><th class="l">Prospect</th><th>Pos</th><th>Age</th><th class="l">League · club</th><th title="Estimated overall">Est OVR</th><th class="l" title="Estimated potential">Est pot</th><th class="l">Style</th><th>Scouted</th></tr></thead><tbody>${list.slice(0, 150).map(p => `<tr><td>${starBtn(p)}</td><td><b>${CS.myRank[p.id]}</b></td><td>${CS.rank[p.id]}</td><td class="small">${projLabel(CS.rank[p.id])}</td><td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${SMK(p)}</td><td>${p.pos}</td><td>${p.age}</td><td class="l nowrap">${lgPill(p)} <span class="small dc-club" title="${esc(p.club || '')}">${clubLogo(p.lg, p.club)}${esc(p.club || '')}</span></td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${(a => hidden(p) && (p.sp || 0) < 25 ? archChip(p) : `<span class="arch" title="${esc(a + ': ' + ((ARCH[a] || {}).d || ''))}">${esc(ARCH_AB[a] || a)}</span>`)(p.arch || archOf(p))}</td><td title="${esc((l => l ? 'Report: ' + scName(l.s) + ' (' + scGrade(l.s.jud) + ')' : 'No report yet')(L.scLead(p)))}">${spBar(p)}${(l => l ? ` <small class="muted">${scGrade(l.s.jud)}</small>` : '')(L.scLead(p))}</td></tr>`).join('')}</tbody></table></div>` : '<p>The next draft class appears when the new season starts.</p>'}</div>
+    ${cls.length ? `<div class="tblwrap"><table class="tbl dctbl"><thead><tr><th></th><th><button class="sort ${sub.ssort === 'mine' || !sub.ssort ? 'on' : ''}" data-act="ssort" data-k="mine" title="Your scouts' rank">My #</button></th><th><button class="sort ${sub.ssort === 'cons' ? 'on' : ''}" data-act="ssort" data-k="cons" title="The consensus rank (the public lists)">Cons #</button></th><th>Projected</th><th class="l">Prospect</th><th>Pos</th><th>Age</th><th class="l">League · club</th><th title="Estimated overall">Est OVR</th><th class="l" title="Estimated potential">Est pot</th><th class="l">Style</th><th>Scouted</th></tr></thead><tbody>${list.slice(0, 150).map(p => `<tr><td>${starBtn(p)}</td><td><b>${CS.myRank[p.id]}</b></td><td>${CS.rank[p.id]}</td><td class="small">${projLabel(CS.rank[p.id])}</td><td class="l"><button class="link" data-act="player" data-pid="${p.id}">${esc(nm(p))}</button> ${natFlag(p.nat, p)}${SMK(p)}</td><td>${p.pos}</td><td>${p.age}</td><td class="l nowrap">${lgPill(p)} <span class="small dc-club" title="${esc(p.club || '')}">${clubLogo(p.lg, p.club)}${esc(p.club || '')}</span></td><td>${estTxt(p, 'ovr')}</td><td class="l">${tierChip(p, 'pot')}</td><td class="l">${(a => hidden(p) && (p.sp || 0) < 25 ? archChip(p) : `<span class="arch" title="${esc(a + ': ' + ((ARCH[a] || {}).d || ''))}">${esc(ARCH_AB[a] || a)}</span>`)(p.arch || archOf(p))}</td><td title="${esc((l => l ? 'Report: ' + scName(l.s) + ' (' + scGrade(l.s.jud) + ')' : 'No report yet')(L.scLead(p)))}">${spBar(p)}${(l => l ? ` <small class="muted">${scGrade(l.s.jud)}</small>` : '')(L.scLead(p))}${(rc => rc.length ? ' ' + recChip(rc[0][1], rc[0][0]) + (new Set(rc.map(x => x[1])).size > 1 ? '<small class="neg" title="Your scouts disagree">≠</small>' : '') : '')(L.scRecs(p))}</td></tr>`).join('')}</tbody></table></div>` : '<p>The next draft class appears when the new season starts.</p>'}</div>
     <div class="col">${scoutStaffCard()}<div class="card">
       ${myPicksCard(yr)}
       <h3 class="eyebrow">What scouting reveals</h3><ul class="small plist"><li>15%: rating ranges</li><li>25%: playing style</li><li>40%: strengths and weaknesses report</li><li>100%: as sharp as your scouts can see (a weak scout can still be wrong; the truth shows after the draft)</li></ul></div>${draftRealityCard()}
@@ -18019,7 +18175,7 @@ function playerModal(pid) {
       let rep = '';
       if ((p.sp || 0) >= 40) { const est = keys.map(k => [k, (L.scoutRating(p, k)[0] + L.scoutRating(p, k)[1]) / 2]).sort((a, b) => b[1] - a[1]); rep = `<p class="small"><b>Strengths:</b> ${est.slice(0, 2).map(x => RLAB[x[0]]).join(', ')}. <b>Weakness:</b> ${RLAB[est[est.length - 1][0]]}.</p>`; }
       report = scoutReportCard(p, (p.sp || 0) >= 25 ? '' : rep);   // the skill rows replace the strengths line once they show
-    }   // (a drafted player's "Draft report" card - our scouts' read, the lists', now - came off the profile at the user's call; p.scSnap still feeds the scouts' record)
+    } else if (p.tid !== L.userTid && (p.tid >= 0 || p.tid === -1) && !p.retired) report = proScoutCard(p);   // (phase 2: pro scouting on anyone you might trade for or sign)   // (a drafted player's "Draft report" card - our scouts' read, the lists', now - came off the profile at the user's call; p.scSnap still feeds the scouts' record)
     // on a phone: three tabs instead of one long column - the bio and ratings, the numbers, the career (the user's call)
     const mk = sub.pfm || 'ov', mtb = (k, lab) => `<button class="${mk === k ? 'on' : ''}" data-act="pfM" data-k="${k}">${lab}</button>`;
     if (MOBILE) body = `<div class="mh-tabs pf-mt">${mtb('ov', 'Overview')}${mtb('st', 'Stats')}${mtb('cr', 'Career')}</div><div class="pf-grid pf-m">${mk === 'st' ? `<div class="pf-card"><h3 class="pf-band">Stats</h3>${profStats(p)}</div><div class="pf-card"><h3>Milestones</h3>${profMilestones(p)}</div>`
@@ -18978,6 +19134,11 @@ const ACT = {
   // the scouting staff: pick, hire, release, extend, match offers, send to a region, book for events
   scoutSel: d => scoutModal(d.sid),
   scHire: d => { const s = L.scoutDB[d.sid], y = +d.y, e = L.scHireErr(s, y); if (e) return toast(e, 'bad'); L.scHire(s, y); L.addNews('You hired ' + s.first + ' ' + s.last + (s.role === 'dir' ? ' as Director of Scouting' : ' as a scout') + ' (' + regShort(s.home) + ', ' + scGrade(s.jud) + ', ' + money(s.sal) + ' through ' + s.exp + ').', L.userTid, 'front'); L.scTopUp(); save(); closeModal(); render(); toast(scName(s) + ' hired.' + (s.role === 'dir' ? ' Your board has been re-weighed by your new director.' : ''), 'good'); },
+  scJob: d => scJobModal(d.sid),
+  scSendP: d => scSendModal(d.pid),
+  scJobGo: d => { const s = L.scoutDB[d.sid], o = d.reg ? { k: 'league', reg: ($('#scj-reg') || {}).value } : { k: 'watch', pid: d.pid }, e = L.scJobErr(s, o); if (e) return toast(e, 'bad'); if (s.job) L.scJobEnd(s, true); L.scUnbookAll(s.id); L.scJobStart(s, o); const p = o.pid && L.players[o.pid]; save(); closeModal(); render(); toast(scName(s) + (p ? ' is off to watch ' + p.first + ' ' + p.last : ' is off to ' + regName(o.reg)) + ': back ' + scWk(L.scJobLeft(s)) + '.', 'good'); },
+  scJobStop: d => { const s = L.scoutDB[d.sid]; if (!s) return; L.scJobEnd(s, true); save(); render(); scJobModal(d.sid); },
+  scJobBook: d => { const s = L.scoutDB[d.sid], E = L.scEvState(); if (!s || s.job) return toast('He is on another job', 'bad'); E.b = E.b || {}; const b = E.b[d.k] || (E.b[d.k] = []); if (!b.includes(s.id)) b.push(s.id); SCREV++; save(); render(); scJobModal(d.sid); },
   scFire: async d => { const s = L.scoutDB[d.sid]; if (!s || !await askConfirm({ title: 'Release ' + s.first + ' ' + s.last + '?', text: 'He goes back on the market.', yes: 'Release him', danger: true })) return; L.scRelease(s); save(); closeModal(); render(); },
   scExtend: d => { const s = L.scoutDB[d.sid], y = +d.y, e = L.scExtendErr(s, y); if (e) return toast(e, 'bad'); L.scExtend(s, y); save(); closeModal(); render(); toast(scName(s) + ' extended through ' + s.exp + '.', 'good'); },
   scMatch: d => { const o = (L.scOffers || []).find(x => x.sid === d.sid), s = L.scoutDB[d.sid]; if (!o || !s) return; const e = L.scMatchErr(s, o); if (e) return toast(e, 'bad'); L.scMatch(o); L.addNews('You matched the ' + L.tname(o.tid) + "' offer: " + s.first + ' ' + s.last + ' stays.', L.userTid, 'front'); save(); closeModal(); render(); },
