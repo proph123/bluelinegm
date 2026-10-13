@@ -1607,6 +1607,23 @@ function segDist(px, py, ax, ay, bx, by) {
   let t = ((px - ax) * dx + (py - ay) * dy) / l2; t = clamp(t, 0, 1);
   return [hyp(px - (ax + t * dx), py - (ay + t * dy)), t];
 }
+// seconds for a skater to get to a spot (engine.gd _eta): his distance at about top speed, plus time to get going that way
+function etaTo(m, c) {
+  const dx = c.x - m.x, dy = c.y - m.y, dd = hyp(dx, dy);
+  if (dd < 1) return 0;
+  const vt = (m.vx * dx + m.vy * dy) / dd;
+  return dd / 27 + clamp(1 - vt / 27, 0, 2) * 0.45;
+}
+// zone spots [u, v] nobody already holds (engine.gd _open_spots): over 7 ft from every covered point, then backups until
+// there's one for each of the n men
+function openSpots(spots, cov, n, backups) {
+  const out = [];
+  for (const sp of spots.concat(backups)) {
+    if (out.length >= n && !spots.includes(sp)) break;
+    if (cov.concat(out).every(c => hyp(c[0] - sp[0], c[1] - sp[1]) >= 7)) out.push(sp);
+  }
+  return out;
+}
 // keep a point inside rounded rink; returns normal if collided
 function rinkClamp(o, m) {
   const xl = RINK.L - m, yl = RINK.W - m, cx = RINK.L - RINK.CR, cy = RINK.W - RINK.CR, rr = RINK.CR - m;
@@ -1702,7 +1719,7 @@ class HockeyGame {
   mkTeam(data, side, d) {
     const tac = data.tactics && typeof data.tactics === 'object' ? data.tactics : { aggr: 50, shoot: 50, phys: 50, depth: 50 };
     return { data, side, d, cx: data.cx || {}, st: data.st || {}, pen: [], fIdx: 0, dIdx: 0, fShift: 0, dShift: 0, sit: 'ev', on: [], g: null, tac, pp: 0, ppg: 0, en: {}, pressIds: [], chaseId: '', att: 0, box: [],   // box: offsetting fighting majors (no power play)
-      pulled: false, xa: null, iced: false };   // goalie pulled for an extra attacker (xa); iced: no change at the next faceoff
+      pulled: false, xa: null, iced: false, dump_t: -99 };   // goalie pulled for an extra attacker (xa); iced: no change at the next faceoff; dump_t: when it last dumped it in (its forwards go hard after it)
   }
   tac(t, k) {
     const v = t.tac[k]; let b = v == null ? 50 : +v;
@@ -2555,18 +2572,25 @@ class HockeyGame {
         f.tx = a.x + glx * gsk + tpx / tpl * 2.3; f.ty = a.y + gly * gsk + tpy / tpl * 2.3;   // shaded into the passing lane to him (1.5 let a pass into the slot through too often)
       }
       const pIsD = pressers.length > 0 && isD(pressers[0]);
+      // the areas the men marking someone in the house already hold (engine.gd: a zone spot on top of one of them only
+      // stacked two of ours on one man - both D together at the net front ~9 times a game)
+      const dzc = TUNE.dzcov == null || TUNE.dzcov > 0;
+      const cov = dzc ? rest.filter(f => !free.includes(f)).map(f => [f.tx * d, f.ty * d]) : [];
+      const dm = free.filter(isD), fw = free.filter(e => !isD(e));
       // D: one always at the net front (weak-side post); with a forward on the puck the other holds the strong-side post
-      const dSpots = [[-82, -sv * 2.5]];
+      let dSpots = [[-82, -sv * 2.5]];
       if (!pIsD) dSpots.push([-79, sv * 7.5]);
-      this.fillSpots(t, free.filter(isD), dSpots, tm);
+      if (dzc) dSpots = openSpots(dSpots, cov, dm.length, [[-79, sv * 7.5], [-77, -sv * 11]]);
+      this.fillSpots(t, dm, dSpots, tm);
       const pts = [...atk].sort((a, b) => b.x * d - a.x * d);   // their points: furthest from our net
-      const fSpots = [];
+      let fSpots = [];
       if (pIsD) fSpots.push([clamp(cu + 12, -80, -64), sv * 9]);   // centre: low support on the strong side
       fSpots.push([-68, cv * 0.25]);                               // the slot
       // the point men: a forward in each one's shooting lane, a few feet off him (the man on the puck plays right on him, so
       // a D can't stand out there ragging it). The slot comes first: covering the points ahead of it left the slot open
       for (const a of pts.slice(0, 2)) { if (a === car || a.x * d < -60) continue; const au = a.x * d, av = a.y * d; fSpots.push([au + (-89 - au) * 0.2, av * 0.82]); }
-      this.fillSpots(t, free.filter(e => !isD(e)), fSpots, tm);
+      if (dzc && TUNE.dzcov >= 2) fSpots = openSpots(fSpots, cov.concat(dSpots.slice(0, dm.length)), fw.length, [[-62, -sv * 14], [-72, sv * 15]]);   // (nor on a D's spot: a spare man takes the weak-side lane up high or the strong side low)
+      this.fillSpots(t, fw, fSpots, tm);
       return;
     }
     // the forecheck, by how aggressive the coach plays (his system sets it): a 2-1-2 with two men in deep (Heavy Forecheck,
@@ -2634,6 +2658,11 @@ class HockeyGame {
     else this.defenseShape(t, px, py);
     if (ch) { const cq = reachSpot(px, py); ch.tx = cq.x; ch.ty = cq.y; }
     if (sorted.length > 1 && hyp(sorted[1].x - px, sorted[1].y - py) < 20 && p.x * t.d > 0) { sorted[1].tx = px - t.d * 6; sorted[1].ty = py * 0.7; }
+    // our dump-in: the second forward in comes to the net side of the puck, where their man retrieving it wants to move it
+    if (this.lastPoss === t.side && this.clock + this.period * 1200 - t.dump_t < 3.5 && px * t.d > 60 && ch) {
+      const f2 = sorted.find(e => e !== ch && !isD(e));
+      if (f2) { const q2 = this.toXY(t, clamp(px * t.d - 8, 70, 86), py * t.d * 0.45); f2.tx = q2.x; f2.ty = q2.y; }
+    }
   }
   defenseShape(t, px, py) {
     const d = t.d, pu = px * d;
@@ -3108,12 +3137,21 @@ class HockeyGame {
       if (rnd() < want) { p.pass_info.ot = true; this.bump('one_timer_setup'); }
     }
   }
-  // someone to chase a dump-in (as engine.gd _chaser): a forward skating up ice with speed, level or ahead and in reach,
-  // or the carrier himself flying (dumps went in with nobody coming: ~20% recovered, NHL 30-40%)
+  // a dump-in is a race for the puck (as engine.gd _chaser): he puts it in only when one of ours (the dumper himself if
+  // he's flying, or a forward) gets to a corner about when their first skater does (TUNE.drace, s). (2026-10-12: a speed
+  // check alone let a lone carrier dump it from the red line with his linemates ~100 ft from the corner)
   chaser(e, t) {
-    const d = t.d;
-    if (e.vx * d > 16 && hyp(e.vx, e.vy) > 18) return true;
-    return t.on.some(m => m !== e && !m.isG && !m.leaving && !isD(m) && m.vx * d > 10 && (m.x - e.x) * d > -12 && hyp(m.x - e.x, m.y - e.y) < 45);
+    const d = t.d;   // someone actually going in after it: the dumper flying, or a forward skating up ice with speed, level or ahead
+    if (!(e.vx * d > 16 && hyp(e.vx, e.vy) > 18) && !t.on.some(m => m !== e && !m.isG && !m.leaving && !isD(m) && m.vx * d > 10 && (m.x - e.x) * d > -12 && hyp(m.x - e.x, m.y - e.y) < 45)) return false;
+    let best = 99;
+    for (const sv of [1, -1]) {
+      const c = this.toXY(t, 93, sv * 30);
+      let us = 99, them = 99;
+      for (const m of t.on) if (!m.isG && !m.leaving && (m === e || !isD(m))) us = Math.min(us, etaTo(m, c));
+      for (const x of this.T[1 - t.side].on) if (!x.isG && !x.leaving) them = Math.min(them, etaTo(x, c));
+      best = Math.min(best, us - them);
+    }
+    return best < (TUNE.drace != null ? TUNE.drace : 1.0);
   }
   chip(e, t, kind) {
     const p = this.puck, d = t.d, v = e.y * d;
@@ -3139,6 +3177,21 @@ class HockeyGame {
       if (flyer && e.x * d < 40) { tu = 90; tv = ds * (28 + rnd() * 6); sp = 46; vz = 3; }
       else if (rnd() < 0.4) { this.bump('rim_dump'); tu = 99.5; tv = ds * (8 + rnd() * 8); sp = 72; vz = 0; z = 0; }
       else { tu = 96; tv = ds * (30 + rnd() * 8); sp = 62; }
+      if (e.x * d < 60) t.dump_t = this.clock + this.period * 1200;
+      // and past their D, not through him (engine.gd chip): with a man in the first 60 ft of its path he tries the other
+      // corner or rims it hard off the side boards; both taken away, he lifts it over the sticks (TUNE.dlane: room in ft)
+      if (e.x * d < 40) {
+        const dl = TUNE.dlane != null ? TUNE.dlane : 4;
+        const laneTo = (a, b) => { const qa = this.toXY(t, a, b), L = hyp(qa.x - e.x, qa.y - e.y), k = Math.min(1, 60 / Math.max(L, 1)); return this.laneOpen(t, e.x, e.y, e.x + (qa.x - e.x) * k, e.y + (qa.y - e.y) * k); };
+        if (laneTo(tu, tv) < dl) {
+          const bu = clamp(e.x * d + 45, 40, 75);
+          const alts = [[96, -ds * (30 + rnd() * 8), 62, 6, 0.5], [bu, ds * 42.5, 74, 0, 0], [bu, -ds * 42.5, 74, 0, 0]];
+          let bl = -1, ba = null;
+          for (const a of alts) { const lo = laneTo(a[0], a[1]); if (lo > bl) { bl = lo; ba = a; } }
+          if (bl >= dl) { [tu, tv, sp, vz, z] = ba; this.bump('dump_lane'); }
+          else { vz = 13; sp = Math.min(sp, 58); z = 0.5; this.bump('dump_lob'); }
+        }
+      }
     }
     else if (kind === 'ice') { tu = 97; tv = sv * (10 + rnd() * 25); sp = 100; vz = 3; }   // fired the length of the ice (hard enough to get there)
     else if (kind === 'rim') {   // rimmed along the boards to a teammate on the wall (or around the back to the far side)
@@ -3768,6 +3821,7 @@ class HockeyGame {
         else if (pc0 && pc0.team !== e.team && pc0.vx * tq.d < -8) pace = Math.max(pace, 0.96);   // they're coming with speed: everyone hustles back
         else if (pc0 && pc0.team === e.team && pc0.vx * tq.d > 12 && e.x * tq.d < pc0.x * tq.d + 10) pace = Math.max(pace, 0.94);   // joining the rush
         else if (!pc0 && !p.pass_info && hyp(p.x - e.x, p.y - e.y) < 30) pace = Math.max(pace, 0.95);   // a loose puck nearby: a race
+        else if (!pc0 && !isD(e) && tmv - tq.dump_t < 3.5 && p.x * tq.d > e.x * tq.d) pace = 1;   // we just dumped it in: the forwards go hard after it
         pace = clamp(pace, 0.6, 1);
       }
       e.pace = pace; maxS *= pace;
