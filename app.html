@@ -2261,6 +2261,9 @@ class HockeyGame {
       const d = t.d, u0 = s.x * d, v0 = s.y * d;
       const pos = { C: [u0 - 2, v0], LW: [u0 - 3, v0 + 15], RW: [u0 - 3, v0 - 15], LD: [Math.max(u0 - 16, -86), v0 + 9], RD: [Math.max(u0 - 16, -86), v0 - 9],
         XF: [u0 - 8, v0 - Math.sign(v0 + 0.01) * 22] };   // the extra attacker lines up toward the slot
+      // the best faceoff man among his forwards on the ice takes the draw, swapping spots with the centre's (engine.gd: a PP / PK unit's first slot took every draw)
+      { let cen = null, best = null; for (const e of t.on) { if (e.role === 'C') cen = e; if ((e.role === 'C' || e.role === 'LW' || e.role === 'RW') && (!best || e.R.fo > best.R.fo)) best = e; }
+        if (cen && best && best !== cen && best.R.fo > cen.R.fo + 2) { const r0 = best.role; best.role = 'C'; cen.role = r0; } }
       for (const e of t.on) {
         const q = pos[e.role]; e.tx = clamp(q[0] * d, -96, 96); e.ty = clamp(q[1] * d, -40, 40);
         if (snap) { e.x = e.tx; e.y = e.ty; e.vx = 0; e.vy = 0; e.stx = e.tx; e.sty = e.ty; }
@@ -13120,6 +13123,7 @@ let VET_W = [1, .5, .25, .1];   // a skater past YOUNG_W: his seasons by age (la
 // read on what he does now - Nick Foligno, 15 points at 38, read as an average-plus scorer off his 35-point seasons).
 // OLD_W his scoring seasons, OLD_ADV his advanced stats' (primary assists, own-zone time, shot share: 1 / .7 / .5 below)
 let OLD_AGE = 33, OLD_W = [1, .35, .12, .05], OLD_ADV = [1, .45, .2];
+let TOI_PULL = 0;   // (trial, off) the per-60 pull toward the rate his ice time usually brings (nhlRate shr)
 let YOUNG_W = 23;   // up to this age a skater's last season counts most (1 / .3 / .1); older, 1 / .5 / .25 (let: the harness tries others)
 let RUST = [6, 12];   // internal points off after one / two whole seasons out (let: the test harness tries other values)
 // the summer's growth an established young NHL player is credited with (internal points); nhlPot takes it back out so a
@@ -13315,7 +13319,11 @@ function nhlRate(list, season) {
     const grp = x => x.D ? 'D' : 'F', K = 400;
     // his position's average rate per 60 among the regulars, for the pull
     const mean60 = {}; const rate = (key, cnt) => { for (const g of ['F', 'D']) { const r = reg.filter(x => grp(x) === g); mean60[key + g] = r.reduce((s, x) => s + cnt(x), 0) / Math.max(1, r.reduce((s, x) => s + mins(x), 0)) * 60; } };
-    const shr = (key, x, c) => (c + mean60[key + grp(x)] * K / 60) / (mins(x) + K) * 60;
+    // (TOI_PULL, off by default - a trial, 2026-10-14: the pull goes toward the rate usual for his ice time, not the
+    // regulars' average, so a fourth-liner's small sample isn't pulled up to a middle-six rate)
+    const toiAvg = {}; for (const g of ['F', 'D']) { const r = reg.filter(x => grp(x) === g); toiAvg[g] = r.reduce((s, x) => s + mins(x), 0) / Math.max(1, r.reduce((s, x) => s + x.ngp, 0)); }
+    const tgt = x => TOI_PULL ? cl(1 + TOI_PULL * (x.toi / toiAvg[grp(x)] - 1), .55, 1.35) : 1;
+    const shr = (key, x, c) => (c + mean60[key + grp(x)] * tgt(x) * K / 60) / (mins(x) + K) * 60;
     rate('g', x => x.ng); rate('a', x => x.na); rate('s', x => x.sh); rate('p', x => x.ng + x.na);
     // shooting %: each position's rate, his career (pulled toward it by 100 shots), then his three seasons pulled toward that by 300
     const posSh = {}; for (const g of ['F', 'D']) { const r = reg.filter(x => grp(x) === g); posSh[g] = r.reduce((s, x) => s + x.fg, 0) / Math.max(1, r.reduce((s, x) => s + x.fs, 0)); }
