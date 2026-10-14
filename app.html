@@ -1664,7 +1664,7 @@ function wallInfo(x, y) {
 // facing-aware passes/shots, structured AI (zone shapes, coverage, 1-2-2 forecheck, puck protection, dekes, one-timers),
 // rating-driven physical play (poke checks, body checks, nudges, stick checks, with body weight), wrist and slap shots.
 // Same constructor and result() shape as before, so the rest of the app is unchanged.
-const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.46, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.02, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.02, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -1961,7 +1961,7 @@ class HockeyGame {
   mkEnt(pid, t, role, isG, x, y) {
     const R = this.compR(pid), pp = this.P[pid];
     return { pid, team: t.side, role, isG, x, y, px: x, py: y, vx: 0, vy: 0, pvx: 0, pvy: 0, tx: x, ty: y, stx: x, sty: y, mark: '', stun: 0,
-      dec: rnd() * 0.3, ph: rnd() * HG_TAU, hd: t.side === 0 ? 0 : Math.PI, cool: 0, press: false, pend: null, deke: 0, deke_side: 1, one_t: false, bkw: false, bkw_dk: false, go_t: 0, go_x: 0, go_y: 0, leaving: false, relief: '', relief_role: '', out: false, shift: 0, chg_cd: 0, idle_c: 0, hold_t: 0, bat: null, batT: 0, rimTo: null, poff: null, deke_kind: '', tip_shot: false, oz_role: '', office: 0, office_s: 1, office_w: false, wrap: false, rel_t: 99, blk_t: 0,
+      dec: rnd() * 0.3, ph: rnd() * HG_TAU, hd: t.side === 0 ? 0 : Math.PI, cool: 0, press: false, pend: null, deke: 0, deke_side: 1, deke_ctx: '', dk_vs: null, dk_ok: false, dk_res: false, dk_after: 0, bump_t: 0, bump_k: '', bump_sev: 0, bump_dx: 0, bump_dy: 0, shove_t: 0, getup: 0, dn: false, pin_t: 0, pin_out: 0, pin_out_k: '', poke_t: 0, poke_vic: null, one_t: false, bkw: false, bkw_dk: false, go_t: 0, go_x: 0, go_y: 0, leaving: false, relief: '', relief_role: '', out: false, shift: 0, chg_cd: 0, idle_c: 0, hold_t: 0, bat: null, batT: 0, rimTo: null, poff: null, deke_kind: '', tip_shot: false, oz_role: '', office: 0, office_s: 1, office_w: false, wrap: false, rel_t: 99, blk_t: 0,
       W: pp.wt > 0 ? +pp.wt : 200 + ((R.chk ?? 65) - 65) * 0.7, R, E: t.en[pid], S: this.st[pid], X: this.xfMap(pid) };
   }
   refreshEnt() { this.ent = [...this.T[0].on, this.T[0].g, ...this.T[1].on, this.T[1].g]; }
@@ -2089,6 +2089,7 @@ class HockeyGame {
     const p = this.puck; p.px = p.x; p.py = p.y; p.pz = p.z;
     if (this.phase === 'stop') {
       this.goalT = Math.max(0, this.goalT - dt);
+      if (this.celebrate >= 0 && this.goalT > 0) this.benchByTargets();
       if (this.fight) this.fightTargets(dt); if (this.scrum) this.scrumTargets(dt);
       // once the whistle's gone (and a goal's been celebrated), the change happens and everyone heads for the faceoff:
       // the new men have the whole stoppage to get there instead of appearing at the bench as the puck drops
@@ -2490,7 +2491,7 @@ class HockeyGame {
     for (const e of defs) {
       if (!t.pressIds.includes(e.pid)) continue;
       const dc = hyp(e.x - car.x, e.y - car.y);
-      if (dc < 9 && ((isD(e) && cu < -40) || (!isD(e) && cu > -86) || slot)) {
+      if (dc < 9 && ((isD(e) && cu < ((TUNE.dzhi || 0) > 0 ? -52 : -40)) || (!isD(e) && cu > -86) || slot)) {   // (TUNE.dzhi: a D lets him go up the wall at the hash marks, engine.gd)
         if (!defs.some(o => o !== e && hyp(o.x - car.x, o.y - car.y) < dc - 6 && hyp(o.x - gxp, o.y) < hyp(car.x - gxp, car.y))) return [e];
       }
     }
@@ -2601,11 +2602,14 @@ class HockeyGame {
       this.fillSpots(t, dm, dSpots, tm);
       const pts = [...atk].sort((a, b) => b.x * d - a.x * d);   // their points: furthest from our net
       let fSpots = [];
+      // (TUNE.dzhi, engine.gd: with the puck down low the forwards keep their shape above it - the slot man high, the wingers
+      // out toward the points, the centre the only one down low in support)
+      const dzhi = (TUNE.dzhi || 0) > 0 && (cu < -86 || (cu < -72 && Math.abs(cv) > 18));
       if (pIsD) fSpots.push([clamp(cu + 12, -80, -64), sv * 9]);   // centre: low support on the strong side
-      fSpots.push([-68, cv * 0.25]);                               // the slot
+      fSpots.push([dzhi ? -63 : -68, cv * (dzhi ? 0.1 : 0.25)]);   // the slot
       // the point men: a forward in each one's shooting lane, a few feet off him (the man on the puck plays right on him, so
       // a D can't stand out there ragging it). The slot comes first: covering the points ahead of it left the slot open
-      for (const a of pts.slice(0, 2)) { if (a === car || a.x * d < -60) continue; const au = a.x * d, av = a.y * d; fSpots.push([au + (-89 - au) * 0.2, av * 0.82]); }
+      for (const a of pts.slice(0, 2)) { if (a === car || a.x * d < -60) continue; const au = a.x * d, av = a.y * d; fSpots.push([au + (-89 - au) * (dzhi ? 0.12 : 0.2), av * 0.82]); }
       if (dzc && TUNE.dzcov >= 2) fSpots = openSpots(fSpots, cov.concat(dSpots.slice(0, dm.length)), fw.length, [[-62, -sv * 14], [-72, sv * 15]]);   // (nor on a D's spot: a spare man takes the weak-side lane up high or the strong side low)
       this.fillSpots(t, fw, fSpots, tm);
       return;
@@ -2769,7 +2773,13 @@ class HockeyGame {
     if (!e || e.isG) return;
     const t = this.T[e.team], d = t.d, r = e.R, u = e.x * d, v = e.y * d;
     e.dec -= dt; e.office -= dt;
-    if (e.deke > 0) { e.deke -= dt; if (e.deke > 0) return; }
+    e.dk_after = Math.max(0, e.dk_after - dt);
+    if (e.deke > 0) {
+      e.deke -= dt;
+      if (e.dk_vs && !e.dk_res && e.deke < 0.25) { this.dkResolve(e); if (p.owner !== e) return; }
+      if (e.deke > 0) return;
+      if (e.dk_vs) { if (e.dk_ok) { e.dk_after = 1.2; e.dec = 0; } e.dk_vs = null; e.deke_ctx = ''; }   // through it: with his man beaten, he moves it now (engine.gd)
+    }
     if (e.bat) { e.wind = 0; e.wind_k = ''; e.wind_plan = null; return; }   // tied up in a battle along the boards (the wind-up's off: its kind was left behind and the next shot took it)
     // winding up: he keeps the puck until the stick comes through (a slapshot's backswing takes longest), and a checker
     // who gets to him first can still take it off him
@@ -2936,12 +2946,58 @@ class HockeyGame {
     // a D out wide at the point, more than ~60 ft out with no clean lane, doesn't fire it at the checker coming at him
     // (engine.gd far_pt: 99% of attempts from > 60 ft were D at the point, mostly this pressured blue-line shot)
     const farPt = isD(e) && hyp(d * 89 - e.x, e.y) > (TUNE.dfar != null ? TUNE.dfar : 60) && this.laneOpen(t, e.x, e.y, d * 89, 0) < 6;
+    // the rush: a skilled forward with speed against a D holding a tight gap now and then takes him on - wide round his
+    // outside at full speed, or a toe drag / shift inside (engine.gd, TUNE.dkrush)
+    const spdC = hyp(e.vx, e.vy);
+    if ((TUNE.dkrush || 0) > 0 && !isD(e) && u > -30 && u < 42 && spdC > 14 && e.vx * d > 8 && sit !== 'pk') {
+      const gd = this.T[1 - t.side].on.find(x => { const du = (x.x - e.x) * d; return isD(x) && du > 2.5 && du < 13 && Math.abs(x.y - e.y) < 6 && x.cool <= 0 && !(x.stun > 0); });
+      if (gd) {
+        const gap = (gd.x - e.x) * d;
+        const pDk = TUNE.dkrush * clamp((r.hnd - 64) / 18, 0, 1.6) * clamp((spdC - 14) / 8, 0.3, 1.2) * (gap < 8 ? 1.3 : 1) * ('mitts' in e.X ? xs(e.X.mitts, 1.4) : 1);
+        if (rnd() < pDk) {
+          const wide = spdC > 20 && Math.abs(e.y) < 30 && rnd() < clamp((r.ska - 60) / 40, 0.15, 0.6);
+          const side = wide ? (e.y !== 0 ? Math.sign(e.y) : 1) : (Math.abs(e.y - gd.y) > 0.8 ? Math.sign(e.y - gd.y) : -Math.sign(e.y + 0.01));
+          const skC = r.hnd * (wide ? 0.4 : 0.6) + r.ska * (wide ? 0.6 : 0.4), skX = gd.R.def * 0.6 + gd.R.ska * 0.4;
+          this.dkStart(e, gd, 'rush', side, wide, 0.36 + (skC - skX) / 45 + clamp((spdC - hyp(gd.vx, gd.vy)) / 50, -0.1, wide ? 0.18 : 0.1)); this.bump(wide ? 'dk_rush_wide' : 'dk_rush_in');
+          return;
+        }
+      }
+    }
+    // a D who's just sidestepped his man at the point uses the lane it opened: the shot, or the pass across
+    if (atPoint && e.dk_after > 0) {
+      e.dk_after = 0;
+      if (shootV > -0.4 && !laneBlocked && !farPt) { this.bump('dk_point_shot'); this.play(e, t, { k: 'shot' }); return; }
+      if (best && bestV > -0.3) { this.bump('dk_point_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
+    }
     if (blHit && sit !== 'pk') {
+      // a forward closing hard on a D at the point: a D with the hands and feet for it now and then sidesteps him along the
+      // line instead (engine.gd, TUNE.dkpt)
+      if (atPoint && (TUNE.dkpt || 0) > 0) {
+        let cx = null, cdd = 7.5;
+        for (const x of this.T[1 - t.side].on) { const xd = hyp(x.x - e.x, x.y - e.y); if (xd < cdd && !isD(x) && x.cool <= 0 && !(x.stun > 0)) { cdd = xd; cx = x; } }
+        if (cx) {
+          const rlx = (cx.x - e.x) / Math.max(cdd, 0.1), rly = (cx.y - e.y) / Math.max(cdd, 0.1);
+          const closing = -(rlx * (cx.vx - e.vx) + rly * (cx.vy - e.vy));
+          if (closing > 4) {
+            const skD = r.hnd * 0.6 + r.ska * 0.4;
+            const pDk = TUNE.dkpt * clamp((skD - 62) / 14, 0, 1.6) * clamp(0.3 + dstyle(e) / 8, 0, 2.2) * clamp(closing / 12, 0.4, 1.3);
+            if (pDk > 0 && rnd() < pDk) {
+              const side = Math.abs(e.y - cx.y) > 1.5 ? Math.sign(e.y - cx.y) : -Math.sign(e.y + 0.01);
+              this.dkStart(e, cx, 'point', side, false, 0.45 +(skD - (cx.R.def * 0.6 + cx.R.ska * 0.4)) / 45 + clamp((closing - 10) / 40, -0.1, 0.12));
+              return;
+            }
+          }
+        }
+      }
       const inZ = u > 25;
+      // a D at the point with a man closing gets it through quickly - a wrister or snap through the traffic, off the catch
+      // most of all - rather than ringing it round the boards (engine.gd, TUNE.ptq)
+      const ptq = TUNE.ptq || 0;
+      if (atPoint && ptq > 0 && sit === 'ev' && !farPt && shootV > -0.15 && rnd() < ptq * (laneBlocked ? 0.4 : 0.7) * (p.recvT < 0.6 ? 1.25 : 1)) { this.bump('pt_quick'); this.play(e, t, { k: 'shot' }); return; }
       if (best && bestV > -0.05 && pV >= sV - 0.1) { this.bump('bl_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
       if (inZ && isD(e) && shootV > 0 && !laneBlocked && !farPt && rnd() < (atPoint ? 0.6 : 0.4)) { this.bump('bl_shot'); this.play(e, t, { k: 'shot' }); return; }
       if (atPoint && best && bestV > (sit === 'ev' ? (TUNE.ptout != null ? TUNE.ptout : -0.6) : -0.3)) { this.bump('bl_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
-      if (atPoint && pr < 5 && rnd() < 0.3) { this.bump('bl_rim'); this.play(e, t, { k: 'chip', kind: 'dump' }); return; }   // around the boards, deep: it stays in
+      if (atPoint && pr < 5 && rnd() < (ptq > 0 ? 0.18 : 0.3)) { this.bump('bl_rim'); this.play(e, t, { k: 'chip', kind: 'dump' }); return; }   // around the boards, deep: it stays in
       if (u > 0 && ahead >= 1 && (gassed || this.chaser(e, t)) && rnd() < (inZ ? 0.12 : 0.18) && rnd() > clamp((r.hnd - 62) / 45, 0, 0.4)) { this.bump('bl_dump'); this.play(e, t, { k: 'chip', kind: 'dump' }); return; }
     }
     // the point: a D with it on the blue line gets it to the net - right off the pass most of all, through a screen or down a
@@ -3119,6 +3175,36 @@ class HockeyGame {
     else if (rnd() < clamp((h - 50) / (onGoalie ? 80 : 90), 0.08, 0.42)) k = 'toe';
     e.deke_kind = k;
     e.deke = k === 'toe' ? 0.5 : 0.45;
+  }
+  // a deke on a man coming at him (a D at the point sidestepping a forward closing on him; a forward beating a D on the
+  // rush), rolled against that checker when it starts and decided at the middle of the move (engine.gd _dk_start)
+  dkStart(e, x, ctx, side, wide, okP) {
+    this.bump('deke'); this.bump('dk_' + ctx);
+    e.deke_side = side;
+    this.dekeMove(e, this.pressure(e), false);
+    if (wide) { e.deke_kind = ''; e.deke = 0.45; }
+    else if (ctx === 'rush' && e.deke_kind === 'spin') { e.deke_kind = 'toe'; e.deke = 0.5; }
+    e.deke_ctx = ctx + (wide ? '_wide' : '');
+    e.dk_vs = x; e.dk_res = false; e.dk_ok = rnd() < clamp(okP, 0.2, 0.85);
+    const d = this.T[e.team].d;
+    if (ctx === 'point') { e.tx = e.x + d * 2.5; e.ty = clamp(e.y + side * 10, -36, 36); }
+    else { e.tx = clamp(e.x + d * 14, -96, 96); e.ty = clamp(e.y + side * (wide ? 9 : 7), -38, 38); }
+  }
+  dkResolve(e) {
+    e.dk_res = true;
+    const x = e.dk_vs, p = this.puck;
+    if (!x || !this.T[x.team].on.includes(x) || x.stun > 0) return;
+    const ck = 'dk_' + (e.deke_ctx === 'point' ? 'point' : 'rush');
+    if (e.dk_ok) { this.bump(ck + '_ok'); x.cool = Math.max(x.cool, 1.3); x.vx *= 0.45; x.vy *= 0.45; return; }   // he bit: a stride lost, no stick on it for a moment
+    if (hyp(x.x - e.x, x.y - e.y) > 11) return;
+    this.bump(ck + '_fail');
+    if (rnd() < 0.5) { this.bump('steal'); p.owner = x; this.touch(x); e.cool = 0.5; e.deke = 0; }   // read it: his stick lifts it off him
+    else {   // or pokes it off his blade mid-move
+      this.bump('poke'); p.owner = null; e.cool = 0.35; e.deke = 0;
+      const a = Math.atan2(e.y - x.y, e.x - x.x) + (rnd() - 0.5) * 2;
+      p.vx = Math.cos(a) * (6 + rnd() * 8); p.vy = Math.sin(a) * (6 + rnd() * 8);
+      this.logEv('poke', x.team, shortName(this.pl(x.pid)) + ' pokes it off ' + shortName(this.pl(e.pid)), { pid: x.pid, vic: e.pid });
+    }
   }
   // a D with the puck up at the point (not skating it back out): he works it facing the net, walking the line laterally
   walksLine(e) {
@@ -3417,7 +3503,8 @@ class HockeyGame {
     const own = !!s.own, who = this.P[spid] ? shortName(this.pl(spid)) : (t.data.abbr || 'Goal');
     this.logEv('goal', t.side, who + ' scores' + tag + (own ? ' — in off a defender' : names.length ? ' — assists ' + names.join(', ') : ' — unassisted'), { pid: spid, asst: s.asst, pp, sh: shg, en, xa: t.pulled, own, loose: 'pid' in s });
     if (this.ot) { this.phase = 'stop'; this.stopT = 4; this.goalT = 4; this.finish(); return; }
-    this.whistle({ x: 0, y: 0 }, '', 6.5); this.goalT = 4;   // the celebration, then the change and the lineup at centre
+    const bby = TUNE.benchby || 0;   // (seconds more for the scoring line's skate past its bench, benchByTargets - engine.gd)
+    this.whistle({ x: 0, y: 0 }, '', 6.5 + bby); this.goalT = 4 + bby;   // the celebration, then the change and the lineup at centre
     this.puck.vx = t.d * 7; this.puck.vy *= 0.4;   // it carries on into the back of the net (puckPhys keeps it inside)
     this.buildOnIce(o); this.buildOnIce(t);
     this.celebrate = t.side; this.celebratePid = s.by.pid;
@@ -3427,6 +3514,18 @@ class HockeyGame {
       k++; e.tx = sc.x - t.d * 6 + Math.cos(k * 1.7) * 3; e.ty = sc.y * 0.6 + Math.sin(k * 1.7) * 3;
     }
     for (const e of o.on) { e.tx = e.x * 0.9 - t.d * 4; e.ty = e.y * 0.8; }
+  }
+  // after the goal huddle the scoring line skates past its bench in single file along the boards for the glove bumps
+  // (engine.gd _celebration_targets, TUNE.benchby): onto the boards ahead of the bench, then along it and past
+  benchByTargets() {
+    const bby = TUNE.benchby || 0; if (bby <= 0 || this.goalT >= bby + 2.5) return;
+    const t = this.T[this.celebrate], g = this.benchGate(t); let j = 0;
+    for (const e of t.on) {
+      if (e.isG) continue;
+      const ex = (e.x - g.x) * t.d;
+      if (e.y > -36.5 && ex > -8) { e.tx = g.x + t.d * (14 + j * 5); e.ty = -39; } else { e.tx = g.x - t.d * 20; e.ty = -39; }
+      j++;
+    }
   }
   // after a big hit, the hit player's toughest teammate on the ice (or the player himself) may go after the hitter: the best
   // fighter among them (Fighting, then temper and size), more likely the better a fighter and the shorter his fuse
@@ -3511,6 +3610,9 @@ class HockeyGame {
   // checker gives that speed up, stopping in the hit instead of skating on through (the man hit used to be shoved straight away
   // at a set speed, losing all his own momentum)
   impact(x, v, kb) {
+    // (TUNE.hitd, engine.gd _impact: the hit lands in contact - the checker carried the last foot into the man, to hitd ft)
+    const hd0 = hyp(v.x - x.x, v.y - x.y);
+    if ((TUNE.hitd || 0) > 0 && hd0 > TUNE.hitd) { x.x = v.x - (v.x - x.x) / hd0 * TUNE.hitd; x.y = v.y - (v.y - x.y) / hd0 * TUNE.hitd; }
     const dx = v.x - x.x, dy = v.y - x.y, dd = Math.max(hyp(dx, dy), 0.1), nx = dx / dd, ny = dy / dd;
     const close = Math.max(0, (x.vx - v.vx) * nx + (x.vy - v.vy) * ny);
     const mx = Math.max(x.W || 200, 150), mv = Math.max(v.W || 200, 150);
@@ -3542,7 +3644,7 @@ class HockeyGame {
         const kb = clamp(0.6 + close / 25 + edge * 0.3, 0.4, 1.6);
         this.impact(x, v, kb);
         const hk = wallInfo(v.x, v.y)[0] < 6 ? 'boards' : 'shoulder';
-        this.logEv('hit', x.team, shortName(this.pl(x.pid)) + ' finishes his check on ' + shortName(this.pl(v.pid)), { pid: x.pid, vic: v.pid, big: close > 14 && v.stun > 0.75, kind: hk, dx: dx / dd, dy: dy / dd, down: v.stun > 0.75 });
+        this.logEv('hit', x.team, shortName(this.pl(x.pid)) + ' finishes his check on ' + shortName(this.pl(v.pid)), { pid: x.pid, vic: v.pid, big: close > 14 && v.stun > 0.75, kind: hk, dx: dx / dd, dy: dy / dd, down: v.stun > 0.75, sev: clamp(v.stun / 1.6, 0.1, 1) });
         const late = v.rel_t > 0.45;
         v.rel_t = 99;
         if (late && rnd() < 0.08 * (1 + (55 - rx.dis) / 60)) { this.penalty(x, tt, 'Interference'); return true; }
@@ -3554,7 +3656,8 @@ class HockeyGame {
   }
   contests(dt) {
     const p = this.puck;
-    for (const e of this.ent) { if (e.cool > 0) e.cool -= dt; e.rel_t = (e.rel_t ?? 99) + dt; }
+    for (const e of this.ent) { if (e.cool > 0) e.cool -= dt; e.rel_t = (e.rel_t ?? 99) + dt; if (e.bump_t > 0) e.bump_t -= dt; if (e.shove_t > 0) e.shove_t -= dt; if (e.pin_out > 0) e.pin_out -= dt; if (e.poke_t > 0) e.poke_t -= dt; }
+    if (this.phase === 'play' && (TUNE.shove || 0) > 0 && this.netShoves(dt)) return;
     if (this.finishChecks()) return;
     if (p.shot) return;
     if (p.owner) {
@@ -3564,7 +3667,11 @@ class HockeyGame {
       if (c.bat) {
         const b = c.bat;
         if (b.stun > 0 || !this.T[b.team].on.includes(b) || hyp(b.x - c.x, b.y - c.y) > 5.5) this.endBattle(c);
-        else { c.batT -= dt; if (c.batT <= 0) this.resolveBattle(c, b); return; }
+        else {
+          c.batT -= dt; c.pin_t = (c.pin_t || 0) + dt; b.pin_t = c.pin_t;
+          if ((TUNE.pinx || 0) > 0 && c.pin_t > 0.3 && this.pinOut(c, b, dt)) return;
+          if (c.batT <= 0) this.resolveBattle(c, b); return;
+        }
       }
       const t = this.T[1 - c.team];
       // goalie poke check: a carrier coming right at him in tight
@@ -3591,10 +3698,15 @@ class HockeyGame {
         const beaten = c.deke > 0 && rnd() < clamp(0.55 + (rc.hnd - rx.def) / 120, 0.25, 0.85);
         const thief = 'thief' in x.X ? xs(x.X.thief, 1.35) : 1, mitts = 'mitts' in c.X ? xs(c.X.mitts, 0.65) : 1;
         if (dd >= 3.6) {   // poke check from stick's length, in front of the carrier
-          if (!x.press) continue;
+          // (TUNE.pkv, engine.gd) any defender the carrier comes within a stick's length of reaches for it now and then too,
+          // each jab's success scaled down (TUNE.pks) so the pucks won stay about the same
+          const pkv = TUNE.pkv || 0;
+          if (!x.press && (pkv <= 0 || dd > 6 || rnd() >= pkv * 0.3)) continue;
           if (((x.x - c.x) * Math.cos(c.hd) + (x.y - c.y) * Math.sin(c.hd)) / dd < (ownEnd ? 0.1 : 0.35)) continue;
           x.cool = ownEnd ? 0.55 : 0.8;
-          const pPoke = TUNE.poke * aggr * clamp(1 + (rx.def - rc.hnd) / 45, 0.25, 2) * thief * mitts * (beaten ? 0.2 : 1) * (0.7 + 0.3 * x.E.v) * (1.3 - 0.3 * c.E.v) * (hyp(c.vx, c.vy) < 4 ? 2.2 : 1) * (ownEnd ? 1 : 0.65);   // fresh legs win the puck; standing still with it, easy to poke away (a third less outside his own end)
+          this.bump('poke_try');
+          const pPoke = TUNE.poke * aggr * clamp(1 + (rx.def - rc.hnd) / 45, 0.25, 2) * thief * mitts * (beaten ? 0.2 : 1) * (0.7 + 0.3 * x.E.v) * (1.3 - 0.3 * c.E.v) * (hyp(c.vx, c.vy) < 4 ? 2.2 : 1) * (ownEnd ? 1 : 0.65) * (TUNE.pks != null ? TUNE.pks : 1);   // fresh legs win the puck; standing still with it, easy to poke away (a third less outside his own end)
+          x.poke_t = 0.3; x.poke_vic = c;   // the jab, hit or miss: a viewer can draw it off poke_t (seconds left) / poke_vic (engine.gd: poke_go + the poke_try event)
           if (rnd() < pPoke) {
             this.bump('poke'); p.owner = null; c.cool = 0.35;
             const a = Math.atan2(c.y - x.y, c.x - x.x) + (rnd() - 0.5) * 2;
@@ -3602,6 +3714,7 @@ class HockeyGame {
             this.logEv('poke', x.team, shortName(this.pl(x.pid)) + ' pokes it off ' + shortName(this.pl(c.pid)), { pid: x.pid, vic: c.pid });
             return;
           }
+          if ((TUNE.pkh || 0) > 0 && rnd() < TUNE.pkh) { c.vx *= 0.85; c.vy *= 0.85; c.dec = Math.min(c.dec, 0.15); this.bump('poke_harass'); }   // missed, but the stick got there: off his stride, his play hurried
           if (rnd() < 0.3) x.cool = 1.4;
           else if (rnd() < TUNE.stickPen * 0.8 * (1 + (55 - rx.dis) / 60)) { this.penalty(x, tt, ['Hooking', 'Slashing', 'Tripping'][Math.floor(rnd() * 3)]); return; }
           continue;
@@ -3635,13 +3748,13 @@ class HockeyGame {
           if (wallInfo(c.x, c.y)[0] < 6) hk = 'boards';
           else if (hsp < 17 && Math.abs(ca) < 0.6 && rnd() < 0.35) { hk = 'hip'; c.stun += 0.3; }
           const hl = hyp(c.x - x.x, c.y - x.y) || 1;
-          this.logEv('hit', x.team, shortName(this.pl(x.pid)) + ' hits ' + shortName(this.pl(c.pid)), { pid: x.pid, vic: c.pid, big: hsp > 18 && c.stun > 0.75, kind: hk, dx: (c.x - x.x) / hl, dy: (c.y - x.y) / hl, down: c.stun > 0.75 });
+          this.logEv('hit', x.team, shortName(this.pl(x.pid)) + ' hits ' + shortName(this.pl(c.pid)), { pid: x.pid, vic: c.pid, big: hsp > 18 && c.stun > 0.75, kind: hk, dx: (c.x - x.x) / hl, dy: (c.y - x.y) / hl, down: c.stun > 0.75, sev: clamp(c.stun / 1.6, 0.1, 1) });
           if (hsp > 18 && edge > 0.2 && !this.fight && this.maybeFight(x, c)) return;   // a big hit can start a fight
           if (rnd() < TUNE.hitPen * (1 + (55 - rx.dis) / 60) * (0.6 + phys * 0.4) * (boards && hsp > 18 ? 1.3 : 1))
             this.penalty(x, tt, boards && rnd() < 0.5 ? 'Boarding' : rnd() < 0.5 ? 'Roughing' : 'Interference');
           return;
         } else if (!beaten && (x.press || hyp(c.vx, c.vy) < 9) && !c.bat && !x.bat && wallInfo(c.x, c.y)[0] < 5 && hyp(c.vx, c.vy) < 16 && rnd() < 0.26 + (phys - 1) * 0.1 + (ownEnd && c.x * this.T[c.team].d > 55 ? 0.12 : 0)) {   // pinned on the wall: a battle for it (the engaged checker, or anyone who catches him slowing on the boards)
-          c.bat = x; x.bat = c; c.batT = 0.8 + rnd() * 1.4; this.bump('battle');
+          c.bat = x; x.bat = c; c.batT = 0.8 + rnd() * 1.4; c.pin_t = 0; x.pin_t = 0; this.bump('battle');
           return;
         } else if (roll < pHit + pNudge) {   // nudge: wins position, leans him off it
           this.bump('nudge');
@@ -3751,6 +3864,66 @@ class HockeyGame {
     p.vx = -wi[2] * s - wi[1] * 2; p.vy = wi[1] * s - wi[2] * 2;
   }
   endBattle(c) { if (c.bat) { c.bat.bat = null; c.bat = null; } }
+  // pinned on the wall with it (EA NHL's pass out of a pin, engine.gd _pin_out): kicked along the wall or banked off it to a
+  // teammate in support, a backhand out to a man off the wall, or chipped past the pinner when nobody's there (TUNE.pinx)
+  pinOut(c, b, dt) {
+    const t = this.T[c.team], rc = c.R, rb = b.R;
+    const sk = (rc.hnd * 0.35 + rc.pas * 0.35 + rc.chk * 0.3) - (rb.chk * 0.6 + rb.def * 0.4) + (c.W - b.W) / 10;
+    const rate = TUNE.pinx * clamp(0.6 + sk / 30, 0.15, 1.5);
+    let m = null, md = 30;
+    for (const o of t.on) { if (o === c || o.isG || o.bat || o.leaving) continue; const dd = hyp(o.x - c.x, o.y - c.y); if (dd > 6 && dd < md && this.laneRisk(t, c.x, c.y, o.x, o.y) > 0) { md = dd; m = o; } }
+    if (m) {
+      if (rnd() >= rate * dt) return false;
+      this.endBattle(c); b.cool = Math.max(b.cool, 0.6);
+      c.pin_out = 0.45; c.pin_out_k = Math.abs(m.y) > 30 && Math.sign(m.y) === Math.sign(c.y) ? (md < 15 ? 'kick' : 'bank') : 'bh';
+      this.bump('pin_pass'); this.passTo(c, m, t);
+      return true;
+    }
+    if (rnd() >= rate * 0.04 * dt) return false;
+    this.endBattle(c); b.cool = Math.max(b.cool, 0.6);
+    c.pin_out = 0.4; c.pin_out_k = 'chip';
+    const cu = c.x * t.d;
+    this.bump('pin_chip'); this.chip(c, t, cu > -10 ? 'dump' : cu < -40 ? 'glass' : 'clear');
+    return true;
+  }
+  // in front of the net a defender on the screener / tip man shoves or cross-checks him off his spot now and then; once in a
+  // while it's called (engine.gd _shoves, TUNE.shove). True when a penalty stopped play.
+  netShoves(dt) {
+    for (const t of this.T) {
+      for (const x of t.on) {
+        if (x.isG || x.cool > 0 || x.stun > 0 || x.shove_t > 0 || x.leaving) continue;
+        for (const a of this.T[1 - t.side].on) {
+          if (a.isG || a.stun > 0 || a.bump_t > 0) continue;
+          const ad = this.T[a.team].d, au = a.x * ad;
+          if (au < 76 || au > 89 || Math.abs(a.y) > 10 || this.puck.x * ad < 25) continue;
+          const dd = hyp(a.x - x.x, a.y - x.y);
+          if (dd > 3.6 || dd < 0.1) continue;
+          if (rnd() >= TUNE.shove * 0.6 * dt) continue;
+          const edge = (x.R.chk * 0.6 + (x.W - 200) * 0.3 - (a.R.chk * 0.5 + a.R.ska * 0.2 + (a.W - 200) * 0.3)) / 25;
+          const sev = clamp(0.45 + edge * 0.3, 0.15, 0.95), nx = (a.x - x.x) / dd, ny = (a.y - x.y) / dd;
+          a.vx += nx * sev * 7; a.vy += ny * sev * 7;
+          a.bump_k = 'shove'; a.bump_sev = sev; a.bump_t = 0.3 + 0.3 * sev; a.bump_dx = nx; a.bump_dy = ny;
+          x.shove_t = 0.35; this.bump('shove'); this.logEv('shove', x.team, '', { pid: x.pid, vic: a.pid, dx: nx, dy: ny, sev });   // (no cool on the shover: he still plays the rebound)
+          if (rnd() < TUNE.stickPen * 0.3 * (1 + (55 - x.R.dis) / 60)) { this.penalty(x, t, 'Cross-checking'); return true; }
+          break;
+        }
+      }
+    }
+    return false;
+  }
+  // two opponents running into each other short of a hit (engine.gd _body_bump, TUNE.bmp): both knocked off their line and a
+  // stride lost, the weaker / lighter man more; nobody goes down or loses the puck from it
+  bodyBump(a, b, cl, nx, ny) {
+    const sa = a.R.chk * 0.5 + a.R.ska * 0.2 + (a.W - 200) * 0.4, sb = b.R.chk * 0.5 + b.R.ska * 0.2 + (b.W - 200) * 0.4;
+    const edge = clamp((sa - sb) / 25, -1, 1), base = clamp((cl - 10) / 12, 0.15, 1);
+    const sevA = clamp(base * (1 - edge * 0.7), 0.05, 1), sevB = clamp(base * (1 + edge * 0.7), 0.05, 1);
+    Object.assign(a, { bump_sev: sevA, bump_k: sevA < 0.3 ? 'shrug' : 'bump', bump_t: 0.2 + 0.5 * sevA, bump_dx: -nx, bump_dy: -ny });
+    Object.assign(b, { bump_sev: sevB, bump_k: sevB < 0.3 ? 'shrug' : 'bump', bump_t: 0.2 + 0.5 * sevB, bump_dx: nx, bump_dy: ny });
+    a.vx -= nx * sevA * 3; a.vy -= ny * sevA * 3; b.vx += nx * sevB * 3; b.vy += ny * sevB * 3;
+    this.bump('bodybump');
+    if (sevB >= sevA) this.logEv('bump', a.team, '', { pid: a.pid, vic: b.pid, dx: nx, dy: ny, sev: sevB });   // (pid came off better, vic knocked more)
+    else this.logEv('bump', b.team, '', { pid: b.pid, vic: a.pid, dx: -nx, dy: -ny, sev: sevA });
+  }
   touch(e) {
     const p = this.puck;
     if (this.delayed && e.team === this.delayed.team && this.phase === 'play') {   // the offending side touched it: the whistle goes
@@ -3767,7 +3940,7 @@ class HockeyGame {
     if (p.touchTeam >= 0 && p.touchTeam !== e.team && e.x * this.T[e.team].d < -25) this.T[1 - e.team].lost_t = this.clock + this.period * 1200;   // won it off them in his end
     if (p.pass_info && p.pass_info.from && p.pass_info.from.team === p.pass_info.team) this.bump(wasPass ? 'pass_ok' : 'pass_int');
     if (p.owner) { this.endBattle(p.owner); p.owner.wind = 0; p.owner.wind_k = ''; }   // (taken off him mid-wind-up)
-    Object.assign(p, { owner: e, pass_info: null, vx: 0, vy: 0, vz: 0, z: 0, idle: 0, ice_team: -1 }); e.pend = null; e.deke = 0; e.bkw = false; e.bkw_dk = false; e.go_t = 0; e.office = 0; e.wind = 0; e.wind_k = '';
+    Object.assign(p, { owner: e, pass_info: null, vx: 0, vy: 0, vz: 0, z: 0, idle: 0, ice_team: -1 }); e.pend = null; e.deke = 0; e.bkw = false; e.bkw_dk = false; e.go_t = 0; e.office = 0; e.wind = 0; e.wind_k = ''; e.dk_vs = null; e.dk_after = 0; e.deke_ctx = '';
     p.recvT = wasPass ? 0 : 9;
     // retrieving a dump-in or a rim deep in his own end with a forechecker coming: he stops it, turns and looks before he can move it (0.15-0.3 s: the defending side won 90% of dump-ins back)
     const retrieve = !wasPass && p.lastTouch && p.lastTouch.team !== e.team && e.x * this.T[e.team].d < -62 && this.T[1 - e.team].on.some(x => !x.isG && hyp(x.x - e.x, x.y - e.y) < 30);
@@ -3823,8 +3996,16 @@ class HockeyGame {
       // a checker leaning on him in their end: shielding it he can't skate away at near full speed
       if (e === p.owner && !e.isG && e.x * this.T[e.team].d > 25) maxS *= 0.68 + 0.32 * clamp((this.pressure(e) - 3) / 6, 0, 1);
       if (dead) maxS *= 0.7;
+      if (e.bump_t > 0 && e.bump_k) maxS *= 1 - 0.3 * e.bump_sev;   // staggered by a bump / shove: a stride lost
       if (e.blk_t > 0) { e.blk_t -= dt; maxS = Math.min(maxS, 3); }   // down on his knees after blocking a shot
-      if (e.stun > 0) { e.stun -= dt; e.vx *= 0.92; e.vy *= 0.92; continue; }
+      if (e.stun > 0) {
+        if (e.stun > 0.75) e.dn = true;
+        e.stun -= dt; e.vx *= 0.92; e.vy *= 0.92;
+        // (TUNE.getup, engine.gd: down on the ice, he stays there while a viewer plays him getting up, ~1.2 s)
+        if (e.stun <= 0 && e.dn) { e.dn = false; if ((TUNE.getup || 0) > 0) { e.getup = TUNE.getup; e.cool = Math.max(e.cool, TUNE.getup); } }
+        continue;
+      }
+      if (e.getup > 0) { e.getup -= dt; e.vx *= 0.7; e.vy *= 0.7; continue; }
       if (e.leaving) { const gt = this.benchGate(this.T[e.team]); e.tx = gt.x; e.ty = gt.y; }   // coming off: straight for the bench
       // (the man going for a loose puck is all out too, from any distance: chasing a dump-in from 40-60 ft back he used to cruise while the D raced for it)
       const urgent = e === p.owner || e.press || (p.pass_info && p.pass_info.to === e) || e.isG || e.leaving || (!p.owner && !p.shot && e.pid === this.T[e.team].chaseId && !dead);
@@ -3947,6 +4128,7 @@ class HockeyGame {
         const wa = a.isG ? 0 : b.isG ? 1 : b.W / (a.W + b.W), wb = 1 - wa;
         a.x -= nx * push * wa; a.y -= ny * push * wa; b.x += nx * push * wb; b.y += ny * push * wb;
         const rv = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+        if (it === 0 && rv < -10 && (TUNE.bmp || 0) > 0 && a.team !== b.team && !a.isG && !b.isG && !(a.stun > 0) && !(b.stun > 0) && !(a.bump_t > 0) && !(b.bump_t > 0) && rnd() < TUNE.bmp) this.bodyBump(a, b, -rv, nx, ny);   // a real run-in (engine.gd _collide)
         if (rv < 0) { a.vx += nx * rv * wa; a.vy += ny * rv * wa; b.vx -= nx * rv * wb; b.vy -= ny * rv * wb; }
       }
     }
@@ -18619,13 +18801,13 @@ function watchGame() {
   </div>
   <aside class="gside"><div class="gtabs"><button class="on" data-act="gtab" data-k="pbp">Play-by-play</button><button data-act="gtab" data-k="stats">Game stats</button></div><div id="gpanel" class="gpanel"><ul class="pbp" id="pbp"></ul></div></aside></div>`;
   const stage = $('#stage');
-  game.onEvent = ev => { liveGame.feed.unshift(ev); if (ev.type === 'goal') flashGoal(ev); if (liveGame.tab !== 'stats') addFeed(ev); };
+  game.onEvent = ev => { if (!ev.text) return; liveGame.feed.unshift(ev); if (ev.type === 'goal') flashGoal(ev); if (liveGame.tab !== 'stats') addFeed(ev); };
   viewer = new RinkViewer(stage, game, { home: ht, away: at, mode2d: MOBILE, onFrame: updateSB, onFinal: finishWatch, onCam: m => { const s = $('#gcam'); if (s) s.value = m; } });
   if (viewer.mode === '2d' && !MOBILE) toast('3D graphics are unavailable here, showing a 2D view.', 'bad');
   const q = $('#gqual'); if (q) q.value = viewer.quality;
 }
 function addFeed(ev) {
-  const ul = $('#pbp'); if (!ul) return;
+  const ul = $('#pbp'); if (!ul || !ev.text) return;   // (bump / shove events carry no text: they're for the 3D view)
   if (['hit', 'miss', 'block'].includes(ev.type) && Math.random() < .5) return;
   const t = ev.team >= 0 ? (ev.team === 0 ? liveGame.ht : liveGame.at) : null;
   const li = document.createElement('li'); li.className = 'ev-' + ev.type;
@@ -19501,7 +19683,7 @@ const ACT = {
   gpause: () => { viewer.paused = !viewer.paused; $('#gp').textContent = viewer.paused ? 'Play' : 'Pause'; },
   gspeed: (d, el) => { viewer.speed = +d.s; el.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === el)); },
   glabels: () => { const o = ['names', 'numbers', 'off']; viewer.labels = o[(o.indexOf(viewer.labels) + 1) % 3]; $('#glabels').textContent = 'Labels: ' + { names: 'Names', numbers: 'Numbers', off: 'Off' }[viewer.labels]; },
-  gskip: () => { const g = liveGame.game; const cb = g.onEvent; g.onEvent = ev => { liveGame.feed.unshift(ev); }; while (!g.over) g.step(0.1); g.onEvent = cb; liveGame.feed.slice(0, 30).reverse().forEach(addFeed); },
+  gskip: () => { const g = liveGame.game; const cb = g.onEvent; g.onEvent = ev => { if (ev.text) liveGame.feed.unshift(ev); }; while (!g.over) g.step(0.1); g.onEvent = cb; liveGame.feed.slice(0, 30).reverse().forEach(addFeed); },
   gexit: () => exitGame(),
   gtab: (d, el) => { liveGame.tab = d.k; el.parentElement.querySelectorAll('button').forEach(b => b.classList.toggle('on', b === el)); if (d.k === 'stats') renderGameStats(); else { $('#gpanel').innerHTML = '<ul class="pbp" id="pbp"></ul>'; liveGame.feed.slice(0, 80).reverse().forEach(addFeed); } },
 };
