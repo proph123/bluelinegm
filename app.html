@@ -1664,7 +1664,7 @@ function wallInfo(x, y) {
 // facing-aware passes/shots, structured AI (zone shapes, coverage, 1-2-2 forecheck, puck protection, dekes, one-timers),
 // rating-driven physical play (poke checks, body checks, nudges, stick checks, with body weight), wrist and slap shots.
 // Same constructor and result() shape as before, so the rest of the app is unchanged.
-const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.02, patience: 0.45, bkw: 2.6, blk: 0.29, pp: 0.44, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 0.99, patience: 0.45, bkw: 2.6, blk: 0.22, pp: 0.48, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5, splace: 1, sspd: 1, lnb: 0.9, bhd: 34, bhs: 1, wsnap: 0.14, msh: 0.05 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -2787,7 +2787,7 @@ class HockeyGame {
     if (e.pend) {   // a decided play waits until he faces it
       const pd = e.pend; pd.t -= dt;
       const tgt = this.pendTarget(e, pd);
-      const far = pd.k === 'shot' && hyp(tgt.x - e.x, tgt.y - e.y) > 26;   // (no backhands from out there)
+      const far = pd.k === 'shot' && hyp(tgt.x - e.x, tgt.y - e.y) > (TUNE.bhd || 26);   // (no backhands from out there)
       if (pd.k === 'pass' && !t.on.includes(pd.m)) e.pend = null;
       // opening up to it, he sees a stick step into the lane: he holds it and reads the play again (engine.gd)
       else if (pd.k === 'pass' && (TUNE.precheck == null || TUNE.precheck > 0) && this.laneRisk(t, e.x, e.y, pd.m.x, pd.m.y) < -1) { e.pend = null; e.dec = 0.05; this.bump('pass_abort'); return; }
@@ -3140,7 +3140,7 @@ class HockeyGame {
   execPlay(e, t, pd) {
     // a shot: picked now and released when the stick comes through (HG_WIND; off a rebound, a one-timer or a tip there's
     // no backswing)
-    if (pd.k === 'shot') { const quick = this.puck.rebT > 0 || e.one_t || e.tip_shot, plan = this.shotPlan(e, t, this.shotQ(t, e.x, e.y)), w = quick ? 0 : (HG_WIND[plan.type] || 0); if (w > 0) { e.wind = w; e.wind_k = plan.type; e.wind_plan = plan; this.bump('windup'); } else this.shotFire(e, t, plan); }
+    if (pd.k === 'shot') { const quick = this.puck.rebT > 0 || e.one_t || e.tip_shot, plan = this.shotPlan(e, t, this.shotQ(t, e.x, e.y)), w = quick ? 0 : (plan.type === 'snap' && (TUNE.wsnap || 0) > 0 ? TUNE.wsnap : (HG_WIND[plan.type] || 0)); if (w > 0) { e.wind = w; e.wind_k = plan.type; e.wind_plan = plan; this.bump('windup'); } else this.shotFire(e, t, plan); }
     else if (pd.k === 'pass') this.passTo(e, pd.m, t);
     else this.chip(e, t, pd.kind);
   }
@@ -3150,7 +3150,9 @@ class HockeyGame {
     // up to it; under pressure he uses the backhand. A shot from out past the dots always waits: nobody takes a backhand
     // from the point.
     if ((pd.k === 'shot' || pd.k === 'pass') && this.backhand(e, tg.x, tg.y)) {
-      if ((pd.k === 'shot' && hyp(tg.x - e.x, tg.y - e.y) > 26) || (this.pressure(e) > 3 && rnd() < 0.9)) pd.fh = true;
+      // (TUNE.bhs / bhd, engine.gd: in range a shooter with the hands for it takes the backhand more often than one in ten)
+      const toFh = pd.k === 'shot' && (TUNE.bhs || 0) > 0 ? 1 - clamp(0.25 + (e.R.hnd - 60) / 70, 0.15, 0.6) * TUNE.bhs : 0.9;
+      if ((pd.k === 'shot' && hyp(tg.x - e.x, tg.y - e.y) > (TUNE.bhd || 26)) || (this.pressure(e) > 3 && rnd() < toFh)) pd.fh = true;
     }
     if (!pd.fh && this.facing(e, tg, pd.k === 'shot' ? 1.25 : 1.75)) { this.execPlay(e, t, pd); return; }
     pd.t = 0.6; e.pend = pd;
@@ -3329,7 +3331,7 @@ class HockeyGame {
   shotKind(e, t) {
     const r = e.R, gx = t.d * 89, gd = hyp(gx - e.x, e.y);
     const slap = e.one_t || (gd > 36 && this.pressure(e) > 8 && rnd() < clamp(0.3 + (r.sht - 60) / 80 + ('bomb' in e.X ? 0.25 : 0), 0.12, 0.85));
-    if (this.backhand(e, gx, 0) && !e.one_t && gd < 26) return 'backhand';
+    if (this.backhand(e, gx, 0) && !e.one_t && gd < (TUNE.bhd || 26)) return 'backhand';
     if (slap) return 'slap';
     if (!e.one_t && gd > 16 && (this.pressure(e) < 8 || this.puck.recvT < 0.8) && rnd() < clamp(0.35 + (r.sht - 60) / 90, 0.15, 0.7)) return 'snap';
     return 'wrist';
@@ -3346,9 +3348,13 @@ class HockeyGame {
     let blocker = null, bt = 1;
     // a man near the lane can get into it: more time to slide over or drop the further out the shot (3 ft in tight, 3.8 from the point)
     const lw = 3 + 0.8 * clamp((hyp(gx - e.x, e.y) - 30) / 25, 0, 1);
+    // (TUNE.lnb, engine.gd: a body right on the shot's line is always hit - blocked or deflected; the roll is for a man getting into the lane)
+    const lnb = TUNE.lnb || 0; let onLine = false;
     for (const x of o.on) {
       if (e.tip_shot) break;   // (a redirection is on the goalie before anyone can get in front of it)
       const sd = segDist(x.x, x.y, e.x, e.y, gx, 0);
+      if (lnb > 0 && !x.isG && sd[1] > 0.08 && sd[1] < 0.92 && sd[0] < lnb) { if (sd[1] < bt || !onLine) { bt = sd[1]; blocker = x; onLine = true; } continue; }
+      if (onLine) continue;
       if (sd[1] > 0.08 && sd[1] < 0.92 && sd[0] < lw && rnd() < TUNE.blk + x.R.def / 500 + (isD(x) ? 0.06 : 0) + ('wall' in x.X ? 0.12 * xk(x.X.wall) : 0)) {
         if (sd[1] < bt) { bt = sd[1]; blocker = x; }
       }
@@ -3404,18 +3410,114 @@ class HockeyGame {
         if (sm[0] < 5.5 && sm[1] > 0.55 && rnd() < (0.58 + (m.R.hnd - 60) / 200) * (1 - fk * fk * (3 - 2 * fk))) { tipper = m; break; }
       }
     }
-    const outcome = blocker ? 'block' : tipper ? 'tip' : rnd() < pMiss ? (rnd() < 0.08 ? 'post' : 'miss') : rnd() < pGoal ? 'goal' : 'save';   // some misses ring off the iron (a couple a game)
-    const sp = (70 + s * 0.3) * (slapT ? 1.16 : bh ? 0.85 : snap ? 1.05 : 1);
-    let ty = 0, tz = 0.5;
-    if (outcome === 'goal') { ty = (rnd() < 0.5 ? -1 : 1) * (1 + rnd() * 1.7); tz = rnd() * 3.2; }
+    // a teammate right on the line further out (not the net-front man, who tips it): off him and away
+    if (lnb > 0 && !blocker && !tipper && !e.tip_shot) {
+      for (const m of t.on) { if (m === e || m.isG) continue; const sm2 = segDist(m.x, m.y, e.x, e.y, gx, 0); if (sm2[1] > 0.08 && sm2[1] < 0.75 && sm2[0] < lnb * 0.8) { blocker = m; bt = sm2[1]; onLine = true; break; } }
+    }
+    if ((TUNE.msh || 0) > 0) pMiss = Math.max(0.06, pMiss - TUNE.msh);   // (fewer plain misses: the deflections off bodies on the line are the misses now, engine.gd)
+    let outcome = blocker ? 'block' : tipper ? 'tip' : rnd() < pMiss ? (rnd() < 0.08 ? 'post' : 'miss') : rnd() < pGoal ? 'goal' : 'save';   // some misses ring off the iron (a couple a game)
+    if (outcome === 'block' && onLine && (blocker.team === t.side || rnd() < 0.3)) outcome = 'deflect';
+    const label = slapT ? (e.one_t && gdist < 22 ? 'tap' : 'slap') : bh ? 'backhand' : snap ? 'snap' : 'wrist';
+    let sp = (70 + s * 0.3) * (slapT ? 1.16 : bh ? 0.85 : snap ? 1.05 : 1);
+    if ((TUNE.sspd || 0) > 0) sp = this.shotSpeed(e, label, s, false);
+    let ty = 0, tz = 0.5, saveK = '';
+    if ((TUNE.splace || 0) > 0) { const tg = this.shotTarget(outcome, e, t, o, gdist / Math.max(sp, 30)); ty = tg[0]; tz = tg[1]; saveK = tg[2]; }
+    else if (outcome === 'goal') { ty = (rnd() < 0.5 ? -1 : 1) * (1 + rnd() * 1.7); tz = rnd() * 3.2; }
     else if (outcome === 'save') { ty = o.g.y + (rnd() - 0.5) * 2; tz = rnd() * 2.5; }
     else if (outcome === 'miss') { ty = (rnd() < 0.5 ? -1 : 1) * (3.6 + rnd() * 4); tz = rnd() * 4; }
     else if (outcome === 'post') { ty = (rnd() < 0.5 ? -1 : 1) * 3; tz = rnd() * 4.3; }
-    return { q, outcome, blocker, bt, tipper, sp, ty, tz, reb, bkw: bkwShot, tip: !!e.tip_shot, type: slapT ? (e.one_t && gdist < 22 ? 'tap' : 'slap') : bh ? 'backhand' : snap ? 'snap' : 'wrist' };
+    return { q, outcome, blocker, bt, tipper, sp, ty, tz, reb, bkw: bkwShot, tip: !!e.tip_shot, type: label, save_k: saveK };
+  }
+  // how hard it comes off his stick (engine.gd _shot_speed, TUNE.sspd): mph by type over his shooting, +-4%; a tip keeps 70-85%
+  shotSpeed(e, label, s, ot) {
+    if (e.tip_shot && e.tip_in > 20) return e.tip_in * (0.7 + rnd() * 0.15);
+    const f = clamp((s - 50) / 45, 0, 1);
+    let mph = 68 + 17 * f;
+    if (label === 'slap') mph = 82 + 23 * f + ('bomb' in e.X ? 4 * xk(e.X.bomb) : 0) + (ot ? 3 : 0);
+    else if (label === 'tap') mph = 58 + 17 * f;
+    else if (label === 'snap') mph = 72 + 18 * f;
+    else if (label === 'backhand') mph = 50 + 15 * f;
+    return mph * (1 + (rnd() - 0.5) * 0.08) * 1.4667;
+  }
+  // where on (or off) the net it goes, by outcome (engine.gd _shot_target, TUNE.splace): goals where the goalie isn't (high
+  // corners ~38%, the five-hole ~10% with him down or moving, low and mid corners); saves around him by what stops it
+  // (save_k); misses a third over the bar; the iron a post or the crossbar. [ty, tz, save kind]
+  shotTarget(outcome, e, t, o, ft) {
+    const g = o.g, gy = clamp(g.y + g.vy * ft * 0.6, -2.5, 2.5);
+    const gp = this.pl(g.pid), gs = (gp && gp.sh === 'R') ? t.d : -t.d;   // his glove side (world y)
+    let ty = 0, tz = 0.5, k = '';
+    if (outcome === 'goal') {
+      let side = Math.abs(gy) > 0.25 ? -Math.sign(gy) : (rnd() < 0.5 ? 1 : -1);
+      if (rnd() < 0.18) side = -side;
+      const r = rnd(), down = hyp(g.vx, g.vy) > 4 || this.goalieOff(t, e.x, e.y) > 0.3;
+      if (r < 0.25 && down) { ty = gy + (rnd() - 0.5) * 0.5; tz = 0.08 + rnd() * 0.45; }   // five-hole (him down or moving across)
+      else {
+        ty = side * (2 + rnd() * 0.8);
+        if (Math.abs(ty - gy) < 1.4) ty = -ty;
+        tz = r >= 0.1 && r < 0.48 ? 3 + rnd() * 0.85 : r < 0.75 ? 0.05 + rnd() * 0.9 : 1 + rnd() * 2;
+      }
+    } else if (outcome === 'save') {
+      const r2 = rnd();
+      if (r2 < 0.28) { k = 'glove'; ty = gy + gs * (0.8 + rnd() * 1.6); tz = 1.6 + rnd() * 2.3; }
+      else if (r2 < 0.45) { k = 'blocker'; ty = gy - gs * (0.7 + rnd() * 1.4); tz = 1 + rnd() * 2.4; }
+      else if (r2 < 0.75) { k = 'pad'; ty = gy + (rnd() - 0.5) * 4.6; tz = rnd() * 0.9; }
+      else if (r2 < 0.95) { k = 'body'; ty = gy + (rnd() - 0.5) * 0.9; tz = 1 + rnd() * 2.2; }
+      else { k = 'stick'; ty = gy + (rnd() - 0.5) * 1.2; tz = rnd() * 0.25; }
+      ty = clamp(ty, -2.9, 2.9);
+    } else if (outcome === 'miss') {
+      if (rnd() < 0.33) { ty = (rnd() - 0.5) * 6.4; tz = 4.1 + rnd() * 1.9; }
+      else { ty = (rnd() < 0.5 ? -1 : 1) * (3.4 + rnd() * 4); tz = rnd() * 4; }
+    } else if (outcome === 'post') {
+      if (rnd() < 0.3) { ty = (rnd() - 0.5) * 5.6; tz = 4; }
+      else { ty = (rnd() < 0.5 ? -1 : 1) * 3; tz = rnd() * 3.9; }
+    }
+    return [ty, tz, k];
+  }
+  // a save by what stopped it (engine.gd _save_rebound, TUNE.splace): the glove holds most, the body smothers about half and
+  // drops the rest at his feet, the blocker steers it to his blocker-side corner, a low pad kicks it out along the ice to the
+  // side it came from, the stick to the side; rebound control holds more and sends it softer
+  saveRebound(s, t, o, sk, gn, sh) {
+    const p = this.puck, g = o.g, G = g.R, rc = (G.reb - 60) / 100;
+    let hold = sk === 'glove' ? 0.72 + rc * 0.3 : sk === 'body' ? 0.42 + rc * 0.5 : sk === 'pad' ? 0.03 + rc * 0.1 : 0;
+    if (hold > 0) hold += ('vacuum' in g.X ? 0.15 * xk(g.X.vacuum) : 0) - (s.q > 0.5 ? 0.08 : 0);
+    if (rnd() < hold) {
+      p.vx = 0; p.vy = 0; p.x = g.x; p.y = g.y;
+      this.logEv('save', o.side, 'Save ' + gn + ' on ' + shortName(sh) + ', covers it', { kind: sk, held: true, ty: s.ty, tz: s.tz });
+      this.whistle({ x: t.d * 69, y: s.sy >= 0 ? 22 : -22 }, '', 1.8);
+      return;
+    }
+    const gp = this.pl(g.pid), gs = (gp && gp.sh === 'R') ? t.d : -t.d;
+    let ss = Math.sign((s.ty || 0) - g.y); if (!ss) ss = rnd() < 0.5 ? 1 : -1;
+    let a, sp, vz = 0;
+    if (sk === 'glove' || sk === 'body') { a = (rnd() - 0.5) * 2; sp = 2 + rnd() * 5; }
+    else if (sk === 'blocker') { a = -gs * (1.1 + rnd() * 0.35); sp = (20 + rnd() * 10) * (1 - rc * 0.4); vz = 1; }
+    else if (sk === 'pad') { a = ss * (0.25 + rnd() * 0.55); sp = (14 + rnd() * 12) * (1 - rc * 0.5); }
+    else { a = ss * (0.95 + rnd() * 0.5); sp = 15 + rnd() * 10; }
+    p.vx = -t.d * Math.cos(a) * sp; p.vy = Math.sin(a) * sp; p.x = g.x - t.d; p.vz = vz;
+    p.rebT = 1.6;
+    this.logEv('save', o.side, 'Save ' + gn + ' on ' + shortName(sh) + ', rebound', { kind: sk, held: false, ty: s.ty, tz: s.tz });
   }
   // the release: the puck leaves his blade on the planned shot
   shotFire(e, t, pl) {
-    const p = this.puck, gx = t.d * 89, { outcome, tipper, sp } = pl; let tz = pl.tz;
+    const p = this.puck, gx = t.d * 89;
+    // (TUNE.lnb, engine.gd) at the release, on the line it actually takes to where it's aimed: a body on it is hit
+    // (he often picks another lane to the same kind of spot when one's clear; otherwise it hits the man)
+    if ((TUNE.lnb || 0) > 0 && !pl.tip && ['save', 'goal', 'miss', 'post'].includes(pl.outcome)) {
+      let hit = this.lineBody(e, t, gx, pl.ty);
+      if (hit[0] && rnd() < clamp(0.45 + (e.R.sht - 60) / 80, 0.25, 0.8)) {
+        const gy0 = this.T[1 - t.side].g.y, alts = pl.outcome === 'goal' ? [-pl.ty] : pl.outcome === 'save' ? [gy0 + 1.6, gy0 - 1.6] : [pl.ty + 1.5, pl.ty - 1.5];
+        for (const a2 of alts) {
+          if (pl.outcome === 'save' && Math.abs(a2) > 2.9) continue;
+          if (!this.lineBody(e, t, gx, a2)[0]) {
+            pl.ty = a2; hit = [null, 1]; this.bump('line_reaim');
+            if (pl.outcome === 'save') { const gp = this.pl(this.T[1 - t.side].g.pid), gs = (gp && gp.sh === 'R') ? t.d : -t.d; pl.save_k = pl.tz < 1 ? 'pad' : Math.sign(a2 - gy0) === gs ? 'glove' : 'blocker'; }
+            break;
+          }
+        }
+      }
+      if (hit[0]) { const bl = hit[0]; pl.outcome = bl.team === t.side || rnd() < 0.3 ? 'deflect' : 'block'; pl.blocker = bl; pl.bt = hit[1]; pl.save_k = ''; this.bump('line_hit'); }
+    }
+    const { outcome, tipper, sp } = pl; let tz = pl.tz;
     // the path starts from the puck on his blade (from his body the shot "arrived" short of the line)
     let dx = gx - p.x, dy = pl.ty - p.y;
     if (outcome === 'tip') { dx = tipper.x - p.x; dy = tipper.y - p.y; tz = 0.3; }   // it goes to the stick in front
@@ -3423,10 +3525,20 @@ class HockeyGame {
     this.release(e);
     if (e.x * t.d >= 0) p.ice_team = -1;   // a shot from his own half (at an empty net) that misses is still icing
     p.vx = dx / dd * sp; p.vy = dy / dd * sp; p.z = 0.3; p.vz = 0; p.tz = tz; p.pass_info = null;
-    p.shot = { by: e, team: t.side, outcome, dist: outcome === 'block' ? pl.bt * dd : dd, trav: 0, blocker: pl.blocker, q: pl.q, asst: this.assistList(e), reb: pl.reb, sx: e.x, sy: e.y, tz, type: pl.type, bkw: pl.bkw };
+    p.shot = { by: e, team: t.side, outcome, dist: outcome === 'block' || outcome === 'deflect' ? pl.bt * dd : dd, ty: pl.ty, save_k: pl.save_k || '', sp, trav: 0, blocker: pl.blocker, q: pl.q, asst: this.assistList(e), reb: pl.reb, sx: e.x, sy: e.y, tz, type: pl.type, bkw: pl.bkw };
     if (tipper) p.shot.tipper = tipper;
     if (pl.tip) { p.shot.type = 'tap'; p.shot.tipped = true; }
     p.shot_id++; t.att++;
+  }
+  // the nearest body right on the line from the puck to (gx, ty) (engine.gd _line_body): [who or null, how far along]
+  lineBody(e, t, gx, ty) {
+    const p = this.puck, t0 = 4 / Math.max(hyp(gx - p.x, ty - p.y), 8); let bl = null, bt2 = 1;   // (a man right on his stick he shoots past)
+    for (const x of this.ent) {
+      if (x === e || x.isG || x.leaving) continue;
+      const own = x.team === t.side, sl2 = segDist(x.x, x.y, p.x, p.y, gx, ty);
+      if (sl2[1] > t0 && sl2[1] < (own ? 0.75 : 0.92) && sl2[0] < (own ? TUNE.lnb * 0.8 : TUNE.lnb) && sl2[1] < bt2) { bt2 = sl2[1]; bl = x; }
+    }
+    return [bl, bt2];
   }
   assistList(e) {
     const p = this.puck, a = [];
@@ -3449,6 +3561,14 @@ class HockeyGame {
       this.logEv('block', o.side, shortName(this.pl(s.blocker.pid)) + ' blocks a shot from ' + shortName(sh));
       return;
     }
+    if (s.outcome === 'deflect') {   // off a body on the line (TUNE.lnb, engine.gd): it turns 15-40 degrees and loses ~40% of its pace
+      const b2 = s.blocker, ang = (0.26 + rnd() * 0.44) * (rnd() < 0.5 ? 1 : -1), c2 = Math.cos(ang), s2 = Math.sin(ang), f2 = 0.5 + rnd() * 0.2;
+      const nvx = (p.vx * c2 - p.vy * s2) * f2, nvy = (p.vx * s2 + p.vy * c2) * f2;
+      p.vx = nvx; p.vy = nvy; p.vz = 0; p.z = 0.2;
+      this.bump('deflect');
+      this.logEv('deflect', b2 ? b2.team : -1, '', { pid: b2 ? b2.pid : '', by: s.by.pid, dx: nvx, dy: nvy });
+      return;
+    }
     if (s.outcome === 'miss') { this.logEv('miss', t.side, shortName(sh) + ' misses the net'); return; }
     if (s.outcome === 'post') {   // off the iron and back out (from in front of the post: it never gets over the line)
       this.logEv('post', t.side, shortName(sh) + (s.tz > 3.6 ? ' rings it off the crossbar' : ' hits the post'));
@@ -3459,6 +3579,7 @@ class HockeyGame {
     if (s.outcome === 'tip') {   // redirected by the man in front: a new shot off his stick
       const tp = s.tipper;
       if (!tp || !t.on.includes(tp)) return;
+      tp.tip_in = hyp(p.vx, p.vy);   // (the redirection keeps most of its pace: TUNE.sspd)
       p.x = tp.x; p.y = tp.y; this.touch(tp); this.bump('tip');
       if (this.phase !== 'play') return;
       tp.tip_shot = true; this.shoot(tp, t, this.shotQ(t, tp.x, tp.y)); tp.tip_shot = false;
@@ -3468,9 +3589,10 @@ class HockeyGame {
     if (!this.netEmpty(o)) this.st[o.g.pid].sa++;
     if (s.outcome === 'goal') { p.x = Math.sign(t.d) * 90.2; p.y = clamp(p.y, -2.0, 2.0); p.vx *= 0.05; p.vy *= 0.05; p.in_net = Math.sign(t.d); this.goal(t, o, s); return; }   // in: over the line, clear of the shallow corners, and in the net as puckPhys sees it so the mesh holds it (put over the line instead of carried across, without in_net the next step took it for a puck come into the frame from outside and pushed it out the back or side netting)
     const G = o.g.R;
+    const gn = shortName(this.pl(o.g.pid));
+    if ((TUNE.splace || 0) > 0 && s.save_k) { this.saveRebound(s, t, o, s.save_k, gn, sh); return; }
     // (0.33 base froze 60% of saves: 38 goalie whistles a game, NHL ~15-20)
     const freeze = rnd() < 0.015 + G.reb / 250 - (s.q > 0.5 ? 0.12 : 0) + ('vacuum' in o.g.X ? 0.15 * xk(o.g.X.vacuum) : 0);
-    const gn = shortName(this.pl(o.g.pid));
     if (freeze) {
       p.vx = 0; p.vy = 0; p.x = o.g.x; p.y = o.g.y;
       this.logEv('save', o.side, 'Save ' + gn + ' on ' + shortName(sh) + ', covers it');
