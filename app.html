@@ -18329,7 +18329,23 @@ const SUBR_G = [
 // takeaways, each blended with the core rating. (All were the core rating plus a wobble: Quinn Hughes, an 83rd-percentile
 // top speed and below-average blocks for a D, showed 99 speed and 95 shot blocking.)
 const pctZ = q => cl(Math.log(cl(q, .01, .99) / (1 - cl(q, .01, .99))) / 1.702, -2.4, 2.4);
-const rxC0 = r => ({ ska: r.ska, sht: r.sht, pas: r.pas, hnd: r.hnd, def: r.def, dis: r.dis });   // the core ratings the detail anchors were read against (dis: 2026-10 audit S7)
+const rxC0 = r => ({ ska: r.ska, sht: r.sht, pas: r.pas, hnd: r.hnd, def: r.def, dis: r.dis });
+// the shot detail ratings' own level, by position (the user, 2026-10-14: "it seems like some defenseman have too high of
+// shooting ratings" - Brodin, 4 goals, showed 83-87): finishing and accuracy are measured against his position, so their
+// "average" is his position's average shooting, not every regular's overall (b). On b a D's shot ratings averaged 80-86
+// against his 76 shooting - above the forwards' wrist power - and a forward's sat below his. The average shot speed
+// (wrist power) is read against his position too: a D's average carries his slapshots from the point
+let SHB_C = null;
+function shbOf(p) {
+  const key = L ? L.season + ':' + Object.keys(L.players).length : '';
+  if (!SHB_C || SHB_C.key !== key) {
+    const g = { D: [], F: [] }; for (const q of Object.values(L.players)) if (q.tid >= 0 && q.rx && q.pos !== 'G' && (q.career || q.hist)) g[q.pos === 'D' ? 'D' : 'F'].push(q);
+    const av = a => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0, o = { key };
+    for (const k of ['D', 'F']) { o[k] = g[k].length ? av(g[k].map(q => q.r.sht)) : (k === 'D' ? 57 : 70); o[k + 'as'] = av(g[k].filter(q => q.rx.asZ != null).map(q => q.rx.asZ)); }
+    o.all = av(g.D.concat(g.F).map(q => q.r.sht)) || 65; SHB_C = o;
+  }
+  return SHB_C;
+}   // the core ratings the detail anchors were read against (dis: 2026-10 audit S7)
 // (each anchor moves with his core rating's change since it was read, x.c0: a 19-year-old's speed isn't pinned to last
 // season's tracking while he develops)
 function rxOverrides(p) {
@@ -18351,14 +18367,17 @@ function rxOverrides(p) {
   if (br != null) o['Acceleration'] = r => .3 * r.ska + .7 * A(br, r, 'ska');
   // shot power is the shot itself: a wrist shot's from his average shot speed, a slapshot's from his hardest shot and how
   // many he fires from the point (a D's low goal rate used to hold it down: Evan Bouchard's 317 slap shots came out an 84)
-  if (as != null) o['Wrist Shot Power'] = r => .15 * r.sht + .85 * A(as, r, 'sht');
-  if (hs != null) o['Slap Shot Power'] = r => .1 * r.sht + .9 * A(x.slv != null ? hs * .65 + x.slv * .35 : hs, r, 'sht');
+  // (shot ratings sit on his position's shooting level, shbOf: S for finishing, accuracy and his average shot speed; the
+  // hardest shot - slap power - stays against every skater, on the skaters' shooting level, since a D's slapper is harder)
+  const SB = shbOf(p), pk = D ? 'D' : 'F', S = (zv, r) => r.sht + (SB[pk] + zv * 8 + dv(r, 'sht') - r.sht) * fd, SA = (zv, r) => r.sht + (SB.all + zv * 8 + dv(r, 'sht') - r.sht) * fd;
+  if (as != null) o['Wrist Shot Power'] = r => .15 * r.sht + .85 * S(x.asZ != null ? as - SB[pk + 'as'] : as, r);
+  if (hs != null) o['Slap Shot Power'] = r => .1 * r.sht + .9 * SA(x.slv != null ? hs * .65 + x.slv * .35 : hs, r);
   if (x.blk != null) o['Shot Blocking'] = r => .3 * r.def + .7 * (b + (D ? 3 : -3) + x.blk * 8 + dv(r, 'def'));
   if (x.tk != null) o['Stick Checking'] = r => .4 * r.def + .6 * (b + x.tk * 8 + dv(r, 'def'));
   // accuracy: his finishing with that shot against his position (wrist and snap together) and how often he hits the net.
   // With no slap shots to read, a neutral slapshot, not his shooting rating (157 players inherited it: Wyatt Johnston's 94)
-  if (x.wsh != null) o['Wrist Shot Accuracy'] = r => .35 * r.sht + .4 * A(x.wsh, r, 'sht') + .25 * A(x.acc ?? 0, r, 'sht');
-  o['Slap Shot Accuracy'] = x.ssh != null ? r => .25 * r.sht + .4 * A(x.ssh, r, 'sht') + .35 * A(x.acc ?? 0, r, 'sht') : r => .4 * r.sht + .6 * A(x.acc != null ? x.acc * .5 : 0, r, 'sht');
+  if (x.wsh != null) o['Wrist Shot Accuracy'] = r => .35 * r.sht + .4 * S(x.wsh, r) + .25 * S(x.acc ?? 0, r);
+  o['Slap Shot Accuracy'] = x.ssh != null ? r => .25 * r.sht + .4 * S(x.ssh, r) + .35 * S(x.acc ?? 0, r) : r => .4 * r.sht + .6 * S(x.acc != null ? x.acc * .5 : 0, r);
   // deking: his scoring rate and high-danger goals (penalties drawn only a little: that's an agitator's role too)
   if (x.p60 != null || x.hdg != null) o['Deking'] = r => .5 * r.hnd + .5 * A((x.p60 ?? 0) * .5 + (x.hdg ?? 0) * .35 + (x.pd ?? 0) * .15, r, 'hnd');
   // hockey sense: scoring rate, shot share with him on the ice, his own time in their end, primary assists
