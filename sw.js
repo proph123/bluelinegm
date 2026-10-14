@@ -7,7 +7,7 @@
 //  - the 3D game, NHL.com look-ups, roster files: not on a phone (404 - the page carries on without them)
 // Updates: a new version is published with a new VERSION; the page's "Check for updates" (GET /api/update) compares
 // version.json with this one, and installing it activates the new worker and reloads (index.html's updInstall).
-const VERSION = '2026.10.14.3';
+const VERSION = '2026.10.14.4';
 const SHELL = 'blgm-shell-' + VERSION, MEDIA = 'blgm-media';
 const BASE = new URL('./', self.location).pathname;   // where the app lives (a GitHub Pages project path, or / locally)
 // a request's path relative to the app: the game asks for /api/..., /photos/... from the site root (as on a PC), which
