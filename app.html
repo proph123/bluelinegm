@@ -1664,7 +1664,14 @@ function wallInfo(x, y) {
 // facing-aware passes/shots, structured AI (zone shapes, coverage, 1-2-2 forecheck, puck protection, dekes, one-timers),
 // rating-driven physical play (poke checks, body checks, nudges, stick checks, with body weight), wrist and slap shots.
 // Same constructor and result() shape as before, so the rest of the app is unchanged.
-const TUNE = { sgate: 0.32, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.0, patience: 0.45, bkw: 2.6, blk: 0.22, pp: 0.5, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5, splace: 1, sspd: 1, lnb: 0.9, bhd: 34, bhs: 1, wsnap: 0.14, msh: 0.05, dfnp: 0.3, gsf: 1 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+// (2026-10-14, as engine.gd: gclr / frzw - loose pucks by the net get played, or whistled; dgap / bkz / bktc - the gap man
+// keeps a carrier coming in past the blue line and backs off facing him into the zone; slotsh / psc - shots from home plate
+// (slotbh: the backhand in tight; slotg: the general shot rate in home plate, the slot rule doing that shooting; psc: perimeter
+// shots given up, 0 now; osb: outside shots put on net more). gapt / gapv / gapl / gaps: a tight gap, ~8 ft through the neutral
+// zone and the blue line (was 9-11), the partner a bit deeper. With them sgate .32 -> .18, goal 1.0 -> 1.03: 300 games 5.96
+// goals, SOG 30.7, sv .907, PP 19.6% (200 before: 5.69, 28.6, .905, 20.4%).
+// Each key at 0 (slotbh / slotg / osb 1, bktc 1.5) is the engine as it was)
+const TUNE = { sgate: 0.18, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.03, patience: 0.45, bkw: 2.6, blk: 0.22, pp: 0.5, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5, splace: 1, sspd: 1, lnb: 0.9, bhd: 34, bhs: 1, wsnap: 0.14, msh: 0.05, dfnp: 0.3, gsf: 1, gclr: 1, frzw: 4.5, dgap: 62, bkz: 86, bktc: 1.2, slotsh: 1.0, psc: 0, slotbh: 0.85, slotg: 0.15, osb: 2.0, gapt: 5.5, gapv: 0.2, gapl: 0.1, gaps: 8 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -2138,7 +2145,15 @@ class HockeyGame {
     this.moveAll(dt, false);
     this.puckPhys(dt, false);
     if (this.phase === 'play') { this.contests(dt); this.processChanges(); }
-    if (this.phase === 'play') { p.idle = p.owner ? 0 : p.idle + dt; if (p.idle > 10) this.whistle(this.nearestDot(p.x, p.y), 'Puck frozen along the boards'); }
+    if (this.phase === 'play') {
+      p.idle = p.owner ? 0 : p.idle + dt;
+      if (p.idle > 10) this.whistle(this.nearestDot(p.x, p.y), 'Puck frozen along the boards');
+      else if ((TUNE.frzw || 0) > 0 && p.idle > TUNE.frzw && !p.shot && hyp(p.vx, p.vy) < 2 && Math.abs(Math.abs(p.x) - 89) < 10 && Math.abs(p.y) < 12) {
+        let nb = 0;
+        for (const e of this.ent) if (!e.isG && hyp(e.x - p.x, e.y - p.y) < 8) nb++;
+        if (nb >= 2) this.whistle(this.nearestDot(p.x, p.y), 'Puck frozen in a scrum');   // (TUNE.frzw, engine.gd: the referee loses sight of a dead puck by a net)
+      }
+    }
     if (this.phase === 'play') this.checkLines();
     if (this.phase === 'play' && this.clock >= this.perLen) this.endPeriod();
   }
@@ -2524,7 +2539,9 @@ class HockeyGame {
     // (a carrier coming at us with speed keeps the gap man on him until the top of the circles; a short-handed box never
     // runs the gap-man rule in its own zone - engine.gd defense)
     const rush = car.vx * d < -12, pkBox = t.sit === 'pk' && t.on.length <= 4;
-    const zoneD = cu < -25 && !(rush && cu > -50) && !pkBox;
+    // (TUNE.dgap ft, engine.gd: a carrier still coming in keeps the gap man on him past our blue line down to that depth)
+    const dgIn = (TUNE.dgap || 0) > 0 && !pkBox && cu < -25 && cu > -TUNE.dgap && car.vx * d < -(TUNE.dgv === undefined ? 3 : TUNE.dgv);
+    const zoneD = cu < -25 && !(rush && cu > -50) && !pkBox && !dgIn;
     let pressers = byDist.slice(0, nPress);
     if (zoneD) {   // in our zone the man on the puck depends on where it is (with hand-offs)
       pressers = this.zonePresser(t, car, defs);
@@ -2551,6 +2568,10 @@ class HockeyGame {
         if (sc < gb) { gb = sc; gapMan = e; }
       }
       if (gapMan) { gapD = clamp(5 + (cu + 25) * 0.3, 4, 16) + hyp(car.vx, car.vy) * 0.12; if (!pressers.includes(gapMan)) pressers.push(gapMan); }
+      // (TUNE.gapt ft, engine.gd: a tight gap - about that much at our blue line against a controlled carrier, more the faster he
+      // comes and a few feet more at the red line, with the 0.25 s aim lead on his path taken back off - TUNE.gapl)
+      const gpt = TUNE.gapt || 0;
+      if (gapMan && gpt > 0) gapD = Math.max(1.5, clamp(gpt + (cu + 25) * 0.16, gpt - 1, gpt + 5) + clamp(hyp(car.vx, car.vy) - 10, 0, 20) * (TUNE.gapv != null ? TUNE.gapv : 0.2) - (TUNE.gapl != null ? TUNE.gapl : 0.25) * Math.max(0, -car.vx * d));
     }
     t.pressIds = pressers.map(e => e.pid);
     // how tight he plays it: on the body down low, a step off on the half-wall, in the shooting lane at the point
@@ -2658,7 +2679,7 @@ class HockeyGame {
   markOn(f, a, gx, d) {
     // goal-side of where he's going to be, a D giving more cushion the faster he's coming (engine.gd _mark_on: odd-man
     // rushes ran ~4 a team-game, mostly with a D 3-15 ft behind the puck)
-    f.mark = a.pid; const spIn = Math.max(0, -a.vx * d), k = 0.28 + (isD(f) ? clamp(spIn / 80, 0, 0.2) : 0);
+    f.mark = a.pid; const spIn = Math.max(0, -a.vx * d), k = 0.28 + (isD(f) ? clamp(spIn / 80, 0, 0.2) + ((TUNE.gapt || 0) > 0 ? (TUNE.gaps || 0) * 0.01 : 0) : 0);   // (TUNE.gaps: a tight gap man's partner gives more cushion)
     const ax = a.x + a.vx * 0.45, ay = a.y + a.vy * 0.3;
     f.tx = ax + (gx - ax) * k; f.ty = ay + (0 - ay) * k;
     if (isD(f) && f.tx * d > 20) f.tx = 20 * d;
@@ -2873,6 +2894,7 @@ class HockeyGame {
       if (inOZ && pr > 6 && prog < 5 && this.shotQ(t, m.x, m.y) < 0.3) val -= 0.12;   // and in their zone: a pass across or back that sets nobody up (as engine.gd, 2026-10)
       if (p.recvT < 0.5 && pr > 7 && !inOZ) val -= 0.2;        // just got it with time: settle it first
       if (m.x * d > 25) val += this.shotQ(t, m.x, m.y) * 1.3;
+      if ((TUNE.slotsh || 0) > 0 && u >= 60 && Math.abs(v) <= 3 + (89 - u) * 0.65 && m.x * d < 55) val -= 0.3;   // (TUNE.slotsh: from the slot, not back out to the point)
       // cross-crease / backdoor / slot feeds: a pass that drags the goalie across leaves him not set for the shot
       if (m.x * d > 55) val += clamp((this.goalieMove(t, m.x, m.y) - 1) / 4, 0, 1) * this.shotQ(t, m.x, m.y) * TUNE.xpass;
       if (u < -25 && m.x * d > u + 10) val += 0.15;
@@ -2996,9 +3018,9 @@ class HockeyGame {
       // a D at the point with a man closing gets it through quickly - a wrister or snap through the traffic, off the catch
       // most of all - rather than ringing it round the boards (engine.gd, TUNE.ptq)
       const ptq = TUNE.ptq || 0;
-      if (atPoint && ptq > 0 && sit === 'ev' && !farPt && shootV > -0.15 && rnd() < ptq * (laneBlocked ? 0.4 : 0.7) * (p.recvT < 0.6 ? 1.25 : 1)) { this.bump('pt_quick'); this.play(e, t, { k: 'shot' }); return; }
+      if (atPoint && ptq > 0 && sit === 'ev' && !farPt && shootV > -0.15 && rnd() < ptq * (laneBlocked ? 0.4 : 0.7) * (p.recvT < 0.6 ? 1.25 : 1) * (1 - (TUNE.psc || 0))) { this.bump('pt_quick'); this.play(e, t, { k: 'shot' }); return; }
       if (best && bestV > -0.05 && pV >= sV - 0.1) { this.bump('bl_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
-      if (inZ && isD(e) && shootV > 0 && !laneBlocked && !farPt && rnd() < (atPoint ? 0.6 : 0.4)) { this.bump('bl_shot'); this.play(e, t, { k: 'shot' }); return; }
+      if (inZ && isD(e) && shootV > 0 && !laneBlocked && !farPt && rnd() < (atPoint ? 0.6 : 0.4) * (1 - (TUNE.psc || 0))) { this.bump('bl_shot'); this.play(e, t, { k: 'shot' }); return; }
       if (atPoint && best && bestV > (sit === 'ev' ? (TUNE.ptout != null ? TUNE.ptout : -0.6) : -0.3)) { this.bump('bl_pass'); this.play(e, t, { k: 'pass', m: best }); return; }
       if (atPoint && pr < 5 && rnd() < (ptq > 0 ? 0.18 : 0.3)) { this.bump('bl_rim'); this.play(e, t, { k: 'chip', kind: 'dump' }); return; }   // around the boards, deep: it stays in
       if (u > 0 && ahead >= 1 && (gassed || this.chaser(e, t)) && rnd() < (inZ ? 0.12 : 0.18) && rnd() > clamp((r.hnd - 62) / 45, 0, 0.4)) { this.bump('bl_dump'); this.play(e, t, { k: 'chip', kind: 'dump' }); return; }
@@ -3012,6 +3034,7 @@ class HockeyGame {
       ps *= (p.recvT < 0.6 ? 1.8 : 1) * (shootTac / 1.4) * (1 + (r.sht - 65) / 80) * clamp(1 + dstyle(e) * 0.05, 0.6, 1.5);
       if (pr < 6) ps *= 0.7;
       if (farPt) ps *= 0.35;
+      ps *= 1 - (TUNE.psc || 0);   // (TUNE.psc: point / perimeter shots given up for the slot ones)
       if (rnd() < 1 - Math.exp(-ps * Math.max(0.12, e.dec))) { this.bump('point_shot'); this.play(e, t, { k: 'shot' }); return; }
     }
     // own zone, deep: rim it up the wall to a winger posted on the boards (beats a forechecker a pass can't get by)
@@ -3028,6 +3051,19 @@ class HockeyGame {
     // set) is shot most of the time within a second; from the outside only now and then; a stick on him ties him up; a D
     // at the point with a lane puts it through (TUNE.dshot). TUNE.sgate scales the volume. (A flat ~2% gate per read used
     // to fall through to a pass: slot chances were passed off or carried away, and most shots came from the point.)
+    // in close (TUNE.slotsh, a rate a second; engine.gd): with it in home plate he gets it off - a quick release, through a
+    // screen, the backhand from in tight; the pass across only to a man clearly better placed and open with the goalie to move
+    const ssh = TUNE.slotsh || 0;
+    if (ssh > 0 && inOZ && u >= 60 && u < 88 && Math.abs(v) <= 3 + (89 - u) * 0.65 && !(e.office > 0)) {
+      const inner = u >= 69 && Math.abs(v) <= 9;
+      const xok = best && best.x * d >= 62 && Math.abs(best.y * d) <= 3 + (89 - best.x * d) * 0.65 && this.laneRisk(t, e.x, e.y, best.x, best.y) >= 3 && this.pressure(best) > 6;
+      if (xok && this.shotQ(t, best.x, best.y) > q + (TUNE.slotx === undefined ? 0.12 : TUNE.slotx) && this.goalieMove(t, best.x, best.y) > 2 && rnd() < 0.75) { this.bump('slot_xpass'); this.play(e, t, { k: 'pass', m: best }); return; }
+      let rs = ssh * (inner ? 1 : 0.45) * (1 + (r.sht - 65) / 100);
+      if (laneBlocked) rs *= 0.55;
+      if (pr < 3) rs *= 0.8;
+      if (rnd() < 1 - Math.exp(-rs * Math.max(0.12, e.dec))) { this.bump('slot_shot'); this.play(e, t, { k: 'shot', tight: inner }); return; }
+      e.dec = Math.min(e.dec, 0.15);
+    }
     let holdShot = false;
     if (shootV > 0 && sV >= pV && sV >= cV) {
       const look = q + (p.rebT > 0 ? 0.15 : 0) + this.goalieOff(t, e.x, e.y) * q * 0.5;
@@ -3036,6 +3072,10 @@ class HockeyGame {
       h *= (shootTac / 1.4) * (1 + (r.sht - 65) / 120);
       if (laneBlocked) h *= 0.3;
       if (pr < 3) h *= look >= 0.36 ? 0.55 : 0.4; else if (pr < 6 && look < 0.36) h *= 0.75;
+      if (!(u >= 60 && Math.abs(v) <= 3 + (89 - u) * 0.65)) {
+        h *= 1 - (TUNE.psc || 0);   // (from outside home plate: TUNE.psc)
+        if (u >= 45 && !(u >= 54 && Math.abs(v) <= 22)) h *= TUNE.osb != null ? TUNE.osb : 1;   // (TUNE.osb: from the outside he puts it on net more)
+      } else if (ssh > 0) h *= TUNE.slotg != null ? TUNE.slotg : 1;   // (in home plate the slot rule does the shooting: TUNE.slotg)
       const hd = h * TUNE.sgate * (freshIn ? 1 + 2 * TUNE.entry : 1);   // (a D at the point has his own shot rate, above)
       if (rnd() < 1 - Math.exp(-hd * Math.max(0.12, e.dec))) { this.play(e, t, { k: 'shot' }); return; }
       holdShot = look >= 0.3 && !laneBlocked;   // a look worth shooting isn't given away: he shoots at the next read
@@ -3154,7 +3194,7 @@ class HockeyGame {
     // from the point.
     if ((pd.k === 'shot' || pd.k === 'pass') && this.backhand(e, tg.x, tg.y)) {
       // (TUNE.bhs / bhd, engine.gd: in range a shooter with the hands for it takes the backhand more often than one in ten)
-      const toFh = pd.k === 'shot' && (TUNE.bhs || 0) > 0 ? 1 - clamp(0.25 + (e.R.hnd - 60) / 70, 0.15, 0.6) * TUNE.bhs : 0.9;
+      const toFh = (pd.k === 'shot' && (TUNE.bhs || 0) > 0 ? 1 - clamp(0.25 + (e.R.hnd - 60) / 70, 0.15, 0.6) * TUNE.bhs : 0.9) * (pd.tight && TUNE.slotbh != null ? TUNE.slotbh : 1);   // (in tight, TUNE.slotsh / slotbh: the backhand now more often)
       if ((pd.k === 'shot' && hyp(tg.x - e.x, tg.y - e.y) > (TUNE.bhd || 26)) || (this.pressure(e) > 3 && rnd() < toFh)) pd.fh = true;
     }
     if (!pd.fh && this.facing(e, tg, pd.k === 'shot' ? 1.25 : 1.75)) { this.execPlay(e, t, pd); return; }
@@ -3940,7 +3980,8 @@ class HockeyGame {
     for (const t of this.T) {
       if (t.pulled) continue;
       const g = t.g;
-      if (spd < 35 && g.cool <= 0 && hyp(g.x - p.x, g.y - p.y) < 3.2 && p.x * t.d < -89.5) { this.goaliePlay(g, t); return; }   // behind his net: he plays it (can't cover it there)
+      const gcl = (TUNE.gclr || 0) > 0;   // (and from the goal line back: between -89 and -89.5 he could neither cover it nor play it)
+      if (spd < 35 && g.cool <= 0 && hyp(g.x - p.x, g.y - p.y) < (gcl ? 3.6 : 3.2) && p.x * t.d < (gcl ? -89 : -89.5)) { this.goaliePlay(g, t); return; }   // behind his net: he plays it (can't cover it there)
       // freezing it: only in front of his goal line, around the crease (behind the line it's delay of game: he plays it)
       if (spd < 14 && hyp(g.x - p.x, g.y - p.y) < 3.2 && p.x * t.d > -89 && p.x * t.d < -80 && Math.abs(p.y) < 9) {
         // with nobody of theirs near he moves it to an open D instead of covering it (that alone made 8-10 whistles a game)
@@ -4107,17 +4148,35 @@ class HockeyGame {
   // through the goalie goes round him (the user's screenshot, 2026-10: a D glued to his own goalie's side with the play at
   // the blue line - the net-front spots fell inside the goalie, ~10 times a game)
   clearGoalie(e, wp) {
-    const GC = 4.4;
+    const GC = 4.4, p = this.puck;
+    // (TUNE.gclr, engine.gd: a man going for a loose puck lying by the goalie takes it from the far side of the puck, round
+    // the back of the net or a step at a time round the front of the goalie - moved out front, nobody could reach it)
+    const lp = (TUNE.gclr || 0) > 0 && !p.owner && !p.shot && hyp(wp.x - p.x, wp.y - p.y) < 2.5;
     for (const t of this.T) {
       const g = t.g;
       if (!g || t.pulled || hyp(g.x + t.d * 85, g.y) > 7) continue;
       let vx = wp.x - g.x, vy = wp.y - g.y; const d = hyp(vx, vy);
-      if (d < GC) {
+      const gpl = hyp(p.x - g.x, p.y - g.y);
+      if (lp && d < GC && gpl >= 2) {
+        const k = Math.max(1.2, 3.6 - gpl); wp = { x: p.x + (p.x - g.x) / gpl * k, y: p.y + (p.y - g.y) / gpl * k };
+      } else if (d < GC) {
         const side = Math.abs(vy) > 0.3 ? Math.sign(vy) : (Math.abs(e.y - g.y) > 0.1 ? Math.sign(e.y - g.y) : 1);
         if (vx * t.d < 0.3 || d < 0.05) { vx = t.d * 0.8; vy = side * 0.6; }   // behind him or on top of him: out front, on his side
         const n = hyp(vx, vy) || 1; wp = { x: g.x + vx / n * GC, y: g.y + vy / n * GC };
       }
       const sd = segDist(g.x, g.y, e.x, e.y, wp.x, wp.y);
+      if (lp) {
+        const gx0 = -t.d * 89, sg0 = -t.d, es = sg0 * (e.x - gx0);
+        if (es > 0.5 && es < 6 && Math.abs(e.y) < 7 && Math.abs(wp.y) < 7 && Math.sign(e.y) !== Math.sign(wp.y) && sg0 * (wp.x - gx0) < 6) return { x: gx0 + sg0 * 6.8, y: wp.y * 0.4 };
+        if (sd[0] < 3.4 && sd[1] > 0.05 && sd[1] < 0.95 && hyp(e.x - g.x, e.y - g.y) > 3.0) {
+          const ae = Math.atan2(e.y - g.y, e.x - g.x), at = Math.atan2(wp.y - g.y, wp.x - g.x), af = t.d > 0 ? 0 : Math.PI;
+          let df = hgWrap(at - ae); const back = hgWrap(af + Math.PI - ae);
+          if (Math.sign(back) === Math.sign(df) && Math.abs(back) < Math.abs(df)) df -= Math.sign(df) * 2 * Math.PI;
+          const a = ae + clamp(df, -0.8, 0.8);
+          return { x: g.x + Math.cos(a) * (GC + 0.3), y: g.y + Math.sin(a) * (GC + 0.3) };
+        }
+        continue;
+      }
       if (sd[0] < 3.4 && sd[1] > 0.05 && sd[1] < 0.95 && hyp(e.x - g.x, e.y - g.y) > 3.4) {
         const s = Math.abs(e.y - g.y) > 0.2 ? Math.sign(e.y - g.y) : (Math.abs(wp.y - g.y) > 0.2 ? Math.sign(wp.y - g.y) : 1);
         return { x: g.x + t.d * 3, y: g.y + s * (GC + 0.6) };   // round the front of him, his own side first
@@ -4290,7 +4349,8 @@ class HockeyGame {
     }
     const tox = p.x - e.x, toy = p.y - e.y, dpk = hyp(tox, toy), dsg = this.T[e.team].d, bsp = hyp(e.vx, e.vy);
     const ownM = hyp(pc.x + dsg * 89, pc.y) - hyp(e.x + dsg * 89, e.y);   // how far nearer our net he is than the carrier
-    if (!(bsp > 3 && dpk < 60 && e.vx * tox + e.vy * toy < -0.35 * bsp * dpk && e.x * dsg > -66 && ownM > 3)) {
+    const bkz = TUNE.bkz || 0;   // (TUNE.bkz ft: how deep into our zone he still backs off facing the play; 66 when 0)
+    if (!(bsp > 3 && dpk < 60 && e.vx * tox + e.vy * toy < -0.35 * bsp * dpk && e.x * dsg > -(bkz > 0 ? bkz : 66) && ownM > 3)) {
       if (e.bkg) { e.bkl = (e.bkl || 0) + dt; if (e.bkl < (e.bkp > 0 ? 1 : 0.3)) return; }   // off it for a moment: keeps the state
       e.bkp = 0; e.bkn = 0; e.bkl = 0; e.bkg = false; return;
     }
