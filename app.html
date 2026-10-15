@@ -211,6 +211,11 @@ tr.cutline td { border-bottom: 2px solid var(--blue) }
 td.b { font-weight: 700 }
 .ln { padding: 10px 0; border-bottom: 1px solid var(--line) } .ln-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px } .ln-h b { font-family: var(--f-display); font-size: 16px } .ln-h small { color: var(--muted); font-size: 12px } .ln-meta { margin-left: auto; display: flex; gap: 6px; align-items: center }
 .ln-cards { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 8px } @media (max-width: 760px) { .ln-cards { grid-template-columns: 1fr } }
+/* the chemistry link from a skater to his right-hand linemate (the line-up card, 2026-10-15): green a creator with a finisher or net-front man, blue a fit, yellow the same type, red two men bringing the same non-scoring thing */
+.ln-cards > .lc[class*="lk-"]::after { content: ''; position: absolute; right: -11px; top: calc(50% - 2px); width: 14px; height: 4px; border-radius: 2px; z-index: 3; pointer-events: none }
+.ln-cards > .lc.lk-good::after { background: #22c55e; height: 5px; top: calc(50% - 2.5px) } .ln-cards > .lc.lk-ok::after { background: #60a5fa } .ln-cards > .lc.lk-avg::after { background: #eab308 } .ln-cards > .lc.lk-bad::after { background: #ef4444 }
+@media (max-width: 760px) { .ln-cards > .lc[class*="lk-"]::after { display: none } }
+.lc-offp { font-style: normal; color: #f87171; font-weight: 600 }
 .lc { position: relative; display: flex; align-items: center; gap: 9px; padding: 7px 9px 7px 6px; min-width: 0; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); border-left: 4px solid var(--c1, var(--blue)); cursor: grab; user-select: none; transition: transform .12s, border-color .12s, box-shadow .12s }
 .lc:hover { transform: translateY(-1px); border-color: color-mix(in srgb, var(--blue) 45%, var(--line)) } .lc.over { border-color: var(--blue); box-shadow: 0 0 0 3px color-mix(in srgb, var(--blue) 35%, transparent) } .lc.picked { border-color: var(--warn); box-shadow: 0 0 0 3px color-mix(in srgb, var(--warn) 40%, transparent) } .lc.dragging { opacity: .4 }
 .lc.off { border-color: color-mix(in srgb, var(--bad) 60%, var(--line)); border-left-color: var(--bad) } .lc.inj { opacity: .55; cursor: default } .lc.empty { border-style: dashed; cursor: pointer; min-height: 52px } .lc-empty { color: var(--muted); font-size: 13px }
@@ -1671,7 +1676,7 @@ function wallInfo(x, y) {
 // zone and the blue line (was 9-11), the partner a bit deeper. With them sgate .32 -> .18, goal 1.0 -> 1.03: 300 games 5.96
 // goals, SOG 30.7, sv .907, PP 19.6% (200 before: 5.69, 28.6, .905, 20.4%).
 // Each key at 0 (slotbh / slotg / osb 1, bktc 1.5) is the engine as it was)
-const TUNE = { sgate: 0.18, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.07, patience: 0.45, bkw: 2.6, blk: 0.22, pp: 0.5, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5, splace: 1, sspd: 1, lnb: 0.9, bhd: 34, bhs: 1, wsnap: 0.14, msh: 0.05, dfnp: 0.3, gsf: 1, gclr: 1, frzw: 4.5, dgap: 62, bkz: 86, bktc: 1.2, slotsh: 1.0, psc: 0, slotbh: 0.85, slotg: 0.15, osb: 2.0, gapt: 5.5, gapv: 0.2, gapl: 0.1, gaps: 8, dpow: 1, dacc: 1, dspd: 1, dblk: 1, dstk: 1 };   // (2026-10-15, dpow / dacc / dspd / dblk / dstk: the measured detail ratings in play, engine.gd; shots on net went in ~4% less often with them, planned sh% .0895 -> .0857 over 560 paired games, so goal 1.03 -> 1.07 - each key at 0 with goal 1.03 is the engine as it was) (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.18, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.07, patience: 0.45, bkw: 2.6, blk: 0.22, pp: 0.5, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5, splace: 1, sspd: 1, lnb: 0.9, bhd: 34, bhs: 1, wsnap: 0.14, msh: 0.05, dfnp: 0.3, gsf: 1, gclr: 1, frzw: 4.5, dgap: 62, bkz: 86, bktc: 1.2, slotsh: 1.0, psc: 0, slotbh: 0.85, slotg: 0.15, osb: 2.0, gapt: 5.5, gapv: 0.2, gapl: 0.1, gaps: 8, dpow: 1, dacc: 1, dspd: 1, dblk: 1, dstk: 1, dfspot: 0, ott: 0, otap: 0 };   // (2026-10-15, dpow / dacc / dspd / dblk / dstk: the measured detail ratings in play, engine.gd; shots on net went in ~4% less often with them, planned sh% .0895 -> .0857 over 560 paired games, so goal 1.03 -> 1.07 - each key at 0 with goal 1.03 is the engine as it was) (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -3296,10 +3301,13 @@ class HockeyGame {
     // so he one-times from the left side, and the reverse for a left shot)
     const rp = hgWrap(Math.atan2(e.y - ty, e.x - tx) - Math.atan2(-ty, t.d * 89 - tx));
     const onFh = (this.P[m.pid].sh || 'R') !== 'L' ? rp < 0.25 : rp > -0.25;
-    if (onFh && ((mu > 40 && mq > 0.3) || mPoint) && this.pressure(m) > 5) {
+    // (TUNE.ott degrees, engine.gd: only when he's already turned roughly to the net as it's passed; facing the passer or the boards he takes it and shoots)
+    const mFaces = !((TUNE.ott || 0) > 0) || Math.abs(hgWrap(m.hd - Math.atan2(-m.y, t.d * 89 - m.x))) <= TUNE.ott * Math.PI / 180;
+    if (onFh && mFaces && ((mu > 40 && mq > 0.3) || mPoint) && this.pressure(m) > 5) {
       let want = clamp((m.R.sht - 55) / 160 + mq * 0.25, 0.03, 0.4);
       if (mPoint) want = clamp((m.R.sht - 55) / 200, 0.02, 0.2);   // point one-timers: the shooters with a big shot
       if ('bomb' in m.X && isD(m)) want = Math.min(0.55, want + 0.15);
+      if ((TUNE.ott || 0) > 0) want *= TUNE.ottw ?? 1;   // (only the men turned to the net get one now: they look for it more)
       if (rnd() < want) { p.pass_info.ot = true; this.bump('one_timer_setup'); }
     }
   }
@@ -3424,6 +3432,7 @@ class HockeyGame {
     const bkwShot = e.bkw && this.pressure(e) > 7;
     if (bkwShot) { pGoal *= TUNE.bkw; pMiss = Math.max(0.1, pMiss - 0.08); this.bump('bkw_shot'); }   // alone on the goalie
     if (e.one_t) { pGoal *= 1.4; pMiss = Math.min(0.5, pMiss + 0.06); } else if (ot_) pGoal *= 1.25;
+    const otShot = e.one_t;   // (TUNE.otap, engine.gd ot_shot: the type label reads it after the reset - a one-timer in tight was never a "tap")
     e.one_t = false;
     const X = e.X, GX = o.g.X;
     if ('laser' in X) pGoal *= xs(X.laser, 1.1);
@@ -3466,11 +3475,11 @@ class HockeyGame {
     if ((TUNE.msh || 0) > 0) pMiss = Math.max(0.06, pMiss - TUNE.msh);   // (fewer plain misses: the deflections off bodies on the line are the misses now, engine.gd)
     let outcome = blocker ? 'block' : tipper ? 'tip' : rnd() < pMiss ? (rnd() < 0.08 ? 'post' : 'miss') : rnd() < pGoal ? 'goal' : 'save';   // some misses ring off the iron (a couple a game)
     if (outcome === 'block' && onLine && (blocker.team === t.side || rnd() < 0.3)) outcome = 'deflect';
-    const label = slapT ? (e.one_t && gdist < 22 ? 'tap' : 'slap') : bh ? 'backhand' : snap ? 'snap' : 'wrist';
+    const label = slapT ? (((TUNE.otap || 0) > 0 ? otShot : e.one_t) && gdist < 22 ? 'tap' : 'slap') : bh ? 'backhand' : snap ? 'snap' : 'wrist';
     let sp = (70 + s * 0.3) * (slapT ? 1.16 : bh ? 0.85 : snap ? 1.05 : 1);
     // (TUNE.dpow, engine.gd: how hard by that kind's own power - a slapper off his slap-shot power, the rest his wrist-shot power - on the GM app's scale, not the compressed one)
     const pk = slapT ? 'dsp' : 'dwp', pw = (TUNE.dpow || 0) > 0 && r[pk] != null ? (65 + (hgDet(r, pk, 'sht', TUNE.dpow) - 65) / Math.max(TUNE.comp, 0.05)) * (0.9 + 0.1 * en) : s;
-    if ((TUNE.sspd || 0) > 0) sp = this.shotSpeed(e, label, pw, false);
+    if ((TUNE.sspd || 0) > 0) sp = this.shotSpeed(e, label, pw, (TUNE.otap || 0) > 0 && otShot);
     let ty = 0, tz = 0.5, saveK = '';
     const ak = (TUNE.dacc || 0) > 0 ? clamp((sa - 64) / 12, -1, 1) : 0;   // (TUNE.dacc: how near the corners his goals and how near the net his misses go)
     if ((TUNE.splace || 0) > 0) { const tg = this.shotTarget(outcome, e, t, o, gdist / Math.max(sp, 30), ak); ty = tg[0]; tz = tg[1]; saveK = tg[2]; }
@@ -3478,7 +3487,7 @@ class HockeyGame {
     else if (outcome === 'save') { ty = o.g.y + (rnd() - 0.5) * 2; tz = rnd() * 2.5; }
     else if (outcome === 'miss') { ty = (rnd() < 0.5 ? -1 : 1) * (3.6 + rnd() * 4); tz = rnd() * 4; }
     else if (outcome === 'post') { ty = (rnd() < 0.5 ? -1 : 1) * 3; tz = rnd() * 4.3; }
-    return { q, outcome, blocker, bt, tipper, sp, ty, tz, reb, bkw: bkwShot, tip: !!e.tip_shot, type: label, save_k: saveK };
+    return { q, outcome, blocker, bt, tipper, sp, ty, tz, reb, bkw: bkwShot, tip: !!e.tip_shot, type: label, save_k: saveK, pm: pMiss, pg: pGoal, ak };   // (pm / pg / ak: the rolls a block or deflection skipped - shotFire, TUNE.dfspot)
   }
   // how hard it comes off his stick (engine.gd _shot_speed, TUNE.sspd): mph by type over his shooting, +-4%; a tip keeps 70-85%
   shotSpeed(e, label, s, ot) {
@@ -3559,6 +3568,20 @@ class HockeyGame {
   // the release: the puck leaves his blade on the planned shot
   shotFire(e, t, pl) {
     const p = this.puck, gx = t.d * 89;
+    // (TUNE.dfspot x lnb ft, engine.gd) a block or deflection settled at the decision is off the man where he is at the release, on the
+    // puck's real line, if he's still within dfspot * lnb of it; moved off it, the lane's clear and the shot takes the rolls it skipped
+    if ((TUNE.dfspot || 0) > 0 && (pl.outcome === 'deflect' || pl.outcome === 'block') && pl.blocker && !pl.tip) {
+      const bk = pl.blocker, hb0 = segDist(bk.x, bk.y, p.x, p.y, gx, pl.ty), tf = hb0[1] * hyp(gx - p.x, pl.ty - p.y) / Math.max(pl.sp, 30);   // (where he'll be when it gets to him)
+      const hb = segDist(bk.x + bk.vx * tf, bk.y + bk.vy * tf, p.x, p.y, gx, pl.ty);
+      if (hb[0] < TUNE.lnb * TUNE.dfspot && hb[1] > 0.02 && hb[1] < 0.95 && !bk.leaving && !(bk.stun > 0) && (bk.team === t.side || this.T[1 - t.side].on.includes(bk))) { pl.bt = hb[1]; this.bump('blk_spot'); }
+      else {
+        this.bump('blk_gone'); pl.blocker = null; pl.bt = 1;
+        if (pl.tipper && this.T[t.side].on.includes(pl.tipper)) pl.outcome = 'tip';
+        else if (rnd() < (pl.pm ?? 0.3)) pl.outcome = rnd() < 0.08 ? 'post' : 'miss';
+        else pl.outcome = rnd() < (pl.pg ?? 0.1) ? 'goal' : 'save';
+        if ((TUNE.splace || 0) > 0 && pl.outcome !== 'tip') { const tg2 = this.shotTarget(pl.outcome, e, t, this.T[1 - t.side], hyp(gx - e.x, e.y) / Math.max(pl.sp, 30), pl.ak || 0); pl.ty = tg2[0]; pl.tz = tg2[1]; pl.save_k = tg2[2]; }
+      }
+    }
     // (TUNE.lnb, engine.gd) at the release, on the line it actually takes to where it's aimed: a body on it is hit
     // (he often picks another lane to the same kind of spot when one's clear; otherwise it hits the man)
     if ((TUNE.lnb || 0) > 0 && !pl.tip && ['save', 'goal', 'miss', 'post'].includes(pl.outcome)) {
@@ -4957,48 +4980,87 @@ function goalRec(p) {
   ys.forEach((y, i) => { g += W[i] * by[y][0]; a += W[i] * by[y][1]; gp += W[i] * by[y][2]; });
   return g + a >= 25 && gp > 0 ? { s: g / (g + a), ppg: (g + a) / gp } : null;
 }
-// chemistry for a set of players on one unit; returns {score 0-100, notes:[[text,+/-]]}. Only two things count (the
-// user's call): how the players' styles fit together, and whether each is playing a position he plays. (Familiarity,
+// chemistry for a set of players on one unit; returns {score 0-100, notes:[[text,+/-]], roles, links}. Two things count
+// (the user's call): how the players' games fit together, and whether each is playing a position he plays. (Familiarity,
 // handedness, leadership, countrymen and skating pace were tried and taken out.)
+// SKILL-BASED ROLES (the user's pick, 2026-10-15, "option B"): what each player brings is read from his skills, not his
+// one style label - a forward creates (passing, hands), finishes (shot), works the net front (size, checking, shot) or
+// retrieves pucks (skating, checking); a defenseman moves the puck (passing, skating, hands) or shuts down (defence,
+// checking). Each is a z-score against the NHL's forwards / defensemen; his roles are his best one and any within .35 of
+// it. A forward line needs someone to create and someone to finish (by different players for the feed), and a net-front
+// or retrieving third man; a pair wants a mover with a shutdown partner. Best line 66, best pair 62 - the old maximums -
+// so the sim's chemistry weight (engineTeam, teamStrength) moves the game as much as before
+const ROLE_F = { create: r => .6 * r.pas + .4 * r.hnd, finish: r => .75 * r.sht + .25 * r.hnd, net: (r, p) => .4 * (p.ht && p.wt ? 62 + (p.wt - 200) * .5 + (p.ht - 73) * 1.2 : 62) + .3 * r.chk + .3 * r.sht, retrieve: r => .5 * r.ska + .3 * r.chk + .2 * r.hnd };
+const ROLE_D = { move: r => .4 * r.pas + .3 * r.ska + .3 * r.hnd, shut: r => .6 * r.def + .4 * r.chk };
+const ROLE_LAB = { create: 'Creates', finish: 'Finishes', net: 'Net front', retrieve: 'Retrieves', move: 'Moves the puck', shut: 'Shuts down' };
+let ROLE_C = null;
+function roleNorms() {
+  const key = L ? L.season + ':' + Object.keys(L.players).length : '';
+  if (ROLE_C && ROLE_C.key === key) return ROLE_C;
+  const o = { key }, reg = L ? Object.values(L.players).filter(q => q.tid >= 0 && q.pos !== 'G' && q.r && !q.prospect && L.where(q) === 'roster') : [];
+  for (const [g, RR] of [['F', ROLE_F], ['D', ROLE_D]]) {
+    const ps = reg.filter(q => (q.pos === 'D') === (g === 'D'));
+    for (const k in RR) { const v = ps.map(q => RR[k](q.r, q)), mu = v.length ? v.reduce((s, x) => s + x, 0) / v.length : 65, sd = v.length ? Math.sqrt(v.reduce((s, x) => s + (x - mu) ** 2, 0) / v.length) || 6 : 6; o[g + k] = [mu, sd]; }
+  }
+  return ROLE_C = o;
+}
+function rolesOf(p) {
+  const g = p.pos === 'D' ? 'D' : 'F', RR = g === 'D' ? ROLE_D : ROLE_F, N = roleNorms(), z = {};
+  for (const k in RR) { const ns = N[g + k] || [65, 6]; z[k] = (RR[k](p.r, p) - ns[0]) / ns[1]; }
+  const ks = Object.keys(z).sort((a, b) => z[b] - z[a]);
+  return { z, top: ks.filter((k, i) => i === 0 || (i === 1 && z[k] >= z[ks[0]] - .35)) };
+}
 function chemistryOf(ps, slots) {
-  const a = ps.map(p => p ? (p.arch || archOf(p)) : null);
   let s = 50; const notes = [];
   const add = (v, t) => { s += v; notes.push([t, v]); };
-  const has = k => a.filter(x => x === k).length;
+  let roles, links = [];
   if (slots === 'F') {
     // (a forward line's chemistry is its offensive chemistry only - how it creates and finishes - and it only moves the
     // line's offence (engineTeam, teamStrength). 2026-10, the user: three two-way forwards are a shutdown line, not a bad
-    // one; the defensive-conscience and two-way-centre bonuses came out, and their own defensive game carries them)
-    const shooters = has('Sniper') + has('Power Forward'), makers = has('Playmaker');
-    if (shooters && makers) add(12, 'Playmaker feeding a shooter');
-    if (!shooters) add(-8, 'No finisher on the line');
-    if (!makers && !has('Two-Way F')) add(-6, 'Nobody to create chances');
-    if (has('Sniper') >= 3 || has('Playmaker') >= 3) add(-8, 'Three of the same style');
-    if (has('Enforcer') >= 2) add(-6, 'Two enforcers on one line');
-    if (has('Power Forward') && has('Playmaker')) add(4, 'Net-front presence');
-    if (a.filter(x => x === 'Grinder' || x === 'Power Forward' || x === 'Enforcer').length === 3) add(4, 'Heavy, forechecking unit');
+    // one, so defending earns no chemistry here; their own defensive game carries them)
+    roles = ps.map(p => p && p.pos !== 'D' && p.r ? rolesOf(p) : null);
+    // (a role counts in full when it's one of his roles AND he's clearly above the NHL's forwards at it, z .5; half when
+    // he's at least average at it. Counted as any role at all, auto-set made 69% of the league's lines green - nearly
+    // every forward has a "best" thing; this way depth lines of ordinary players read average, the league mean is 55
+    // against the old system's 54, so the sim's chemistry weight is unchanged)
+    const full = k => roles.map((x, i) => x && x.top.includes(k) && x.z[k] >= .5 ? i : -1).filter(i => i >= 0), part = k => roles.map((x, i) => x && x.z[k] >= 0 ? i : -1).filter(i => i >= 0);
+    const cr = full('create'), fi = full('finish');
+    if (cr.length) add(5, 'A playmaker to create chances'); else if (part('create').length) add(2, 'Some playmaking'); else add(-6, 'Nobody to create chances');
+    if (fi.length) add(5, 'A finisher'); else if (part('finish').length) add(2, 'Some finishing'); else add(-8, 'No finisher on the line');
+    if (cr.some(i => fi.some(j => j !== i))) add(2, 'Playmaker feeding a shooter');
+    const busy = new Set([...cr, ...fi]);
+    const sup = ['net', 'retrieve'].filter(k => full(k).some(i => !busy.has(i)));
+    if (sup.length) add(4, sup.includes('net') ? 'Net-front presence' : 'Retrieves pucks on the forecheck');
+    const p0 = roles.filter(Boolean).map(x => x.top[0]);
+    if (p0.length === 3 && p0[0] === p0[1] && p0[1] === p0[2]) add(-6, 'Three of the same type');
     // positions: the slots are [C, LW, RW]
     ['C', 'LW', 'RW'].forEach((slot, i) => {
       const p = ps[i]; if (!p) return;
       if (p.pos === 'D') add(-6, p.last + ': a defenseman playing forward');
       else if (!plays(p, slot)) add(slot === 'C' ? -5 : -3, p.last + (slot === 'C' ? ': a natural winger at centre' : ': not his wing (plays ' + posLab(p) + ')'));
     });
+    // the links the Lines page draws between linemates (LW-C, C-RW): a creator with a finisher or a net-front man is the
+    // good one; two men who bring the same thing and neither creates nor finishes, the weak one
+    const fit = (a, b) => { const A = roles[a], B = roles[b]; if (!A || !B) return null; const h = (x, k) => x.top.includes(k);
+      if ((h(A, 'create') && (h(B, 'finish') || h(B, 'net'))) || (h(B, 'create') && (h(A, 'finish') || h(A, 'net')))) return 'good';
+      if (A.top[0] === B.top[0] && !['create', 'finish'].includes(A.top[0])) return 'bad';
+      return A.top[0] === B.top[0] ? 'avg' : 'ok'; };
+    links = [fit(1, 0), fit(0, 2)];
   } else {
-    const o = has('Offensive D'), d = has('Defensive Defenseman') + has('Enforcer D');
-    if (o && d) add(14, 'Offensive + defensive partner');
-    if (o >= 2) add(-8, 'Both partners jump into the play');
-    if (d >= 2) add(-4, 'No puck mover on the pair');
-    // (a two-way D balances a specialist partner - good; two two-way D are steady but nothing more. At +5 for any two-way
-    // D, 95% of the league's pairs read green)
-    const tw = has('Two-Way D');
-    if (tw === 1 && (o || d)) add(9, 'Two-way partner balances a specialist'); else if (tw) add(5, 'Steady two-way pair');
+    roles = ps.map(p => p && p.pos === 'D' && p.r ? rolesOf(p) : null);
+    const R2 = roles.filter(Boolean), mv = R2.filter(x => x.top[0] === 'move').length, sh = R2.filter(x => x.top[0] === 'shut').length, both = R2.filter(x => x.top.length === 2).length;
+    if (mv === 1 && sh === 1) add(12, 'Puck mover with a shutdown partner');
+    else if (mv === 2) { if (both) add(4, 'Two puck movers, one can defend'); else add(-8, 'Both partners jump into the play'); }
+    else if (sh === 2) { if (both) add(4, 'Two defenders, one can move it'); else add(-4, 'No puck mover on the pair'); }
     ps.forEach(p => { if (p && p.pos !== 'D') add(-8, p.last + ': a forward playing defense'); });
+    const A = roles[0], B = roles[1];
+    links = [!A || !B ? null : A.top[0] !== B.top[0] ? 'good' : (A.top.length === 2 || B.top.length === 2) ? 'ok' : A.top[0] === 'move' ? 'bad' : 'avg'];
   }
-  return { score: Math.max(0, Math.min(100, Math.round(s))), notes };
+  return { score: Math.max(0, Math.min(100, Math.round(s))), notes, roles, links };
 }
-// the best score a unit can reach (the bar is full there): a Playmaker with a Sniper and a Power Forward, all on their own
-// sides, 66; an offensive D with a defensive partner, 64
-const CHEM_MAX = { F: 66, D: 64 };
+// the best score a unit can reach (the bar is full there): a playmaker, a finisher and a net-front or retrieving third
+// man, all on their own sides, 66; a puck mover with a shutdown partner, 62
+const CHEM_MAX = { F: 66, D: 62 };
 // a unit's chemistry as EA NHL shows it, +0 to +5: +5 at the best possible score, a step every 4 points below it
 const chemPlus = ch => Math.max(0, Math.min(5, Math.round(5 - (CHEM_MAX[ch.k || 'F'] - ch.score) / 4)));
 // Display rating scale (75-99 style). Internal ratings stay as-is; OVR/POT are shown through dispR().
@@ -16183,14 +16245,14 @@ function vLines() {
   const minor = tab === 'ahl' || tab === 'echl', minorList = tab === 'ahl' ? L.ahlOf(t) : tab === 'echl' ? L.echlOf(t) : [];
   const minorLines = minorList.length ? L.autoLines(t, minorList) : { F: [], D: [], G: [] };
   const slotPos ={ LW: 'LW', C: 'C', RW: 'RW', LD: 'D', RD: 'D', F: 'C', D: 'D', G: 'G' };
-  const pcard = (p, pos, attrs, extra, ro, acts) => {
+  const pcard = (p, pos, attrs, extra, ro, acts, rnote) => {
     const sp = slotPos[pos] || p.pos, o = R(sp === 'G' ? p.ovr : ovrOf(p, sp));
     const off = sp !== 'G' && (sp === 'D') !== (p.pos === 'D');
     // (under the name: his position and play style, short, with the full style on hover)
     const ar = p.arch || archOf(p), note = p.inj ? 'Injured · ' + injLen(p) : posLab(p) + ' · ' + (ARCH_AB[ar] || ar);
     // (his X-factors as small tier-coloured icons under the line - Bronze, Silver, Gold - the name and what it does on hover)
     const xfs = (p.xf || []).filter(k => XF[k]), xfRow = xfs.length ? `<span class="lc-xf">${xfs.map(k => { const tr = xfTier(p, k); return xfBadge(k, tr, 24, XF[k].name + ' (' + XF_TIERS[tr] + '): ' + XF[k].d); }).join('')}</span>` : '';
-    return `<div class="lc${off ? ' off' : ''}${p.inj ? ' inj' : ''}${extra || ''}" ${p.inj || ro ? '' : 'draggable="true"'} data-pid="${p.id}" ${attrs}><span class="lc-pos">${pos}</span><span class="lc-face">${faceSVG(p, t, 42)}</span><span class="lc-nm"><b>${esc(p.last)}${capB(p)}</b><small>${esc(note)}</small>${xfRow}</span><span class="ovr ${ovrCls(o)} ${rvCls(o)}">${o}</span>${acts ? `<span class="lc-acts">${acts}</span>` : ''}</div>`;
+    return `<div class="lc${off ? ' off' : ''}${p.inj ? ' inj' : ''}${extra || ''}" ${p.inj || ro ? '' : 'draggable="true"'} data-pid="${p.id}" ${attrs}><span class="lc-pos">${pos}</span><span class="lc-face">${faceSVG(p, t, 42)}</span><span class="lc-nm"><b>${esc(p.last)}${capB(p)}</b><small>${p.inj || rnote == null ? esc(note) : rnote}</small>${xfRow}</span><span class="ovr ${ovrCls(o)} ${rvCls(o)}">${o}</span>${acts ? `<span class="lc-acts">${acts}</span>` : ''}</div>`;
   };
   // roster moves right on the cards (shown on hover): send a scratch down, call AHL players up, move between AHL and ECHL
   const mv = (act, pid, lab, tip) => `<button class="lc-mv" data-act="${act}" data-pid="${pid}" title="${esc(tip)}">${lab}</button>`;
@@ -16199,7 +16261,17 @@ function vLines() {
     const picked = pick && pick.g === g && pick.i === i && pick.j === j ? ' picked' : '';
     // one healthy goalie dresses as starter and backup both: say so instead of showing him twice
     if (g === 'G' && i === 1 && id && id === Ln.G[0]) return `<div class="lc empty${picked}" ${at}><span class="lc-pos">G</span><span class="lc-empty neg">No backup: call up or sign a goalie</span></div>`;
-    return p ? pcard(p, pos, at, picked) : `<div class="lc empty${picked}" ${at}><span class="lc-pos">${pos}</span><span class="lc-empty">Empty slot</span></div>`;
+    // (the line-up card, the user's pick 2026-10-15: under each skater what he brings to this unit - his skill-based role -
+    // and a red tag when he's off his natural position; a link to his right-hand linemate coloured by how they fit)
+    let lk = '', rn;
+    if (p && (g === 'F' || g === 'D') && CH[g][i]) {
+      const ch = CH[g][i], ro = ch.roles && ch.roles[j], link = g === 'F' ? (j === 1 ? ch.links[0] : j === 0 ? ch.links[1] : null) : (j === 0 ? ch.links[0] : null);
+      if (link) lk = ' lk-' + link;
+      const offPos = g === 'F' ? (p.pos === 'D' || !plays(p, pos)) : p.pos !== 'D';
+      const rk = ro ? ro.top.filter(k => ro.z[k] >= 0) : [];
+      rn = esc(posLab(p)) + (ro ? ' · ' + (rk.length ? ROLE_LAB[rk[0]] : 'Depth') : '') + (offPos ? ` <i class="lc-offp">${g === 'D' ? 'not a D' : pos === 'C' ? 'not a C' : 'off his wing'}</i>` : '');
+    }
+    return p ? pcard(p, pos, at, picked + lk, false, undefined, rn) : `<div class="lc empty${picked}" ${at}><span class="lc-pos">${pos}</span><span class="lc-empty">Empty slot</span></div>`;
   };
   const CH = L.lineChem(t); CH.F.forEach(c => c.k = 'F'); CH.D.forEach(c => c.k = 'D');
   const unitOvr = ids => { const v = ids.filter(id => P[id]); return v.length ? R(Math.round(v.reduce((s, id) => s + P[id].ovr, 0) / v.length)) : '—'; };
