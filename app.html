@@ -1671,7 +1671,7 @@ function wallInfo(x, y) {
 // zone and the blue line (was 9-11), the partner a bit deeper. With them sgate .32 -> .18, goal 1.0 -> 1.03: 300 games 5.96
 // goals, SOG 30.7, sv .907, PP 19.6% (200 before: 5.69, 28.6, .905, 20.4%).
 // Each key at 0 (slotbh / slotg / osb 1, bktc 1.5) is the engine as it was)
-const TUNE = { sgate: 0.18, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.03, patience: 0.45, bkw: 2.6, blk: 0.22, pp: 0.5, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5, splace: 1, sspd: 1, lnb: 0.9, bhd: 34, bhs: 1, wsnap: 0.14, msh: 0.05, dfnp: 0.3, gsf: 1, gclr: 1, frzw: 4.5, dgap: 62, bkz: 86, bktc: 1.2, slotsh: 1.0, psc: 0, slotbh: 0.85, slotg: 0.15, osb: 2.0, gapt: 5.5, gapv: 0.2, gapl: 0.1, gaps: 8 };   // (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
+const TUNE = { sgate: 0.18, entry: 0.15, entryc: 0.15, hit: 0.021, fhit: 0.7, stickPen: 0.0034, hitPen: 0.045, steal: 0.03, poke: 0.032, nudge: 0.024, goal: 1.07, patience: 0.45, bkw: 2.6, blk: 0.22, pp: 0.5, comp: 0.4, gout: 0.6, xpass: 0.8, dpass: 0.02, dshot: 0.065, sbias: 0.36, grip: 1.07, brake: 1.15, cyc: 0.08, office: 0.08, regroup: 0.15, bkcap: 15.5, bkpc: 0.4, ptq: 0.1, dkpt: 1.5, dkrush: 0.12, pks: 0.9, pkh: 0.35, bmp: 0.07, shove: 0.05, pinx: 1.2, dzhi: 1, hitd: 2.0, getup: 1.2, benchby: 5, splace: 1, sspd: 1, lnb: 0.9, bhd: 34, bhs: 1, wsnap: 0.14, msh: 0.05, dfnp: 0.3, gsf: 1, gclr: 1, frzw: 4.5, dgap: 62, bkz: 86, bktc: 1.2, slotsh: 1.0, psc: 0, slotbh: 0.85, slotg: 0.15, osb: 2.0, gapt: 5.5, gapv: 0.2, gapl: 0.1, gaps: 8, dpow: 1, dacc: 1, dspd: 1, dblk: 1, dstk: 1 };   // (2026-10-15, dpow / dacc / dspd / dblk / dstk: the measured detail ratings in play, engine.gd; shots on net went in ~4% less often with them, planned sh% .0895 -> .0857 over 560 paired games, so goal 1.03 -> 1.07 - each key at 0 with goal 1.03 is the engine as it was) (2026-10: goal .76, sgate .365, dpass .2, dshot .065, pp 1.05, regroup .35 made 7 goals a game, a 28% power play and D 35% of all points with 48% of the assists; now ~6.0, ~22%, ~29%) (2026-10-05, the AI audit's fixes - the power play back at 5-on-4, coverage held on passes and rushes: goal .65 / pp 1.0 gave ~5.0 goals and a 32% power play; at .78 / .65, 5.75 and 24% over 120 games; .80 / .58 gave 5.65, 20.1%, sv .899 over 160; .83 gave 5.6, then the pacing (cruising into position, hustling back) 5.35 over 120 - now .88 / .58) (2026-10-05, the point: dshot is now a D's own shot rate per second at the point; D-to-D swings 175 -> 75 a game; sgate .34 / dshot .08 gave 119 attempts, 62 SOG, 6.1 goals, a 20% power play over 60 games) (then the defending zone - sticks in the lanes, quicker plays on the puck, a man who stays on the carrier, cyc .3 -> .12 - cost goals: goal .7 / 1.06 / 1.15 / 1.4 gave 4.3 / 5.5 / 6.7 / 7.8 a game; now 1.1 / pp .5)
 const PEN_TYPES = ['Tripping', 'Hooking', 'Slashing', 'Holding', 'Roughing', 'Interference', 'High-sticking', 'Cross-checking', 'Holding the stick', 'Boarding'];
 const XK = [0, .6, 1, 1.45]; const xk = t => XK[t === true ? 2 : t] || 0; const xs = (t, v) => Math.max(.1, 1 + (v - 1) * xk(t)); // X-Factor tier scaling (bronze/silver/gold)
 const ROLES = { 5: ['C', 'LW', 'RW', 'LD', 'RD'], 4: ['C', 'LW', 'LD', 'RD'], 3: ['C', 'LD', 'RD'] };
@@ -1698,6 +1698,10 @@ const hgWrap = a => { a = (a + Math.PI) % HG_TAU; if (a < 0) a += HG_TAU; return
 const hgToward = (a, b, d) => (Math.abs(b - a) <= d ? b : a + Math.sign(b - a) * d);
 const hgSmooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 const HG_RKEYS = ['ska', 'sht', 'pas', 'hnd', 'def', 'chk', 'fo', 'end', 'dis', 'ref', 'pos', 'reb'];
+// a measured detail rating (League.engineTeam puts them in r: dwp / dsp shot power, dwa / dsa accuracy, dspd speed, dacl
+// acceleration, dblk shot blocking, dstk stick checking) moved toward by w from the core rating it stands in for; the core
+// rating when he has none (a made-up player) or w is 0 (engine.gd _det; TUNE dpow / dacc / dspd / dblk / dstk)
+const hgDet = (R, k, core, w) => { const c = R[core]; return w > 0 && R[k] != null ? c + (R[k] - c) * w : c; };
 const hgFlat = a => { const o = []; if (!a) return o; for (const l of a) { if (Array.isArray(l)) o.push(...l); else o.push(l); } return o; };
 const hgAt = (a, i) => { if (!a || i >= a.length) return null; const v = a[i]; return v == null || v === '' ? null : v; };
 const isD = e => e.role === 'LD' || e.role === 'RD';
@@ -3398,15 +3402,17 @@ class HockeyGame {
       const sd = segDist(x.x, x.y, e.x, e.y, gx, 0);
       if (lnb > 0 && !x.isG && sd[1] > 0.08 && sd[1] < 0.92 && sd[0] < lnb) { if (sd[1] < bt || !onLine) { bt = sd[1]; blocker = x; onLine = true; } continue; }
       if (onLine) continue;
-      if (sd[1] > 0.08 && sd[1] < 0.92 && sd[0] < lw && rnd() < TUNE.blk + x.R.def / 500 + (isD(x) ? 0.06 : 0) + ('wall' in x.X ? 0.12 * xk(x.X.wall) : 0)) {
+      if (sd[1] > 0.08 && sd[1] < 0.92 && sd[0] < lw && rnd() < TUNE.blk + ((TUNE.dblk || 0) > 0 && x.R.dblk != null ? 65 + (hgDet(x.R, 'dblk', 'def', TUNE.dblk) - 65) / Math.max(TUNE.comp, 0.05) : x.R.def) / 500 + (isD(x) ? 0.06 : 0) + ('wall' in x.X ? 0.12 * xk(x.X.wall) : 0)) {
         if (sd[1] < bt) { bt = sd[1]; blocker = x; }
       }
     }
-    let pMiss = clamp(0.36 - (s - 60) / 260 - q * 0.08 + (1 - en) * 0.06, 0.16, 0.48);   // tired: less accurate
     let pGoal = (0.022 + 0.235 * Math.pow(q, 1.35)) * (1 + (s - 65) / 70) * clamp(1 - (gR - 70) / 48, 0.45, 1.6);
     // the kind of shot (shotKind), picked when he started winding up
     const kind = e.wind_k || this.shotKind(e, t); e.wind_k = '';
     const slapT = kind === 'slap', bh = kind === 'backhand', snap = kind === 'snap';
+    // on net or not: his accuracy with that kind of shot (TUNE.dacc, engine.gd: a slapper off his slap-shot accuracy, the rest his wrist-shot accuracy)
+    const sa = hgDet(r, slapT ? 'dsa' : 'dwa', 'sht', TUNE.dacc || 0) * (0.9 + 0.1 * en);
+    let pMiss = clamp(0.36 - (sa - 60) / 260 - q * 0.08 + (1 - en) * 0.06, 0.16, 0.48);   // tired: less accurate
     if (slapT) { pMiss = Math.min(0.5, pMiss + 0.05); pGoal *= 1.08; }
     else if (bh) { pMiss = Math.min(0.5, pMiss + 0.04); pGoal *= 0.88; }
     else pMiss = Math.max(0.12, pMiss - 0.03);
@@ -3462,9 +3468,12 @@ class HockeyGame {
     if (outcome === 'block' && onLine && (blocker.team === t.side || rnd() < 0.3)) outcome = 'deflect';
     const label = slapT ? (e.one_t && gdist < 22 ? 'tap' : 'slap') : bh ? 'backhand' : snap ? 'snap' : 'wrist';
     let sp = (70 + s * 0.3) * (slapT ? 1.16 : bh ? 0.85 : snap ? 1.05 : 1);
-    if ((TUNE.sspd || 0) > 0) sp = this.shotSpeed(e, label, s, false);
+    // (TUNE.dpow, engine.gd: how hard by that kind's own power - a slapper off his slap-shot power, the rest his wrist-shot power - on the GM app's scale, not the compressed one)
+    const pk = slapT ? 'dsp' : 'dwp', pw = (TUNE.dpow || 0) > 0 && r[pk] != null ? (65 + (hgDet(r, pk, 'sht', TUNE.dpow) - 65) / Math.max(TUNE.comp, 0.05)) * (0.9 + 0.1 * en) : s;
+    if ((TUNE.sspd || 0) > 0) sp = this.shotSpeed(e, label, pw, false);
     let ty = 0, tz = 0.5, saveK = '';
-    if ((TUNE.splace || 0) > 0) { const tg = this.shotTarget(outcome, e, t, o, gdist / Math.max(sp, 30)); ty = tg[0]; tz = tg[1]; saveK = tg[2]; }
+    const ak = (TUNE.dacc || 0) > 0 ? clamp((sa - 64) / 12, -1, 1) : 0;   // (TUNE.dacc: how near the corners his goals and how near the net his misses go)
+    if ((TUNE.splace || 0) > 0) { const tg = this.shotTarget(outcome, e, t, o, gdist / Math.max(sp, 30), ak); ty = tg[0]; tz = tg[1]; saveK = tg[2]; }
     else if (outcome === 'goal') { ty = (rnd() < 0.5 ? -1 : 1) * (1 + rnd() * 1.7); tz = rnd() * 3.2; }
     else if (outcome === 'save') { ty = o.g.y + (rnd() - 0.5) * 2; tz = rnd() * 2.5; }
     else if (outcome === 'miss') { ty = (rnd() < 0.5 ? -1 : 1) * (3.6 + rnd() * 4); tz = rnd() * 4; }
@@ -3485,8 +3494,10 @@ class HockeyGame {
   // where on (or off) the net it goes, by outcome (engine.gd _shot_target, TUNE.splace): goals where the goalie isn't (high
   // corners ~38%, the five-hole ~10% with him down or moving, low and mid corners); saves around him by what stops it
   // (save_k); misses a third over the bar; the iron a post or the crossbar. [ty, tz, save kind]
-  shotTarget(outcome, e, t, o, ft) {
+  // ak (TUNE.dacc, -1..1): his accuracy - an accurate shooter's goals sit tighter to the posts and the bar or the ice, his misses only just wide or over
+  shotTarget(outcome, e, t, o, ft, ak = 0) {
     const g = o.g, gy = clamp(g.y + g.vy * ft * 0.6, -2.5, 2.5);
+    const tight = u => ak === 0 ? u : ak > 0 ? 1 - (1 - u) * (1 - 0.55 * ak) : u * (1 + 0.55 * ak), near = u => ak === 0 ? u : ak > 0 ? u * (1 - 0.6 * ak) : 1 - (1 - u) * (1 + 0.6 * ak);
     const gp = this.pl(g.pid), gs = (gp && gp.sh === 'R') ? t.d : -t.d;   // his glove side (world y)
     let ty = 0, tz = 0.5, k = '';
     if (outcome === 'goal') {
@@ -3495,9 +3506,9 @@ class HockeyGame {
       const r = rnd(), down = hyp(g.vx, g.vy) > 4 || this.goalieOff(t, e.x, e.y) > 0.3;
       if (r < 0.25 && down) { ty = gy + (rnd() - 0.5) * 0.5; tz = 0.08 + rnd() * 0.45; }   // five-hole (him down or moving across)
       else {
-        ty = side * (2 + rnd() * 0.8);
+        ty = side * (2 + tight(rnd()) * 0.8);
         if (Math.abs(ty - gy) < 1.4) ty = -ty;
-        tz = r >= 0.1 && r < 0.48 ? 3 + rnd() * 0.85 : r < 0.75 ? 0.05 + rnd() * 0.9 : 1 + rnd() * 2;
+        tz = r >= 0.1 && r < 0.48 ? 3 + tight(rnd()) * 0.85 : r < 0.75 ? 0.05 + near(rnd()) * 0.9 : 1 + rnd() * 2;
       }
     } else if (outcome === 'save') {
       const r2 = rnd();
@@ -3513,8 +3524,8 @@ class HockeyGame {
         if (this.gloveSide(t, g, e.x, e.y, ty) !== wantG) { const ty2 = clamp(2 * gy - ty, -2.9, 2.9); if (this.gloveSide(t, g, e.x, e.y, ty2) === wantG) ty = ty2; else k = wantG ? 'blocker' : 'glove'; }
       }
     } else if (outcome === 'miss') {
-      if (rnd() < 0.33) { ty = (rnd() - 0.5) * 6.4; tz = 4.1 + rnd() * 1.9; }
-      else { ty = (rnd() < 0.5 ? -1 : 1) * (3.4 + rnd() * 4); tz = rnd() * 4; }
+      if (rnd() < 0.33) { ty = (rnd() - 0.5) * 6.4; tz = 4.1 + near(rnd()) * 1.9; }
+      else { ty = (rnd() < 0.5 ? -1 : 1) * (3.4 + near(rnd()) * 4); tz = rnd() * 4; }
     } else if (outcome === 'post') {
       if (rnd() < 0.3) { ty = (rnd() - 0.5) * 5.6; tz = 4; }
       else { ty = (rnd() < 0.5 ? -1 : 1) * 3; tz = rnd() * 3.9; }
@@ -3877,6 +3888,7 @@ class HockeyGame {
         const phys = this.tac(tt, 'phys') / 50, aggr = this.tac(tt, 'aggr') / 50;
         const beaten = c.deke > 0 && rnd() < clamp(0.55 + (rc.hnd - rx.def) / 120, 0.25, 0.85);
         const thief = 'thief' in x.X ? xs(x.X.thief, 1.35) : 1, mitts = 'mitts' in c.X ? xs(c.X.mitts, 0.65) : 1;
+        const skChk = hgDet(rx, 'dstk', 'def', TUNE.dstk || 0);   // (TUNE.dstk: his stick checking for the poke and the stick check; his defence when he has none)
         if (dd >= 3.6) {   // poke check from stick's length, in front of the carrier
           // (TUNE.pkv, engine.gd) any defender the carrier comes within a stick's length of reaches for it now and then too,
           // each jab's success scaled down (TUNE.pks) so the pucks won stay about the same
@@ -3885,7 +3897,7 @@ class HockeyGame {
           if (((x.x - c.x) * Math.cos(c.hd) + (x.y - c.y) * Math.sin(c.hd)) / dd < (ownEnd ? 0.1 : 0.35)) continue;
           x.cool = ownEnd ? 0.55 : 0.8;
           this.bump('poke_try');
-          const pPoke = TUNE.poke * aggr * clamp(1 + (rx.def - rc.hnd) / 45, 0.25, 2) * thief * mitts * (beaten ? 0.2 : 1) * (0.7 + 0.3 * x.E.v) * (1.3 - 0.3 * c.E.v) * (hyp(c.vx, c.vy) < 4 ? 2.2 : 1) * (ownEnd ? 1 : 0.65) * (TUNE.pks != null ? TUNE.pks : 1);   // fresh legs win the puck; standing still with it, easy to poke away (a third less outside his own end)
+          const pPoke = TUNE.poke * aggr * clamp(1 + (skChk - rc.hnd) / 45, 0.25, 2) * thief * mitts * (beaten ? 0.2 : 1) * (0.7 + 0.3 * x.E.v) * (1.3 - 0.3 * c.E.v) * (hyp(c.vx, c.vy) < 4 ? 2.2 : 1) * (ownEnd ? 1 : 0.65) * (TUNE.pks != null ? TUNE.pks : 1);   // fresh legs win the puck; standing still with it, easy to poke away (a third less outside his own end)
           x.poke_t = 0.3; x.poke_vic = c;   // the jab, hit or miss: a viewer can draw it off poke_t (seconds left) / poke_vic (engine.gd: poke_go + the poke_try event)
           if (rnd() < pPoke) {
             this.bump('poke'); p.owner = null; c.cool = 0.35;
@@ -3909,7 +3921,7 @@ class HockeyGame {
         // all); in open ice he usually sees it coming. (Nine in ten were open-ice hits.)
         pHit *= (boards ? 3.0 : 0.15) * (x.press && c.x * this.T[c.team].d < -25 ? 1.8 : 1) * this.deter(c);
         let pNudge = TUNE.nudge * clamp(1 + edge, 0.3, 2) * (boards ? 1.4 : 1) * crease;
-        let pSteal = (TUNE.steal + (rx.def - rc.hnd) / 260 + (aggr * 50 - 50) / 900) * thief * mitts * (0.7 + 0.3 * x.E.v) * (1.3 - 0.3 * c.E.v);
+        let pSteal = (TUNE.steal + (skChk - rc.hnd) / 260 + (aggr * 50 - 50) / 900) * thief * mitts * (0.7 + 0.3 * x.E.v) * (1.3 - 0.3 * c.E.v);
         if (hyp(c.vx, c.vy) < 4) { pSteal *= 2.2; pNudge *= 1.5; }   // a puck sitting still with a stick on it is there to be taken
         if (!ownEnd) { pSteal *= 0.65; pNudge *= 0.65; }   // outside the checker's own end a third less (possessions were ~5 s, twice the NHL's entries and passes)
         // shielding: a checker beside him has the carrier's body between his stick and the puck; he has to win it with the body
@@ -4190,7 +4202,9 @@ class HockeyGame {
       const r = e.R, en = e.E.v;
       // skating sets top speed (about 20% from slow to fast) and, with body weight, how hard he accelerates
       const wk = e._wk || (e._wk = Math.pow(200 / (e.W || 200), 0.35));   // (fixed for the game: cached)
-      let maxS = e.isG ? 14 : (28.6 + (r.ska - 65) * 0.22) * (1 - ((e.W || 200) - 200) / 2000) * (0.8 + 0.2 * en) * ('jets' in e.X ? xs(e.X.jets, 1.05) : 1);
+      // (TUNE.dspd: top speed off his Speed, the push-off off his Acceleration; his skating for both when he has neither)
+      const sTop = hgDet(r, 'dspd', 'ska', TUNE.dspd || 0), sAcl = hgDet(r, 'dacl', 'ska', TUNE.dspd || 0);
+      let maxS = e.isG ? 14 : (28.6 + (sTop - 65) * 0.22) * (1 - ((e.W || 200) - 200) / 2000) * (0.8 + 0.2 * en) * ('jets' in e.X ? xs(e.X.jets, 1.05) : 1);
       if (e === p.owner) maxS *= 0.9;
       if (e === p.owner && e.walk_on) maxS = Math.min(maxS, 12);   // walking the line: a sideways glide, crossovers, not a sprint
       // a checker leaning on him in their end: shielding it he can't skate away at near full speed
@@ -4258,7 +4272,7 @@ class HockeyGame {
       }
       const sp0 = hyp(e.vx, e.vy);
       if (e.isG || dead || !HockeyGame.MOMENTUM) {   // goalies and set-ups at stoppages: steer straight
-        const dvx = tvx - e.vx, dvy = tvy - e.vy, acc = (e.isG ? 40 : (16 + r.ska * 0.3) * wk * (0.75 + 0.25 * en)) * dt, dm = hyp(dvx, dvy);
+        const dvx = tvx - e.vx, dvy = tvy - e.vy, acc = (e.isG ? 40 : (16 + sAcl * 0.3) * wk * (0.75 + 0.25 * en)) * dt, dm = hyp(dvx, dvy);
         if (dm > acc) { e.vx += dvx / dm * acc; e.vy += dvy / dm * acc; } else { e.vx += dvx; e.vy += dvy; }
       } else {
         // skating physics: the body only changes velocity through forces it can actually put into the ice.
@@ -4268,7 +4282,7 @@ class HockeyGame {
         //            a wider arc or scrubs speed to tighten it
         //  brake   - snowplough / hockey stop; strongest when he wants to go back the way he came
         //  glide   - ice friction and air drag: coasting slowly bleeds speed
-        const A0 = (16 + r.ska * 0.3) * wk * ('jets' in e.X ? xs(e.X.jets, 1.08) : 1) * (0.75 + 0.25 * en) * (e.bkp > 0 && e.bkp < 0.35 ? (TUNE.bkpc != null ? TUNE.bkpc : 1) : 1);   // tired legs push off slower; turning his hips in a pivot, no push for a moment
+        const A0 = (16 + sAcl * 0.3) * wk * ('jets' in e.X ? xs(e.X.jets, 1.08) : 1) * (0.75 + 0.25 * en) * (e.bkp > 0 && e.bkp < 0.35 ? (TUNE.bkpc != null ? TUNE.bkpc : 1) : 1);   // tired legs push off slower; turning his hips in a pivot, no push for a moment
         const grip = (30 + r.ska * 0.22) * TUNE.grip, brake = (30 + r.ska * 0.24) * TUNE.brake;
         let ax = (tvx - e.vx) / 0.3, ay = (tvy - e.vy) / 0.3;   // what he'd like to do over the next ~0.3 s
         if (sp0 > 3) {
@@ -5869,6 +5883,10 @@ class League {
       if (p.pos === 'G') bump(r, ['ref', 'pos'], cb.g * .8); else { bump(r, ['sht', 'pas', 'hnd'], cb.off * .8); bump(r, ['def'], cb.def * .8); bump(r, ['fo'], cb.fo); bump(r, ['end'], cb.end); }
       // (a forward line's chemistry moves its offence only - shooting, passing, puck skills; a pair's moves all of it)
       const c = unitChem[id]; if (c != null) { const d = (c - 50) / 50 * 3; for (const k of (unitF[id] ? ['sht', 'pas', 'hnd'] : ['ska', 'sht', 'pas', 'hnd', 'def'])) if (r[k] != null) r[k] = Math.max(1, Math.min(99, r[k] + d)); }
+      // the detail ratings read from his own numbers (rxOverrides: shot power and accuracy by type, speed, acceleration, shot
+      // blocking, stick checking), off tonight's ratings so the style, coaching and chemistry above move them too; both
+      // engines play them (TUNE dpow / dacc / dspd / dblk / dstk). A made-up player has none and plays on his core ratings
+      if (p.pos !== 'G') { const ov = rxOverrides(p); if (ov) for (const [lab, k] of ENG_DET) if (ov[lab]) { const v = ov[lab](r, p); if (Number.isFinite(v)) r[k] = Math.round(Math.max(20, Math.min(99, v)) * 10) / 10; } }
       const [ht, wt] = this.bodyOf(p);
       players[id] = { id, first: p.first, last: p.last, pos: p.pos, num: p.num, r, arch: p.arch, xf: p.xf || xfOf(p), xt: xfTiers(p), ht, wt, sh: p.sh || 'R' };
       if (p.skin) players[id].skin = p.skin;   // sampled from his headshot (photoSkin), for the 3D model
@@ -18475,6 +18493,8 @@ function rxOverrides(p) {
   if (x.dmi != null) o['Discipline'] = r => .3 * r.dis + .7 * Mz(x.dmi, r, 'dis');
   return rsbDet(p, o);
 }
+// the measured detail ratings the game engines play (League.engineTeam -> r): profile label, engine key
+const ENG_DET = [['Wrist Shot Power', 'dwp'], ['Slap Shot Power', 'dsp'], ['Wrist Shot Accuracy', 'dwa'], ['Slap Shot Accuracy', 'dsa'], ['Speed', 'dspd'], ['Acceleration', 'dacl'], ['Shot Blocking', 'dblk'], ['Stick Checking', 'dstk']];
 // size and injury history for the bodily detail ratings, for anyone whose height and weight are known
 function bodyOverrides(p, o) {
   if (p.pos === 'G') return o;
